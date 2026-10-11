@@ -1,0 +1,10 @@
+#!/bin/sh
+# Runs bruster for this OS. macOS has the native WKWebView build. A Linux
+# container has no display, so its build runs under a virtual one (Xvfb).
+REPO="$HOME/Developer/bruster"
+case "$(uname -s)" in
+  Darwin) exec "$REPO/target/release/bruster" "$@" ;;
+  *)      # Without a locale WebKit sends Accept-Language: C and Intl throws.
+          export LANG="${LANG:-en_US.UTF-8}"
+          exec xvfb-run -a "$REPO/target/linux/bruster" "$@" ;;
+esac
