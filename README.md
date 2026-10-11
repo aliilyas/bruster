@@ -5,7 +5,7 @@
     <strong>Native webview browser driven by an agent over JSON lines on stdio.</strong>
   </p>
   <p>
-    WKWebView · WebKitGTK · WebView2 &mdash; no Chromium download, no Node, one process under 1&nbsp;MB.
+    WKWebView · WebKitGTK · WebView2. No Chromium download. No Node. One process of less than 1&nbsp;MB.
   </p>
   <p>
     <a href="https://github.com/aliilyas/bruster/actions/workflows/ci.yml"><img src="https://github.com/aliilyas/bruster/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
@@ -28,23 +28,23 @@
 
 <br>
 
-bruster wraps the browser engines your operating system already ships. It runs
-as a single, lightweight process and speaks JSON lines on stdin/stdout —
-perfect for agents, scripts and test harnesses. With `--mcp` it exposes
-every method as a tool.
+bruster uses the browser engines that your operating system already supplies.
+It is one lightweight process. It reads and writes JSON lines on stdin and
+stdout. This design is good for agents, scripts, and test harnesses. The
+`--mcp` option exposes every method as a tool.
 
 ## Why bruster?
 
-- **No Chromium.** Uses WKWebView (macOS), WebKitGTK (Linux) and WebView2 (Windows) via [wry](https://github.com/tauri-apps/wry).
-- **Tiny footprint.** One release binary, usually **< 1&nbsp;MB**; no bundled runtime or download on first run.
-- **Agent-ready.** First-class [MCP](#mcp) support (`--mcp`) with screenshots as image content and page events as notifications.
-- **Cross-platform.** Prebuilt for macOS (arm64, x86_64), Linux (x86_64, arm64) and Windows (x86_64).
-- **Practical API.** Navigate, snapshot, click, fill forms, drag, upload, take screenshots, inspect network/console, manage tabs, persist sessions with `--profile`.
-- **Deterministic and safe.** Every call is a line-based JSON request/response. `beforeunload` is disarmed and dialogs never block.
-- **Fast.** Persistent HTTP cache and profiles help repeat visits. The first tab warms `about:blank` while the agent sets up.
+- **No Chromium.** bruster uses WKWebView on macOS, WebKitGTK on Linux, and WebView2 on Windows. It uses [wry](https://github.com/tauri-apps/wry) to control them.
+- **Small size.** One release binary, usually **< 1&nbsp;MB**. There is no bundled runtime and no download on the first run.
+- **Agent support.** [MCP](#mcp) support with `--mcp`. Screenshots return as image content, and page events return as notifications.
+- **Cross-platform.** Prebuilt for macOS (arm64, x86_64), Linux (x86_64, arm64), and Windows (x86_64).
+- **Practical API.** Navigate, snapshot, click, fill forms, drag, upload, take screenshots, inspect the network and console, manage tabs, and keep a session with `--profile`.
+- **Deterministic and safe.** Each call is one line-based JSON request and response. `beforeunload` is disarmed, and dialogs never block.
+- **Fast.** A persistent HTTP cache and profiles make repeat visits faster. The first tab loads `about:blank` while the agent starts.
 
 > [!TIP]
-> Live performance numbers (cold start, page load, snapshot and idle memory) are published at [aliilyas.github.io/bruster/](https://aliilyas.github.io/bruster/).
+> Live performance numbers (cold start, page load, snapshot, and idle memory) are published at [aliilyas.github.io/bruster/](https://aliilyas.github.io/bruster/).
 
 ## Install
 
@@ -67,7 +67,7 @@ cargo build --release
 ```
 
 > [!NOTE]
-> **Linux requirements.** WebKitGTK 4.1 is needed at runtime: `apt install libwebkit2gtk-4.1-0`, `apk add webkit2gtk-4.1`, or `dnf install webkit2gtk4.1`. Without a desktop session, bruster automatically re-runs under `xvfb-run -a` when no `DISPLAY` is set.
+> **Linux requirements.** WebKitGTK 4.1 is necessary at run time. Install it with one of these commands: `apt install libwebkit2gtk-4.1-0`, `apk add webkit2gtk-4.1`, or `dnf install webkit2gtk4.1`. If the system has no desktop session, bruster starts again under `xvfb-run -a` when `DISPLAY` is not set.
 
 ## Quickstart
 
@@ -86,7 +86,7 @@ Then send JSON objects, one per line:
 {"id":4,"method":"close"}
 ```
 
-You'll receive results and events back on stdout:
+You receive the results and events on stdout:
 
 ```json
 {"event":"load","tab":1,"url":"https://example.com/"}
@@ -97,9 +97,9 @@ You'll receive results and events back on stdout:
 
 ## MCP
 
-With `--mcp`, bruster speaks the Model Context Protocol over stdio. Every
-native method becomes a tool; screenshots return as image content and page
-events come through as notifications.
+With `--mcp`, bruster uses the Model Context Protocol on stdio. Every native
+method becomes a tool. Screenshots return as image content, and page events
+return as notifications.
 
 ### Common MCP client configs
 
@@ -119,7 +119,7 @@ codex mcp add bruster -- bruster --mcp --quiet           # Codex CLI
 { "servers": { "bruster": { "type": "stdio", "command": "bruster", "args": ["--mcp", "--quiet"] } } }
 ```
 
-`--mcp` keeps windows hidden; add `--visible` to watch the browser.
+`--mcp` keeps the windows hidden. Add `--visible` to see the browser.
 
 ## Run
 
@@ -129,26 +129,26 @@ bruster [--mcp] [--hidden|--visible] [--quiet] [options]
 
 | flag | effect |
 |---|---|
-| `--mcp` | speak Model Context Protocol on stdio instead of the native protocol; implies `--hidden` |
-| `--hidden` / `--visible` | park windows off-screen / show them |
-| `--quiet` | stderr to `/dev/null`; mutes GL, ALSA and GTK noise |
+| `--mcp` | use the Model Context Protocol on stdio instead of the native protocol. This option also sets `--hidden` |
+| `--hidden` / `--visible` | move the windows off-screen / show the windows |
+| `--quiet` | send stderr to `/dev/null`. This mutes GL, ALSA, and GTK noise |
 | `--viewport WxH` | initial window size, default 1280x800 |
-| `--user-agent UA` | override the user agent |
-| `--profile DIR` | persistent cookies and storage |
+| `--user-agent UA` | replace the user agent |
+| `--profile DIR` | keep cookies and storage between runs |
 | `--proxy URL` | `http://host:port` or `socks5://host:port` |
-| `--init-script FILE` | JavaScript run in every page before its own scripts |
+| `--init-script FILE` | JavaScript that runs in every page before its own scripts |
 | `--insecure` | ignore TLS errors (Linux only) |
-| `--no-images` | do not load images (Linux only); pages load ~30% faster |
+| `--no-images` | do not load images. Pages load about 30% faster (Linux only) |
 
-Linux rendering is software only under Xvfb (halves memory). Set `BRUSTER_NO_XVFB=1` to stop automatic `xvfb-run -a`.
+Under Xvfb, Linux uses software rendering only, which halves memory. Set `BRUSTER_NO_XVFB=1` to prevent the automatic `xvfb-run -a`.
 
 ## Tests
 
-`tests/run_all.sh [--rounds N] [--no-e2e]` runs the full suite: build, unit tests, smoke, edge, leftover-process check, MCP launch, and e2e tests. On Linux, run it under `xvfb-run -a`. CI runs builds, tests and publishes release archives on `v*` tags.
+`tests/run_all.sh [--rounds N] [--no-e2e]` runs the full suite. The suite does a build, unit tests, smoke tests, edge tests, a leftover-process check, an MCP launch check, and end-to-end tests. On Linux, run the script under `xvfb-run -a`. CI builds and tests every platform. CI also publishes release archives on `v*` tags.
 
 ## Protocol
 
-One JSON object per line in both directions. Elements are addressed by `{"selector": "css"}` or `{"ref": "eN"}` from the last `snapshot`/`find`. With `format: "text"`, a snapshot returns one line per element:
+One JSON object per line, in both directions. Elements are addressed by `{"selector": "css"}` or by `{"ref": "eN"}` from the last `snapshot`/`find`. With `format: "text"`, a snapshot returns one line per element:
 
 ```text
 https://example.com/
@@ -160,19 +160,19 @@ e4 checkbox "Remember me" checked=false
 ```
 
 > [!NOTE]
-> Same-origin hrefs lose the origin in the text format. Alerts/prompts never block — they're answered according to the current `dialog` setting and reported as `dialog` events. `beforeunload` handlers are disarmed.
+> Same-origin hrefs lose the origin in the text format. Alert and prompt dialogs never block. bruster answers them as the current `dialog` setting specifies, and reports them as `dialog` events. `beforeunload` handlers are disarmed.
 
 ## API
 
 | method | params | result |
 |---|---|---|
-| `navigate` | `url`, `until?` (`load` default, `dom`, `idle`), `timeout?` ms (default 30000) | `{tab, url}` on load/DOM/idle, or fails on timeout, DNS/error, download (Linux) |
-| `reload` `back` `forward` | — | `{url}` or `null` if nowhere to go |
-| `url` `title` | — | string |
-| `eval` | `expression` | JSON value; promises awaited; compiled as script |
+| `navigate` | `url`, `until?` (`load` default, `dom`, `idle`), `timeout?` ms (default 30000) | `{tab, url}` on load/DOM/idle, or a failure on timeout, DNS/error, or download (Linux) |
+| `reload` `back` `forward` | none | `{url}`, or `null` if there is nowhere to go |
+| `url` `title` | none | string |
+| `eval` | `expression` | JSON value. Promises are awaited. Compiled as a script |
 | `snapshot` | `selector?`, `max?` (1000), `boxes?`, `format?` (`json` default, `text`) | `{url,title,elements[],truncated?}` or text lines |
 | `find` | `text?` or `regex?` + snapshot params | filtered snapshot |
-| `screenshot` | `path?`, `full?`, `clip?` `{x,y,width,height}` | `{path,bytes}` or `{png_base64}`; full pages capped at 16000 px |
+| `screenshot` | `path?`, `full?`, `clip?` `{x,y,width,height}` | `{path,bytes}` or `{png_base64}`. Full pages are capped at 16000 px |
 | `rect` | target | `{x,y,width,height}` viewport-relative |
 | `click` | target or `x,y`; `force?`, `timeout?` | `null` |
 | `hover` | target | `null` |
@@ -183,47 +183,47 @@ e4 checkbox "Remember me" checked=false
 | `select` | target, `value` | selected values |
 | `check` | target, `checked?` | bool |
 | `drag` | `from` target, `to` target | `null` |
-| `upload` | target, `paths[]` | file names set on input |
+| `upload` | target, `paths[]` | file names set on the input |
 | `scroll` | target or `x,y` | `{x,y}` |
-| `resize` | `width`, `height` (1–16000) | `{width,height}` |
+| `resize` | `width`, `height` (1 to 16000) | `{width,height}` |
 | `text` `html` | target | string |
 | `attr` | target, `name` | string or null |
 | `count` | `selector` | number |
 | `wait_for` | `selector`/`ref` + `state?` (visible, attached, hidden), `text`, `textGone`, `url`, `idle`, `time` ms; `timeout?` ms | `null` |
 | `network` | `clear?` | `[{index,type,method,url,status,ms}]` |
-| `network_request` | `index` | one entry with `req_headers`, `res_headers`, `body` (first 16 KB) |
+| `network_request` | `index` | one entry with `req_headers`, `res_headers`, and `body` (first 16 KB) |
 | `console` | `clear?` | `[{level,text,ms}]` console output and uncaught errors |
-| `dialog` | `accept?`, `text?`, `clear?` | dialogs seen; sets answer for next ones |
-| `cookies` | — | list |
+| `dialog` | `accept?`, `text?`, `clear?` | dialogs seen. Sets the answer for the next dialogs |
+| `cookies` | none | list |
 | `set_cookie` | `name`, `value`, `domain?`, `path?` (`/`) | `null` |
-| `new_tab` | `url?` | `{tab}` or `{tab,url}` after load if URL given |
-| `tabs` | — | `[{tab,url,current}]` |
+| `new_tab` | `url?` | `{tab}`, or `{tab,url}` after the load when you give a URL |
+| `tabs` | none | `[{tab,url,current}]` |
 | `switch_tab` | `tab` | `null` |
 | `close_tab` | (uses `tab`) | `null` |
-| `close` | — | exits |
+| `close` | none | exits |
 
 ## Events
 
-`ready`, `navigating`, `load`, `tab_opened`, `tab_closed`, `dialog` (`type`, `message`, `accept`), `tls_error` (Linux), `load_failed` and `download` (Linux).
+`ready`, `navigating`, `load`, `tab_opened`, `tab_closed`, `dialog` (`type`, `message`, `accept`), `tls_error` (Linux), `load_failed`, and `download` (Linux).
 
 ## Limits
 
-- Input is synthetic DOM events (`isTrusted` is false): no `:hover` styles, no native `<select>` popups, no OS-level shortcuts.
-- Network/console logs are patched in-page; no request bodies, reset on navigation. Use `--proxy` for real interception.
-- Cross-origin iframes are out of reach; same-origin iframes and open shadow roots work.
-- `data:` and `file:` pages load but in-page calls get no reply; serve over localhost instead.
-- Native file choosers are not intercepted; use `upload` instead of clicking a file input.
-- Without `--profile`, cookies and storage live for one session.
-- Full-page screenshots capped at 16000 px; on macOS very tall pages may be cut if exceeding screen height.
-- Windows (WebView2): `screenshot` has no `clip`, `--quiet` is a no-op, Linux-only flags have no effect.
-- Under `--hidden`, WebKit timer throttling can slow `setTimeout`-driven pages.
+- Input uses synthetic DOM events (`isTrusted` is false). You do not get `:hover` styles, native `<select>` popups, or OS-level shortcuts.
+- Network and console logs are patched in the page. They contain no request bodies and they reset on navigation. Use `--proxy` for real interception.
+- Cross-origin iframes are out of reach. Same-origin iframes and open shadow roots work.
+- `data:` and `file:` pages load, but in-page calls get no reply. Serve the pages over localhost instead.
+- bruster does not intercept native file choosers. Use `upload` instead of a click on a file input.
+- Without `--profile`, cookies and storage last for one session.
+- Full-page screenshots are capped at 16000 px. On macOS, very tall pages can be cut when they are higher than the screen.
+- On Windows (WebView2), `screenshot` has no `clip`. `--quiet` does nothing. The Linux-only flags have no effect.
+- With `--hidden`, WebKit timer throttling can make `setTimeout`-driven pages slow.
 
 ## Development
 
 - `bin/bruster` runs the development build from this checkout.
-- `tests/run_all.sh` runs build, unit, smoke, edge, MCP launch and e2e.
-- CI (`.github/workflows/ci.yml`) builds all platforms, runs tests, and publishes release archives on `v*` tags.
-- Benchmarks: `scripts/bench.py` measures binary size, cold start, page load, snapshot and idle RSS under Xvfb.
+- `tests/run_all.sh` runs the build, unit tests, smoke tests, edge tests, the MCP launch check, and end-to-end tests.
+- CI (`.github/workflows/ci.yml`) builds all platforms, runs the tests, and publishes release archives on `v*` tags.
+- Benchmarks: `scripts/bench.py` measures binary size, cold start, page load, snapshot, and idle RSS under Xvfb.
 
 ## License
 
