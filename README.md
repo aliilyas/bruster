@@ -6,7 +6,7 @@ over JSON lines on stdio. No Chromium download, no Node, one process under 1 MB.
 ## Install
 
 ```
-curl -fsSL https://raw.githubusercontent.com/iliyasalikhojayev/bruster/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/aliilyas/bruster/main/install.sh | sh
 ```
 
 Prebuilt for macOS (arm64, x86_64) and Linux (x86_64, arm64); Windows builds

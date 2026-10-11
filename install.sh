@@ -1,8 +1,8 @@
 #!/bin/sh
 # Installs the latest bruster release for this OS and CPU into ~/.local/bin
-# (or $BRUSTER_INSTALL_DIR). Usage: curl -fsSL https://raw.githubusercontent.com/iliyasalikhojayev/bruster/main/install.sh | sh
+# (or $BRUSTER_INSTALL_DIR). Usage: curl -fsSL https://raw.githubusercontent.com/aliilyas/bruster/main/install.sh | sh
 set -eu
-REPO=iliyasalikhojayev/bruster
+REPO=aliilyas/bruster
 DIR=${BRUSTER_INSTALL_DIR:-$HOME/.local/bin}
 
 os=$(uname -s); arch=$(uname -m)
