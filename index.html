@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>bruster — native webview browser for agents</title>
+<meta name="description" content="A native webview browser driven by an agent over JSON lines on stdio. No Chromium download, no Node, one process under 1 MB. MCP support out of the box.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🖥️</text></svg>">
+<style>
+  :root{
+    --bg:#0b1020; --panel:#121a2e; --panel2:#0e1526; --ink:#e8ecf8; --muted:#9aa7c7;
+    --accent:#6ee7f7; --accent2:#7dd3fc; --line:#232e4a; --ok:#34d399; --warn:#fbbf24;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink);background:var(--bg)}
+  a{color:var(--accent2);text-decoration:none}
+  a:hover{text-decoration:underline}
+  code,pre{font-family:var(--mono);font-size:.9em}
+  code{background:#1a2440;border:1px solid var(--line);border-radius:6px;padding:.1em .35em}
+  pre{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:1rem;overflow-x:auto}
+  .wrap{max-width:960px;margin:0 auto;padding:0 1.25rem}
+  header.hero{background:radial-gradient(1200px 500px at 50% -10%,#1b2b52 0%,var(--bg) 65%);border-bottom:1px solid var(--line);padding:4.5rem 0 3.5rem;text-align:center}
+  .hero h1{font-size:3.2rem;margin:0;letter-spacing:-.03em}
+  .hero h1 code{background:none;border:none;color:var(--accent);font-size:1em}
+  .hero p.tag{font-size:1.25rem;color:var(--muted);max-width:640px;margin:1rem auto 1.6rem}
+  .pills{display:flex;gap:.5rem;justify-content:center;flex-wrap:wrap}
+  .pill{border:1px solid var(--line);background:#0e1526;border-radius:999px;padding:.35rem .8rem;font-size:.85rem;color:var(--muted)}
+  .pill b{color:var(--ink);font-weight:600}
+  .buttons{margin-top:1.8rem;display:flex;gap:.8rem;justify-content:center;flex-wrap:wrap}
+  .btn{border-radius:999px;padding:.7rem 1.4rem;font-weight:600;display:inline-block}
+  .btn.primary{background:var(--accent);color:#06283a}
+  .btn.ghost{border:1px solid var(--line);color:var(--ink);background:#0e1526}
+  .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin:2.5rem 0 0}
+  .metric{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:1.1rem 1.2rem;text-align:center}
+  .metric .value{font-size:2rem;font-weight:700;letter-spacing:-.02em;color:var(--accent);font-family:var(--mono)}
+  .metric .unit{font-size:1rem;color:var(--accent)}
+  .metric .label{color:var(--muted);font-size:.85rem;margin-top:.3rem}
+  .metric small{display:block;color:#5d6a8c;font-size:.72rem;margin-top:.55rem}
+  section{margin:3.5rem 0}
+  h2{font-size:1.7rem;letter-spacing:-.01em;margin:0 0 1rem}
+  h2 .num{color:#4a5784;margin-right:.6rem;font-family:var(--mono)}
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1rem}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:1.2rem 1.3rem}
+  .card h3{margin:.1rem 0 .5rem;font-size:1.05rem}
+  .card p{margin:0;color:var(--muted);font-size:.95rem}
+  table{width:100%;border-collapse:collapse;font-size:.92rem}
+  th,td{text-align:left;padding:.55rem .8rem;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted);font-weight:600;width:26%}
+  td code{white-space:nowrap}
+  .muted{color:var(--muted)}
+  ol.steps{list-style:none;counter-reset:s;padding:0;margin:0}
+  ol.steps li{counter-increment:s;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:1rem 1.2rem;margin-bottom:.8rem;display:flex;gap:1rem;align-items:flex-start}
+  ol.steps li::before{content:counter(s);background:var(--accent);color:#06283a;font-weight:700;border-radius:8px;min-width:1.8rem;text-align:center;font-family:var(--mono)}
+  footer{border-top:1px solid var(--line);margin-top:4rem;padding:2rem 0 3rem;color:#5d6a8c}
+  footer a{color:#8b9ac0}
+  .updated{font-size:.8rem;color:#5d6a8c}
+  @media(max-width:760px){.metrics,.grid{grid-template-columns:1fr 1fr}}
+  @media(max-width:520px){.metrics,.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <h1><code>bruster</code></h1>
+    <p class="tag">A native webview browser driven by an agent over JSON lines on stdio.
+      No Chromium download, no Node, one process under 1&nbsp;MB.</p>
+    <div class="pills">
+      <span class="pill"><b>macOS</b> arm64 &amp; x86_64</span>
+      <span class="pill"><b>Linux</b> x86_64 &amp; arm64</span>
+      <span class="pill"><b>Windows</b> x86_64</span>
+      <span class="pill">WKWebView · WebKitGTK · WebView2</span>
+      <span class="pill">MCP ✓</span>
+    </div>
+    <div class="buttons">
+      <a class="btn primary" href="https://github.com/aliilyas/bruster">View on GitHub</a>
+      <a class="btn ghost" href="https://github.com/aliilyas/bruster/releases">Releases</a>
+      <a class="btn ghost" href="https://raw.githubusercontent.com/aliilyas/bruster/main/install.sh">Install script</a>
+    </div>
+    <div class="metrics wrap" id="metrics">
+      <div class="metric"><div><span class="value" id="m-binary">–</span><span class="unit"> MB</span></div><div class="label">Release binary</div></div>
+      <div class="metric"><div><span class="value" id="m-rss">–</span><span class="unit"> MB</span></div><div class="label">Idle memory (RSS)</div></div>
+      <div class="metric"><div><span class="value" id="m-page">–</span><span class="unit"> ms</span></div><div class="label">Page load (local file)</div></div>
+      <div class="metric"><div><span class="value" id="m-cold">–</span><span class="unit"> ms</span></div><div class="label">Cold start → ready</div></div>
+      <p class="updated" style="grid-column:1/-1" id="m-foot">Benchmarks run automatically in CI on every push to <code>main</code>.</p>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section>
+  <h2><span class="num">01</span>What is bruster?</h2>
+  <div class="grid">
+    <div class="card"><h3>An OS-native browser engine</h3><p>bruster wraps WKWebView (macOS), WebKitGTK (Linux) and WebView2 (Windows) through <a href="https://github.com/tauri-apps/wry">wry</a>. No bundled Chromium, no Node runtime, nothing to download — just one small native process.</p></div>
+    <div class="card"><h3>A JSON-lines API</h3><p>Drive it from any language: write one JSON object per line to stdin, read results and <code>event</code> objects from stdout. Navigating, finding, clicking, filling, screenshots — everything is a method call.</p></div>
+    <div class="card"><h3>Model Context Protocol</h3><p>Run with <code>--mcp</code> and every method becomes a tool for Claude, Codex, opencode and other MCP clients, including screenshots as image content and page events as notifications.</p></div>
+    <div class="card"><h3>One process, one profile</h3><p>Multiple tabs share cookies and storage. Persistent profiles and HTTP cache make repeat visits noticeably faster. Cleans up after itself; no stray sessions.</p></div>
+  </div>
+</section>
+
+<section id="why-fast">
+  <h2><span class="num">02</span>Why it&#39;s fast</h2>
+  <div class="grid">
+    <div class="card"><h3>No Chromium baggage</h3><p>Uses the engine the OS already ships. One ~<span id="inline-binary">1</span>&nbsp;MB process instead of a hundred megabytes of downloaded runtime. The first tab warms <code>about:blank</code> while the agent sets up.</p></div>
+    <div class="card"><h3>Cached repeats</h3><p>Persistent HTTP cache and profiles mean repeat visits load about <b>2× faster</b>. <code>--no-images</code> can cut page loads by ~30% on content-heavy sites.</p></div>
+    <div class="card"><h3>Software-only rendering mode</h3><p>Under a virtual display (Linux headless), rendering goes software-only, halving memory use.</p></div>
+    <div class="card"><h3>Measured, not claimed</h3><p>The numbers above come from <code>scripts/bench.py</code>, run on every push in GitHub Actions: build, cold start to <code>{"event":"ready"}</code>, local page load, snapshot round-trip and idle RSS.</p></div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="num">03</span>Install</h2>
+  <ol class="steps">
+    <li><div>One-liner for macOS, Linux and Windows prebuilds (dropped into <code>~/.local/bin</code>):<br><pre><code>curl -fsSL https://raw.githubusercontent.com/aliilyas/bruster/main/install.sh | sh</code></pre></div></li>
+    <li><div>Linux needs WebKitGTK 4.1 and, without a desktop session, Xvfb — the script warns you if either is missing. From source: <code>cargo build --release</code>.</div></li>
+    <li><div>Artifacts for every platform are attached to the <a href="https://github.com/aliilyas/bruster/releases">releases page</a>.</div></li>
+  </ol>
+</section>
+
+<section>
+  <h2><span class="num">04</span>Use it from an agent (MCP)</h2>
+  <p>opencode, Claude Desktop, Cursor, Windsurf and Zed share one shape:</p>
+  <pre><code>{ "mcpServers": { "bruster": { "command": "bruster", "args": ["--mcp", "--quiet"] } } }</code></pre>
+  <pre><code>claude mcp add bruster -- bruster --mcp --quiet      # Claude Code
+codex mcp add bruster -- bruster --mcp --quiet       # Codex CLI</code></pre>
+  <pre><code>{ "servers": { "bruster": { "type": "stdio", "command": "bruster", "args": ["--mcp", "--quiet"] } } }   # VS Code</code></pre>
+  <p class="muted">Windows keep hidden under <code>--mcp</code>; add <code>--visible</code> to watch the browser while the agent works.</p>
+</section>
+
+<section>
+  <h2><span class="num">05</span>Flags</h2>
+  <table>
+    <tr><th><code>--mcp</code></th><td>speak MCP on stdio instead of the native protocol; implies <code>--hidden</code></td></tr>
+    <tr><th><code>--hidden</code>/<code>--visible</code></th><td>park windows off-screen / show them</td></tr>
+    <tr><th><code>--quiet</code></th><td>silence GL/ALSA/GTK noise on stderr</td></tr>
+    <tr><th><code>--viewport WxH</code></th><td>initial window size (default 1280x800)</td></tr>
+    <tr><th><code>--user-agent UA</code></th><td>override the user agent</td></tr>
+    <tr><th><code>--profile DIR</code></th><td>persistent cookies and storage</td></tr>
+    <tr><th><code>--proxy URL</code></th><td><code>http://host:port</code> or <code>socks5://host:port</code></td></tr>
+    <tr><th><code>--init-script FILE</code></th><td>JS injected into every page before its own scripts</td></tr>
+    <tr><th><code>--insecure</code></th><td>ignore TLS errors (Linux)</td></tr>
+    <tr><th><code>--no-images</code></th><td>skip image loads, ~30% faster pages (Linux)</td></tr>
+  </table>
+</section>
+
+<section>
+  <h2><span class="num">06</span>Protocol in one screen</h2>
+  <pre><code>→ {"id":1,"method":"navigate","params":{"url":"https://example.com"}}
+← {"event":"load","tab":1,"url":"https://example.com/"}
+← {"id":1,"result":{"url":"https://example.com/"}}
+→ {"id":2,"method":"snapshot"}
+← {"id":2,"result":{"url":"...","title":"...","elements":[{"ref":"e1","role":"heading","name":"Example Domain"}, ...]}}
+→ {"id":3,"method":"click","params":{"ref":"e4"}}
+← {"id":3,"result":null}</code></pre>
+</section>
+
+</main>
+
+<footer class="wrap">
+  <p><b>bruster</b> · native webview browser for agents · <a href="https://github.com/aliilyas/bruster">GitHub</a> ·
+     <a href="https://github.com/aliilyas/bruster/releases">Releases</a> · MIT License</p>
+</footer>
+
+<script>
+function fmt(n){return Number(n).toLocaleString("en-US");}
+function get(id){return document.getElementById(id);}
+fetch("./metrics.json").then(r=>{if(!r.ok)throw 0;return r.json();}).then(m=>{
+  if(m.binary_kb){get("m-binary").textContent=fmt(m.binary_kb);get("inline-binary").textContent=fmt(m.binary_kb);}
+  if(m.idle_rss_mb)get("m-rss").textContent=fmt(m.idle_rss_mb);
+  if(m.page_load_ms)get("m-page").textContent=fmt(m.page_load_ms);
+  if(m.cold_start_ms)get("m-cold").textContent=fmt(m.cold_start_ms);
+  if(m.updated_utc)get("m-foot").textContent = "Measured " + m.updated_utc + " · " + m.environment + (m.commit ? " · commit " + m.commit.slice(0,7) : "");
+}).catch(()=>{get("m-foot").textContent="Benchmarks pending — they'll appear after the next CI run on main.";});
+</script>
+</body>
+</html>
