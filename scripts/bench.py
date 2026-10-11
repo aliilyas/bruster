@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Measure bruster so the project site can publish real speed numbers.
 
-Reads nothing from the network: cold start, page-load latency to a local
-file, a snapshot round-trip, idle memory (RSS), and binary size.
+Serves one tiny page on localhost: cold start, page-load latency, a snapshot
+round-trip, idle memory (RSS), and binary size. Nothing is read from the
+public network.
 
 Usage (run under a display when headless):
     xvfb-run -a python3 scripts/bench.py --binary target/release/bruster \
@@ -16,6 +17,7 @@ Stdlib only.
 import argparse
 import json
 import os
+import socket
 import subprocess
 import sys
 import threading
@@ -24,6 +26,43 @@ from datetime import datetime, timezone
 
 EVT_READY = '"event":"ready"'
 EVT_LOAD = '"event":"load"'
+
+PAGE = (
+    "<html><head><title>bench</title></head><body>"
+    "<h1>bench</h1><p>page load target</p>"
+    "<ul><li>one</li><li>two</li><li>three</li></ul>"
+    "</body></html>"
+)
+
+
+def serve():
+    """Serve PAGE on a random localhost port. Returns (base, stop) where stop
+    shuts the serving thread down."""
+    listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    listener.bind(("127.0.0.1", 0))
+    listener.listen(16)
+    base = f"http://127.0.0.1:{listener.getsockname()[1]}"
+    stop = threading.Event()
+
+    def run():
+        body = PAGE.encode()
+        while not stop.is_set():
+            try:
+                conn, _ = listener.accept()
+            except OSError:
+                return
+            with conn:
+                conn.recv(4096)
+                conn.sendall(
+                    b"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n"
+                    + f"Content-Length: {len(body)}\r\n".encode()
+                    + b"Connection: close\r\n\r\n"
+                    + body
+                )
+
+    threading.Thread(target=run, daemon=True).start()
+    return base, stop
 
 
 def drain(stream, sink):
@@ -95,6 +134,7 @@ def main():
     errs = Lines()
     threading.Thread(target=drain, args=(proc.stdout, lines), daemon=True).start()
     threading.Thread(target=drain, args=(proc.stderr, errs), daemon=True).start()
+    base, stop = serve()
 
     def send(obj):
         proc.stdin.write(json.dumps(obj) + "\n")
@@ -104,22 +144,23 @@ def main():
         needle = f'"id":{obj_id}'
         return lines.wait(needle, timeout)
 
+    def load_page(id_, path, t_start=None):
+        send({"id": id_, "method": "navigate", "params": {"url": f"{base}{path}"}})
+        lines.wait(EVT_LOAD, 60)
+        ts, _ = wait_reply(id_)
+        return (ts - t_start) * 1000 if t_start else None
+
     t0 = time.perf_counter()
     try:
         # 1. Cold start: spawn -> {"event":"ready"}
         ts, _ = lines.wait(EVT_READY, args.timeout)
         cold_start_ms = (ts - t0) * 1000
 
-        # 2. Warm the web process on about:blank.
-        send({"id": 1, "method": "navigate", "params": {"url": "about:blank"}})
-        wait_reply(1)
-        lines.wait(EVT_LOAD, 60)
+        # 2. Warm the web process on the local page (first render is slower).
+        load_page(1, "/warm")
 
-        # 3. Page load latency to a local file.
-        with __import__("tempfile").NamedTemporaryFile("w", suffix=".html", delete=False) as f:
-            f.write("<html><body><h1>bench</h1><p>page load target</p></body></html>")
-            page = f.name
-        send({"id": 2, "method": "navigate", "params": {"url": f"file://{page}"}})
+        # 3. Page load latency, measured on a fresh navigation.
+        send({"id": 2, "method": "navigate", "params": {"url": f"{base}/measure"}})
         t_sent = time.perf_counter()
         ts, _ = lines.wait(EVT_LOAD, 60)
         page_load_ms = (ts - t_sent) * 1000
@@ -157,6 +198,7 @@ def main():
         proc.kill()
         raise
     finally:
+        stop.set()
         if proc.poll() is None:
             proc.kill()
 
