@@ -3,176 +3,304 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>bruster — native webview browser for agents</title>
-<meta name="description" content="A native webview browser driven by an agent over JSON lines on stdio. No Chromium download, no Node, one process under 1 MB. MCP support out of the box.">
+<title>bruster — Native webview browser for agents</title>
+<meta name="description" content="bruster is a native webview browser (WKWebView, WebKitGTK, WebView2) driven by an agent over JSON lines on stdio. No Chromium download, no Node, one process under 1 MB.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🖥️</text></svg>">
 <style>
-  :root{
-    --bg:#0b1020; --panel:#121a2e; --panel2:#0e1526; --ink:#e8ecf8; --muted:#9aa7c7;
-    --accent:#6ee7f7; --accent2:#7dd3fc; --line:#232e4a; --ok:#34d399; --warn:#fbbf24;
-    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
-  }
-  *{box-sizing:border-box}
-  body{margin:0;font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink);background:var(--bg)}
-  a{color:var(--accent2);text-decoration:none}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:#f6f8fa;color:#24292e;
+       font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+  a{color:#0366d6;text-decoration:none}
   a:hover{text-decoration:underline}
-  code,pre{font-family:var(--mono);font-size:.9em}
-  code{background:#1a2440;border:1px solid var(--line);border-radius:6px;padding:.1em .35em}
-  pre{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:1rem;overflow-x:auto}
-  .wrap{max-width:960px;margin:0 auto;padding:0 1.25rem}
-  header.hero{background:radial-gradient(1200px 500px at 50% -10%,#1b2b52 0%,var(--bg) 65%);border-bottom:1px solid var(--line);padding:4.5rem 0 3.5rem;text-align:center}
-  .hero h1{font-size:3.2rem;margin:0;letter-spacing:-.03em}
-  .hero h1 code{background:none;border:none;color:var(--accent);font-size:1em}
-  .hero p.tag{font-size:1.25rem;color:var(--muted);max-width:640px;margin:1rem auto 1.6rem}
-  .pills{display:flex;gap:.5rem;justify-content:center;flex-wrap:wrap}
-  .pill{border:1px solid var(--line);background:#0e1526;border-radius:999px;padding:.35rem .8rem;font-size:.85rem;color:var(--muted)}
-  .pill b{color:var(--ink);font-weight:600}
-  .buttons{margin-top:1.8rem;display:flex;gap:.8rem;justify-content:center;flex-wrap:wrap}
-  .btn{border-radius:999px;padding:.7rem 1.4rem;font-weight:600;display:inline-block}
-  .btn.primary{background:var(--accent);color:#06283a}
-  .btn.ghost{border:1px solid var(--line);color:var(--ink);background:#0e1526}
-  .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin:2.5rem 0 0}
-  .metric{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:1.1rem 1.2rem;text-align:center}
-  .metric .value{font-size:2rem;font-weight:700;letter-spacing:-.02em;color:var(--accent);font-family:var(--mono)}
-  .metric .unit{font-size:1rem;color:var(--accent)}
-  .metric .label{color:var(--muted);font-size:.85rem;margin-top:.3rem}
-  .metric small{display:block;color:#5d6a8c;font-size:.72rem;margin-top:.55rem}
-  section{margin:3.5rem 0}
-  h2{font-size:1.7rem;letter-spacing:-.01em;margin:0 0 1rem}
-  h2 .num{color:#4a5784;margin-right:.6rem;font-family:var(--mono)}
-  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1rem}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:1.2rem 1.3rem}
-  .card h3{margin:.1rem 0 .5rem;font-size:1.05rem}
-  .card p{margin:0;color:var(--muted);font-size:.95rem}
-  table{width:100%;border-collapse:collapse;font-size:.92rem}
-  th,td{text-align:left;padding:.55rem .8rem;border-bottom:1px solid var(--line);vertical-align:top}
-  th{color:var(--muted);font-weight:600;width:26%}
+  code,pre{font-family:SFMono-Regular,Consolas,"Liberation Mono",Menlo,monospace;font-size:13px}
+  code{background:#f0f2f5;border:1px solid #e1e4e8;border-radius:3px;padding:.1em .35em}
+  pre{background:#f6f8fa;border:1px solid #e1e4e8;border-radius:4px;padding:.9rem 1rem;overflow:auto;line-height:1.5}
+  pre code{background:none;border:none;padding:0}
+
+  /* Top bar */
+  .topbar{position:sticky;top:0;z-index:10;background:#1b2a41;border-bottom:3px solid #2b6cb0}
+  .topbar-inner{max-width:1120px;margin:0 auto;padding:.6rem 1.25rem;display:flex;align-items:center;gap:1rem}
+  .brand{display:flex;align-items:center;gap:.6rem;color:#fff;font-weight:600;font-size:1.15rem}
+  .brand img{width:28px;height:28px;border-radius:6px}
+  .topbar nav{margin-left:auto;display:flex;flex-wrap:wrap;gap:1.1rem}
+  .topbar nav a{color:#c3cbd8;font-size:.9rem}
+  .topbar nav a:hover{color:#fff;text-decoration:none}
+
+  /* Layout */
+  .page{max-width:1120px;margin:0 auto;padding:1.75rem 1.25rem 3rem;display:flex;gap:2rem;align-items:flex-start}
+  .sidebar{position:sticky;top:70px;width:216px;flex:0 0 216px;font-size:.9rem}
+  .sidebar .toc-title{text-transform:uppercase;letter-spacing:.06em;font-size:.72rem;color:#6a737d;margin:0 0 .5rem .6rem}
+  .sidebar a{display:block;color:#444d56;padding:.22rem .6rem;border-left:2px solid transparent}
+  .sidebar a:hover{color:#0366d6;text-decoration:none;border-left-color:#c8d1da}
+  .content{flex:1 1 auto;min-width:0;background:#fff;border:1px solid #e1e4e8;border-radius:6px;
+           padding:2rem 2.25rem 2.5rem}
+  @media(max-width:880px){.sidebar{display:none}.page{padding-top:1.25rem}.content{padding:1.4rem 1.25rem}}
+
+  /* Typography */
+  h1{font-size:2rem;margin:0 0 .4rem;color:#1b2a41;font-weight:600;letter-spacing:-.01em}
+  h2{font-size:1.4rem;margin:2.4rem 0 .9rem;padding-bottom:.35rem;border-bottom:1px solid #e1e4e8;color:#1b2a41;font-weight:600}
+  h3{font-size:1.08rem;margin:1.6rem 0 .5rem;color:#1b2a41}
+  p{margin:.7rem 0}
+  .lead{font-size:1.12rem;color:#444d56}
+  hr{border:0;border-top:1px solid #e1e4e8;margin:2rem 0}
+  ul{margin:.6rem 0;padding-left:1.3rem}
+  li{margin:.25rem 0}
+
+  /* Tables */
+  table{width:100%;border-collapse:collapse;margin:1rem 0;font-size:.92rem}
+  th,td{border:1px solid #e1e4e8;padding:.5rem .7rem;text-align:left;vertical-align:top}
+  th{background:#f6f8fa;font-weight:600}
   td code{white-space:nowrap}
-  .muted{color:var(--muted)}
-  ol.steps{list-style:none;counter-reset:s;padding:0;margin:0}
-  ol.steps li{counter-increment:s;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:1rem 1.2rem;margin-bottom:.8rem;display:flex;gap:1rem;align-items:flex-start}
-  ol.steps li::before{content:counter(s);background:var(--accent);color:#06283a;font-weight:700;border-radius:8px;min-width:1.8rem;text-align:center;font-family:var(--mono)}
-  footer{border-top:1px solid var(--line);margin-top:4rem;padding:2rem 0 3rem;color:#5d6a8c}
-  footer a{color:#8b9ac0}
-  .updated{font-size:.8rem;color:#5d6a8c}
-  @media(max-width:760px){.metrics,.grid{grid-template-columns:1fr 1fr}}
-  @media(max-width:520px){.metrics,.grid{grid-template-columns:1fr}}
+  .metrics td:first-child{width:45%}
+  .metrics td:last-child{font-variant-numeric:tabular-nums}
+
+  /* Callouts */
+  .note{background:#f1f8ff;border-left:4px solid #0366d6;border-radius:3px;padding:.7rem 1rem;margin:1rem 0;font-size:.94rem}
+  .note.warn{background:#fff5b1;border-left-color:#d9a300}
+
+  /* Hero install */
+  .cta{margin:1.1rem 0 0}
+  .btn{display:inline-block;border:1px solid #2b6cb0;border-radius:4px;padding:.45rem .95rem;font-size:.9rem;font-weight:600;margin-right:.5rem}
+  .btn.primary{background:#2b6cb0;color:#fff}
+  .btn.primary:hover{background:#24557f;text-decoration:none}
+  .btn.plain{color:#2b6cb0;background:#fff}
+  .btn.plain:hover{background:#eef4fb;text-decoration:none}
+  .badges{margin:.9rem 0 0}
+  .badges img{height:20px;margin:0 .25rem .35rem 0}
+  footer{border-top:1px solid #e1e4e8;margin-top:1rem;padding:1.4rem 0 2.5rem;color:#6a737d;font-size:.85rem;text-align:center}
 </style>
 </head>
 <body>
 
-<header class="hero">
-  <div class="wrap">
-    <h1><code>bruster</code></h1>
-    <p class="tag">A native webview browser driven by an agent over JSON lines on stdio.
-      No Chromium download, no Node, one process under 1&nbsp;MB.</p>
-    <div class="pills">
-      <span class="pill"><b>macOS</b> arm64 &amp; x86_64</span>
-      <span class="pill"><b>Linux</b> x86_64 &amp; arm64</span>
-      <span class="pill"><b>Windows</b> x86_64</span>
-      <span class="pill">WKWebView · WebKitGTK · WebView2</span>
-      <span class="pill">MCP ✓</span>
-    </div>
-    <div class="buttons">
-      <a class="btn primary" href="https://github.com/aliilyas/bruster">View on GitHub</a>
-      <a class="btn ghost" href="https://github.com/aliilyas/bruster/releases">Releases</a>
-      <a class="btn ghost" href="https://raw.githubusercontent.com/aliilyas/bruster/main/install.sh">Install script</a>
-    </div>
-    <div class="metrics wrap" id="metrics">
-      <div class="metric"><div><span class="value" id="m-binary">–</span><span class="unit"> MB</span></div><div class="label">Release binary</div></div>
-      <div class="metric"><div><span class="value" id="m-rss">–</span><span class="unit"> MB</span></div><div class="label">Idle memory (RSS)</div></div>
-      <div class="metric"><div><span class="value" id="m-page">–</span><span class="unit"> ms</span></div><div class="label">Page load (local file)</div></div>
-      <div class="metric"><div><span class="value" id="m-cold">–</span><span class="unit"> ms</span></div><div class="label">Cold start → ready</div></div>
-      <p class="updated" style="grid-column:1/-1" id="m-foot">Benchmarks run automatically in CI on every push to <code>main</code>.</p>
-    </div>
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="#top"><img src="assets/logo.svg" alt="" onerror="this.style.display='none'">bruster</a>
+    <nav>
+      <a href="#install">Install</a>
+      <a href="#quickstart">Quickstart</a>
+      <a href="#mcp">MCP</a>
+      <a href="#protocol">Protocol</a>
+      <a href="#api">API</a>
+      <a href="#performance">Performance</a>
+      <a href="https://github.com/aliilyas/bruster">GitHub</a>
+      <a href="https://github.com/aliilyas/bruster/releases">Releases</a>
+    </nav>
   </div>
 </header>
 
-<main class="wrap">
+<div class="page">
+  <aside class="sidebar">
+    <p class="toc-title">Contents</p>
+    <nav>
+      <a href="#overview">Overview</a>
+      <a href="#install">Installation</a>
+      <a href="#quickstart">Quickstart</a>
+      <a href="#usage">Command-line usage</a>
+      <a href="#mcp">Model Context Protocol</a>
+      <a href="#protocol">Native protocol</a>
+      <a href="#api">API reference</a>
+      <a href="#events">Events</a>
+      <a href="#limits">Limitations</a>
+      <a href="#performance">Performance</a>
+      <a href="#development">Development</a>
+      <a href="#license">License</a>
+    </nav>
+  </aside>
 
-<section>
-  <h2><span class="num">01</span>What is bruster?</h2>
-  <div class="grid">
-    <div class="card"><h3>An OS-native browser engine</h3><p>bruster wraps WKWebView (macOS), WebKitGTK (Linux) and WebView2 (Windows) through <a href="https://github.com/tauri-apps/wry">wry</a>. No bundled Chromium, no Node runtime, nothing to download — just one small native process.</p></div>
-    <div class="card"><h3>A JSON-lines API</h3><p>Drive it from any language: write one JSON object per line to stdin, read results and <code>event</code> objects from stdout. Navigating, finding, clicking, filling, screenshots — everything is a method call.</p></div>
-    <div class="card"><h3>Model Context Protocol</h3><p>Run with <code>--mcp</code> and every method becomes a tool for Claude, Codex, opencode and other MCP clients, including screenshots as image content and page events as notifications.</p></div>
-    <div class="card"><h3>One process, one profile</h3><p>Multiple tabs share cookies and storage. Persistent profiles and HTTP cache make repeat visits noticeably faster. Cleans up after itself; no stray sessions.</p></div>
-  </div>
-</section>
+  <main class="content">
+    <h1 id="top">bruster</h1>
+    <p class="lead">A native webview browser driven by an agent over JSON lines on
+      stdio. No Chromium download, no Node, one process under 1&nbsp;MB.</p>
+    <p>bruster controls the engine the operating system already ships —
+      <strong>WKWebView</strong> on macOS, <strong>WebKitGTK</strong> on Linux and
+      <strong>WebView2</strong> on Windows — through a small Rust binary built on
+      <a href="https://github.com/tauri-apps/wry">wry</a>. Agents drive it with
+      one JSON object per line, or over the Model Context Protocol with
+      <code>--mcp</code>.</p>
 
-<section id="why-fast">
-  <h2><span class="num">02</span>Why it&#39;s fast</h2>
-  <div class="grid">
-    <div class="card"><h3>No Chromium baggage</h3><p>Uses the engine the OS already ships. One ~<span id="inline-binary">1</span>&nbsp;MB process instead of a hundred megabytes of downloaded runtime. The first tab warms <code>about:blank</code> while the agent sets up.</p></div>
-    <div class="card"><h3>Cached repeats</h3><p>Persistent HTTP cache and profiles mean repeat visits load about <b>2× faster</b>. <code>--no-images</code> can cut page loads by ~30% on content-heavy sites.</p></div>
-    <div class="card"><h3>Software-only rendering mode</h3><p>Under a virtual display (Linux headless), rendering goes software-only, halving memory use.</p></div>
-    <div class="card"><h3>Measured, not claimed</h3><p>The numbers above come from <code>scripts/bench.py</code>, run on every push in GitHub Actions: build, cold start to <code>{"event":"ready"}</code>, local page load, snapshot round-trip and idle RSS.</p></div>
-  </div>
-</section>
+    <div class="badges">
+      <a href="https://github.com/aliilyas/bruster/actions/workflows/ci.yml"><img src="https://github.com/aliilyas/bruster/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+      <a href="https://github.com/aliilyas/bruster/releases"><img src="https://img.shields.io/github/v/release/aliilyas/bruster?label=release" alt="Latest release"></a>
+      <a href="https://github.com/aliilyas/bruster/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT license"></a>
+      <img src="https://img.shields.io/badge/macOS-arm64%20%7C%20x86__64-lightgrey.svg" alt="macOS">
+      <img src="https://img.shields.io/badge/Linux-x86__64%20%7C%20arm64-yellow.svg" alt="Linux">
+      <img src="https://img.shields.io/badge/Windows-x86__64-blue.svg" alt="Windows">
+    </div>
 
-<section>
-  <h2><span class="num">03</span>Install</h2>
-  <ol class="steps">
-    <li><div>One-liner for macOS, Linux and Windows prebuilds (dropped into <code>~/.local/bin</code>):<br><pre><code>curl -fsSL https://raw.githubusercontent.com/aliilyas/bruster/main/install.sh | sh</code></pre></div></li>
-    <li><div>Linux needs WebKitGTK 4.1 and, without a desktop session, Xvfb — the script warns you if either is missing. From source: <code>cargo build --release</code>.</div></li>
-    <li><div>Artifacts for every platform are attached to the <a href="https://github.com/aliilyas/bruster/releases">releases page</a>.</div></li>
-  </ol>
-</section>
+    <div class="cta">
+      <a class="btn primary" href="#install">Install</a>
+      <a class="btn plain" href="https://github.com/aliilyas/bruster">View source</a>
+      <a class="btn plain" href="#api">API reference</a>
+    </div>
 
-<section>
-  <h2><span class="num">04</span>Use it from an agent (MCP)</h2>
-  <p>opencode, Claude Desktop, Cursor, Windsurf and Zed share one shape:</p>
-  <pre><code>{ "mcpServers": { "bruster": { "command": "bruster", "args": ["--mcp", "--quiet"] } } }</code></pre>
-  <pre><code>claude mcp add bruster -- bruster --mcp --quiet      # Claude Code
-codex mcp add bruster -- bruster --mcp --quiet       # Codex CLI</code></pre>
-  <pre><code>{ "servers": { "bruster": { "type": "stdio", "command": "bruster", "args": ["--mcp", "--quiet"] } } }   # VS Code</code></pre>
-  <p class="muted">Windows keep hidden under <code>--mcp</code>; add <code>--visible</code> to watch the browser while the agent works.</p>
-</section>
+    <h2 id="overview">Overview</h2>
+    <p>bruster starts with its native protocol on stdout and reads commands from
+      stdin. It is one process — no bundled browser, no runtime — and it speaks
+      both a line-oriented JSON protocol and the Model Context Protocol. The
+      same binary works for a scripted scrape, a test harness, or an agent tool
+      stack.</p>
+    <ul>
+      <li><strong>Native engine.</strong> WKWebView, WebKitGTK 4.1 and WebView2, selected at build time.</li>
+      <li><strong>Small.</strong> A single release binary around <span id="inline-binary">1</span>&nbsp;MB; no separate browser download.</li>
+      <li><strong>Complete.</strong> Navigation, DOM snapshots, forms, screenshots, cookies, tabs, network and console logs.</li>
+      <li><strong>Portable.</strong> Prebuilt for macOS (arm64, x86_64), Linux (x86_64, arm64) and Windows (x86_64).</li>
+      <li><strong>Agent-ready.</strong> <code>--mcp</code> exposes every method as a tool; page events arrive as notifications.</li>
+    </ul>
 
-<section>
-  <h2><span class="num">05</span>Flags</h2>
-  <table>
-    <tr><th><code>--mcp</code></th><td>speak MCP on stdio instead of the native protocol; implies <code>--hidden</code></td></tr>
-    <tr><th><code>--hidden</code>/<code>--visible</code></th><td>park windows off-screen / show them</td></tr>
-    <tr><th><code>--quiet</code></th><td>silence GL/ALSA/GTK noise on stderr</td></tr>
-    <tr><th><code>--viewport WxH</code></th><td>initial window size (default 1280x800)</td></tr>
-    <tr><th><code>--user-agent UA</code></th><td>override the user agent</td></tr>
-    <tr><th><code>--profile DIR</code></th><td>persistent cookies and storage</td></tr>
-    <tr><th><code>--proxy URL</code></th><td><code>http://host:port</code> or <code>socks5://host:port</code></td></tr>
-    <tr><th><code>--init-script FILE</code></th><td>JS injected into every page before its own scripts</td></tr>
-    <tr><th><code>--insecure</code></th><td>ignore TLS errors (Linux)</td></tr>
-    <tr><th><code>--no-images</code></th><td>skip image loads, ~30% faster pages (Linux)</td></tr>
-  </table>
-</section>
+    <h2 id="install">Installation</h2>
+    <p>The install script downloads the build for this OS and CPU into
+      <code>~/.local/bin</code>:</p>
+    <pre><code>curl -fsSL https://raw.githubusercontent.com/aliilyas/bruster/main/install.sh | sh</code></pre>
+    <p>Prebuilt archives for every platform are attached to the
+      <a href="https://github.com/aliilyas/bruster/releases">releases page</a>.
+      From source, with a Rust toolchain:</p>
+    <pre><code>cargo build --release</code></pre>
+    <div class="note"><strong>Linux runtime.</strong> WebKitGTK 4.1 is required
+      (<code>apt install libwebkit2gtk-4.1-0</code>, <code>apk add webkit2gtk-4.1</code>,
+      <code>dnf install webkit2gtk4.1</code>). Without a desktop session, bruster
+      re-runs itself under <code>xvfb-run -a</code> when no <code>DISPLAY</code> is set.</div>
 
-<section>
-  <h2><span class="num">06</span>Protocol in one screen</h2>
-  <pre><code>→ {"id":1,"method":"navigate","params":{"url":"https://example.com"}}
+    <h2 id="quickstart">Quickstart</h2>
+    <p>Send one JSON object per line to stdin; read results and events from
+      stdout:</p>
+    <pre><code>$ bruster
+→ {"id":1,"method":"navigate","params":{"url":"https://example.com"}}
 ← {"event":"load","tab":1,"url":"https://example.com/"}
 ← {"id":1,"result":{"url":"https://example.com/"}}
 → {"id":2,"method":"snapshot"}
-← {"id":2,"result":{"url":"...","title":"...","elements":[{"ref":"e1","role":"heading","name":"Example Domain"}, ...]}}
-→ {"id":3,"method":"click","params":{"ref":"e4"}}
+← {"id":2,"result":{"url":"...","title":"Example Domain","elements":[{"ref":"e1","role":"heading","name":"Example Domain"}]}}
+→ {"id":3,"method":"click","params":{"ref":"e1"}}
 ← {"id":3,"result":null}</code></pre>
-</section>
 
-</main>
+    <h2 id="usage">Command-line usage</h2>
+    <pre><code>bruster [--mcp] [--hidden|--visible] [--quiet] [options]</code></pre>
+    <table>
+      <tr><th><code>--mcp</code></th><td>speak Model Context Protocol on stdio instead of the native protocol; implies <code>--hidden</code></td></tr>
+      <tr><th><code>--hidden</code> / <code>--visible</code></th><td>park windows off-screen / show them</td></tr>
+      <tr><th><code>--quiet</code></th><td>send stderr to <code>/dev/null</code>; mutes GL, ALSA and GTK noise</td></tr>
+      <tr><th><code>--viewport WxH</code></th><td>initial window size, default <code>1280x800</code></td></tr>
+      <tr><th><code>--user-agent UA</code></th><td>override the user agent</td></tr>
+      <tr><th><code>--profile DIR</code></th><td>persistent cookies and storage</td></tr>
+      <tr><th><code>--proxy URL</code></th><td><code>http://host:port</code> or <code>socks5://host:port</code></td></tr>
+      <tr><th><code>--init-script FILE</code></th><td>JavaScript run in every page before its own scripts</td></tr>
+      <tr><th><code>--insecure</code></th><td>ignore TLS errors (Linux only)</td></tr>
+      <tr><th><code>--no-images</code></th><td>do not load images; pages load about 30% faster (Linux only)</td></tr>
+    </table>
 
-<footer class="wrap">
-  <p><b>bruster</b> · native webview browser for agents · <a href="https://github.com/aliilyas/bruster">GitHub</a> ·
-     <a href="https://github.com/aliilyas/bruster/releases">Releases</a> · MIT License</p>
+    <h2 id="mcp">Model Context Protocol</h2>
+    <p>With <code>--mcp</code>, every method below becomes a tool, and page
+      events are delivered as <code>notifications/message</code>. Buttons
+      remain hidden unless <code>--visible</code> is added.</p>
+    <p>opencode, Claude Desktop, Cursor, Windsurf and Zed share one shape:</p>
+    <pre><code>{ "mcpServers": { "bruster": { "command": "bruster", "args": ["--mcp", "--quiet"] } } }</code></pre>
+    <pre><code>claude mcp add bruster -- bruster --mcp --quiet
+codex mcp add bruster -- bruster --mcp --quiet</code></pre>
+    <p>VS Code uses a <code>servers</code> key:</p>
+    <pre><code>{ "servers": { "bruster": { "type": "stdio", "command": "bruster", "args": ["--mcp", "--quiet"] } } }</code></pre>
+
+    <h2 id="protocol">Native protocol</h2>
+    <p>One JSON object per line, in both directions. A request carries
+      <code>id</code>, <code>method</code> and optional <code>params</code>; the
+      reply carries the same <code>id</code> with a <code>result</code> or
+      <code>error</code>. Elements are addressed by
+      <code>{"selector": "css"}</code> or by a <code>ref</code> from the last
+      snapshot. With <code>format: "text"</code> a snapshot renders as one line
+      per element, about 45% smaller than JSON:</p>
+    <pre><code>https://example.com/
+Example Domain
+e1 heading "Example Domain"
+e2 text "This domain is for use in..."
+e3 link "Learn more" href=https://iana.org/help/example-domains
+e4 checkbox "Remember me" checked=false</code></pre>
+
+    <h2 id="api">API reference</h2>
+    <p>A selection of the available methods. The full table, with every
+      parameter and result, is in the
+      <a href="https://github.com/aliilyas/bruster#native-protocol">repository README</a>.</p>
+    <table>
+      <tr><th>Method</th><th>Purpose</th></tr>
+      <tr><td><code>navigate</code></td><td>load a URL, optionally waiting for <code>load</code>, <code>dom</code> or <code>idle</code></td></tr>
+      <tr><td><code>snapshot</code></td><td>list controls, headings, links and visible text, with refs</td></tr>
+      <tr><td><code>find</code></td><td>a snapshot filtered by text or regex</td></tr>
+      <tr><td><code>click</code> <code>hover</code></td><td>act on a selector, ref or coordinates</td></tr>
+      <tr><td><code>fill</code> <code>type</code> <code>press</code></td><td>enter text and send keys</td></tr>
+      <tr><td><code>fill_form</code></td><td>fill several fields in one call</td></tr>
+      <tr><td><code>select</code> <code>check</code></td><td>drive selects and checkboxes</td></tr>
+      <tr><td><code>upload</code></td><td>set files on a file input</td></tr>
+      <tr><td><code>screenshot</code></td><td>PNG to a path or as base64, optional full page and clip</td></tr>
+      <tr><td><code>eval</code></td><td>run JavaScript and return a JSON value</td></tr>
+      <tr><td><code>wait_for</code></td><td>wait for a selector, text, URL or network idle</td></tr>
+      <tr><td><code>network</code> <code>console</code></td><td>inspect requests, responses and console output</td></tr>
+      <tr><td><code>cookies</code> <code>set_cookie</code></td><td>read and write cookies</td></tr>
+      <tr><td><code>new_tab</code> <code>tabs</code> <code>switch_tab</code></td><td>manage tabs that share one profile</td></tr>
+      <tr><td><code>close</code></td><td>exit the process</td></tr>
+    </table>
+
+    <h2 id="events">Events</h2>
+    <p>Unsolicited messages use an <code>event</code> field:
+      <code>ready</code>, <code>navigating</code>, <code>load</code>,
+      <code>tab_opened</code>, <code>tab_closed</code>, <code>dialog</code>,
+      <code>tls_error</code>, <code>load_failed</code> and
+      <code>download</code>.</p>
+
+    <h2 id="limits">Limitations</h2>
+    <ul>
+      <li>Input is synthetic DOM events (<code>isTrusted</code> is false): no <code>:hover</code> styles, no native select popups, no OS shortcuts.</li>
+      <li>Network and console logs are in-page; they carry no request bodies and reset on navigation. Use <code>--proxy</code> for real interception.</li>
+      <li>Cross-origin iframes are out of reach; same-origin iframes and open shadow roots work.</li>
+      <li><code>data:</code> and <code>file:</code> pages load, but in-page calls get no reply — serve pages over localhost instead.</li>
+      <li>Native file choosers are not intercepted; use <code>upload</code>.</li>
+      <li>Without <code>--profile</code>, cookies and storage live for one session.</li>
+      <li>On Windows (WebView2), <code>screenshot</code> has no <code>clip</code> and the Linux-only flags do nothing.</li>
+    </ul>
+
+    <h2 id="performance">Performance</h2>
+    <p>Numbers are measured in CI on every push to <code>main</code> by
+      <code>scripts/bench.py</code>: a release build on Ubuntu 24.04 x86_64,
+      running under Xvfb with WebKitGTK 4.1.</p>
+    <table class="metrics">
+      <tr><th>Metric</th><th>Value</th></tr>
+      <tr><td>Release binary size</td><td><span id="m-binary">—</span> MB</td></tr>
+      <tr><td>Idle memory (RSS)</td><td><span id="m-rss">—</span> MB</td></tr>
+      <tr><td>Page load (local file)</td><td><span id="m-page">—</span> ms</td></tr>
+      <tr><td>Cold start → ready</td><td><span id="m-cold">—</span> ms</td></tr>
+      <tr><td>Snapshot round-trip</td><td><span id="m-snapshot">—</span> ms</td></tr>
+    </table>
+    <p id="m-foot" style="font-size:.85rem;color:#6a737d">Benchmarks run automatically; results are published here on the next CI run.</p>
+
+    <h2 id="development">Development</h2>
+    <p><code>bin/bruster</code> runs the development build from a checkout.
+      <code>tests/run_all.sh [--rounds N] [--no-e2e]</code> runs the whole
+      cycle: build, unit tests, the smoke and edge suites, a leftover-process
+      check, the MCP launch check and the public-site end-to-end tests. On
+      Linux, run it under <code>xvfb-run -a</code>. CI builds and tests every
+      platform and publishes release archives on a <code>v*</code> tag.</p>
+
+    <h2 id="license">License</h2>
+    <p>bruster is released under the <a href="https://github.com/aliilyas/bruster/blob/main/LICENSE">MIT License</a>.</p>
+  </main>
+</div>
+
+<footer>
+  bruster · native webview browser for agents ·
+  <a href="https://github.com/aliilyas/bruster">GitHub</a> ·
+  <a href="https://github.com/aliilyas/bruster/releases">Releases</a> ·
+  MIT License
 </footer>
 
 <script>
-function fmt(n){return Number(n).toLocaleString("en-US");}
 function get(id){return document.getElementById(id);}
-fetch("./metrics.json").then(r=>{if(!r.ok)throw 0;return r.json();}).then(m=>{
-  if(m.binary_kb){get("m-binary").textContent=fmt(m.binary_kb);get("inline-binary").textContent=fmt(m.binary_kb);}
+function fmt(n){return Number(n).toLocaleString("en-US");}
+fetch("./metrics.json").then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(m){
+  if(m.binary_kb)get("m-binary").textContent=fmt(m.binary_kb);
   if(m.idle_rss_mb)get("m-rss").textContent=fmt(m.idle_rss_mb);
   if(m.page_load_ms)get("m-page").textContent=fmt(m.page_load_ms);
   if(m.cold_start_ms)get("m-cold").textContent=fmt(m.cold_start_ms);
-  if(m.updated_utc)get("m-foot").textContent = "Measured " + m.updated_utc + " · " + m.environment + (m.commit ? " · commit " + m.commit.slice(0,7) : "");
-}).catch(()=>{get("m-foot").textContent="Benchmarks pending — they'll appear after the next CI run on main.";});
+  if(m.snapshot_ms)get("m-snapshot").textContent=fmt(m.snapshot_ms);
+  if(m.updated_utc)get("m-foot").textContent="Measured "+m.updated_utc+" · "+m.environment+(m.commit?" · commit "+m.commit.slice(0,7):"");
+}).catch(function(){
+  get("m-foot").textContent="Benchmarks pending — results will appear here after the next CI run on main.";
+});
 </script>
 </body>
 </html>
