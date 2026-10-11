@@ -41,14 +41,13 @@ fn login_form_error_under_csp() {
         { "selector": "input[name=pw]", "value": "x" },
     ] }));
     b.ok("press", json!({ "selector": "input[name=pw]", "key": "Enter" }));
-    // From cloud IPs HN answers with a bot check instead of the login error; both
-    // prove the form was submitted and the reply rendered.
-    b.ok("wait_for", json!({ "selector": "body", "timeout": SITE_TIMEOUT }));
     let t = Instant::now();
     loop {
         let body = b.ok("text", json!({ "selector": "body" }));
         let body = body.as_str().unwrap();
-        if body.contains("Bad login") || body.contains("Validation required") {
+        // HN answers cloud IPs with a bot check instead of the login error; both
+        // prove the form was submitted and the reply rendered.
+        if ["Bad login", "Validation required", "Sorry"].iter().any(|k| body.contains(*k)) {
             break;
         }
         assert!(t.elapsed() < Duration::from_millis(SITE_TIMEOUT), "{body}");

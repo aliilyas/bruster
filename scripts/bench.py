@@ -8,6 +8,9 @@ Usage (run under a display when headless):
     xvfb-run -a python3 scripts/bench.py --binary target/release/bruster \
         --output metrics.json --commit "$GITHUB_SHA"
 
+A fresh WebKitGTK cold start can take over a minute on an overloaded CI
+runner, so the first `ready` wait is generous. Increase it with --timeout.
+
 Stdlib only.
 """
 import argparse
@@ -23,8 +26,8 @@ EVT_READY = '"event":"ready"'
 EVT_LOAD = '"event":"load"'
 
 
-def read_lines(proc, sink):
-    for line in proc.stdout:
+def drain(stream, sink):
+    for line in stream:
         sink.append((time.perf_counter(), line.rstrip("\n")))
     sink.append((time.perf_counter(), None))  # EOF sentinel
 
@@ -41,6 +44,14 @@ class Lines:
     def since(self, idx):
         with self._lock:
             return list(self.rows[idx:]), len(self.rows)
+
+    def tail(self, count):
+        with self._lock:
+            return [line for _, line in self.rows[-count:]]
+
+    def all_text(self):
+        with self._lock:
+            return [line for _, line in self.rows if line is not None]
 
     def wait(self, needle, timeout, from_idx=0):
         """Return (timestamp, line) for the first line containing needle."""
@@ -62,42 +73,47 @@ def main():
     ap.add_argument("--binary", default="target/release/bruster")
     ap.add_argument("--output", default="metrics.json")
     ap.add_argument("--commit", default="")
+    ap.add_argument("--timeout", type=int, default=120, help="seconds to wait for cold start")
     args = ap.parse_args()
 
     binary = os.path.abspath(args.binary)
     if not os.path.exists(binary):
         sys.exit(f"{binary}: not found")
 
+    # No --quiet: keep stderr so a failed run is diagnosable. The benchmark
+    # ignores stderr unless something goes wrong.
     proc = subprocess.Popen(
-        [binary, "--hidden", "--quiet"],
+        [binary, "--hidden"],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
         text=True,
         bufsize=1,
         cwd=os.path.dirname(binary) or ".",
     )
     lines = Lines()
-    threading.Thread(target=read_lines, args=(proc, lines), daemon=True).start()
+    errs = Lines()
+    threading.Thread(target=drain, args=(proc.stdout, lines), daemon=True).start()
+    threading.Thread(target=drain, args=(proc.stderr, errs), daemon=True).start()
 
     def send(obj):
         proc.stdin.write(json.dumps(obj) + "\n")
         proc.stdin.flush()
 
-    def wait_reply(obj_id, timeout=30):
+    def wait_reply(obj_id, timeout=60):
         needle = f'"id":{obj_id}'
         return lines.wait(needle, timeout)
 
     t0 = time.perf_counter()
     try:
         # 1. Cold start: spawn -> {"event":"ready"}
-        ts, _ = lines.wait(EVT_READY, 30)
+        ts, _ = lines.wait(EVT_READY, args.timeout)
         cold_start_ms = (ts - t0) * 1000
 
         # 2. Warm the web process on about:blank.
         send({"id": 1, "method": "navigate", "params": {"url": "about:blank"}})
         wait_reply(1)
-        lines.wait(EVT_LOAD, 30)
+        lines.wait(EVT_LOAD, 60)
 
         # 3. Page load latency to a local file.
         with __import__("tempfile").NamedTemporaryFile("w", suffix=".html", delete=False) as f:
@@ -105,7 +121,7 @@ def main():
             page = f.name
         send({"id": 2, "method": "navigate", "params": {"url": f"file://{page}"}})
         t_sent = time.perf_counter()
-        ts, _ = lines.wait(EVT_LOAD, 30)
+        ts, _ = lines.wait(EVT_LOAD, 60)
         page_load_ms = (ts - t_sent) * 1000
         wait_reply(2)
 
@@ -133,6 +149,13 @@ def main():
             proc.wait(timeout=15)
         except subprocess.TimeoutExpired:
             proc.kill()
+    except Exception as e:
+        # Surface everything the process said so the next fix is obvious.
+        print(f"bench failed: {e}", file=sys.stderr)
+        print("stdout seen:\n" + "\n".join(lines.all_text()[-20:]), file=sys.stderr)
+        print("stderr seen (last 20):\n" + "\n".join(errs.tail(20)), file=sys.stderr)
+        proc.kill()
+        raise
     finally:
         if proc.poll() is None:
             proc.kill()
