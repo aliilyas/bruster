@@ -1,30 +1,115 @@
-# bruster
+<div align="center">
+  <img src="assets/logo.svg" width="96" alt="bruster">
+  <h1>bruster</h1>
+  <p>
+    <strong>Native webview browser driven by an agent over JSON lines on stdio.</strong>
+  </p>
+  <p>
+    WKWebView · WebKitGTK · WebView2 &mdash; no Chromium download, no Node, one process under 1&nbsp;MB.
+  </p>
+  <p>
+    <a href="https://github.com/aliilyas/bruster/actions/workflows/ci.yml"><img src="https://github.com/aliilyas/bruster/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+    <a href="https://github.com/aliilyas/bruster/releases/latest"><img src="https://img.shields.io/github/v/release/aliilyas/bruster?label=release&color=6ee7f7" alt="Release"></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
+    <img src="https://img.shields.io/badge/macOS-arm64%20%7C%20x86__64-lightgrey.svg" alt="macOS">
+    <img src="https://img.shields.io/badge/Linux-x86__64%20%7C%20arm64-FCC624.svg" alt="Linux">
+    <img src="https://img.shields.io/badge/Windows-x86__64-0078D4.svg" alt="Windows">
+    <a href="https://aliilyas.github.io/bruster/"><img src="https://img.shields.io/badge/docs-%E2%9C%93-6ee7f7.svg" alt="Website"></a>
+  </p>
+  <p>
+    <a href="#install">Install</a> ·
+    <a href="#quickstart">Quickstart</a> ·
+    <a href="#mcp">MCP</a> ·
+    <a href="#protocol">Protocol</a> ·
+    <a href="#api">API</a> ·
+    <a href="https://aliilyas.github.io/bruster/">Performance</a>
+  </p>
+</div>
 
-Native webview (WKWebView / WebKitGTK / WebView2 via `wry`) driven by an agent
-over JSON lines on stdio. No Chromium download, no Node, one process under 1 MB.
+<br>
+
+bruster wraps the browser engines your operating system already ships. It runs
+as a single, lightweight process and speaks JSON lines on stdin/stdout —
+perfect for agents, scripts and test harnesses. With `--mcp` it exposes
+every method as a tool.
+
+## Why bruster?
+
+- **No Chromium.** Uses WKWebView (macOS), WebKitGTK (Linux) and WebView2 (Windows) via [wry](https://github.com/tauri-apps/wry).
+- **Tiny footprint.** One release binary, usually **< 1&nbsp;MB**; no bundled runtime or download on first run.
+- **Agent-ready.** First-class [MCP](#mcp) support (`--mcp`) with screenshots as image content and page events as notifications.
+- **Cross-platform.** Prebuilt for macOS (arm64, x86_64), Linux (x86_64, arm64) and Windows (x86_64).
+- **Practical API.** Navigate, snapshot, click, fill forms, drag, upload, take screenshots, inspect network/console, manage tabs, persist sessions with `--profile`.
+- **Deterministic and safe.** Every call is a line-based JSON request/response. `beforeunload` is disarmed and dialogs never block.
+- **Fast.** Persistent HTTP cache and profiles help repeat visits. The first tab warms `about:blank` while the agent sets up.
+
+> [!TIP]
+> Live performance numbers (cold start, page load, snapshot and idle memory) are published at [aliilyas.github.io/bruster/](https://aliilyas.github.io/bruster/).
 
 ## Install
 
-```
+### One-liner (recommended)
+
+```sh
 curl -fsSL https://raw.githubusercontent.com/aliilyas/bruster/main/install.sh | sh
 ```
 
-Prebuilt for macOS (arm64, x86_64) and Linux (x86_64, arm64); Windows builds
-are on the releases page too. Linux needs WebKitGTK 4.1 at runtime
-(`apt install libwebkit2gtk-4.1-0`, `apk add webkit2gtk-4.1`, `dnf install
-webkit2gtk4.1`) and, without a desktop session, `xvfb` (bruster re-runs itself
-under `xvfb-run -a` when no `DISPLAY` is set). From source: `cargo build
---release`.
+The script installs the correct build for your OS and CPU into `~/.local/bin`.
 
-Then add it to your MCP client:
+### Prebuilt releases
+
+Download archives for all platforms from the [Releases page](https://github.com/aliilyas/bruster/releases).
+
+### From source
+
+```sh
+cargo build --release
+```
+
+> [!NOTE]
+> **Linux requirements.** WebKitGTK 4.1 is needed at runtime: `apt install libwebkit2gtk-4.1-0`, `apk add webkit2gtk-4.1`, or `dnf install webkit2gtk4.1`. Without a desktop session, bruster automatically re-runs under `xvfb-run -a` when no `DISPLAY` is set.
+
+## Quickstart
+
+Run bruster in its native protocol mode:
+
+```sh
+bruster
+```
+
+Then send JSON objects, one per line:
+
+```json
+{"id":1,"method":"navigate","params":{"url":"https://example.com"}}
+{"id":2,"method":"snapshot"}
+{"id":3,"method":"click","params":{"ref":"e2"}}
+{"id":4,"method":"close"}
+```
+
+You'll receive results and events back on stdout:
+
+```json
+{"event":"load","tab":1,"url":"https://example.com/"}
+{"id":1,"result":{"url":"https://example.com/"}}
+{"id":2,"result":{"url":"https://example.com/","title":"Example Domain","elements":[...]}}
+{"id":3,"result":null}
+```
+
+## MCP
+
+With `--mcp`, bruster speaks the Model Context Protocol over stdio. Every
+native method becomes a tool; screenshots return as image content and page
+events come through as notifications.
+
+### Common MCP client configs
 
 ```jsonc
 // opencode (opencode.json), Claude Desktop (claude_desktop_config.json),
-// Cursor (.cursor/mcp.json), Windsurf, Zed: same shape.
+// Cursor (.cursor/mcp.json), Windsurf, Zed
 { "mcpServers": { "bruster": { "command": "bruster", "args": ["--mcp", "--quiet"] } } }
 ```
 
-```
+```sh
 claude mcp add bruster -- bruster --mcp --quiet          # Claude Code
 codex mcp add bruster -- bruster --mcp --quiet           # Codex CLI
 ```
@@ -38,96 +123,34 @@ codex mcp add bruster -- bruster --mcp --quiet           # Codex CLI
 
 ## Run
 
-```
+```sh
 bruster [--mcp] [--hidden|--visible] [--quiet] [options]
 ```
 
 | flag | effect |
 |---|---|
 | `--mcp` | speak Model Context Protocol on stdio instead of the native protocol; implies `--hidden` |
-| `--hidden` / `--visible` | park windows off-screen (an unmapped WebKitGTK view renders nothing, so screenshots would fail) / show them |
-| `--quiet` | stderr to /dev/null; the webview libraries print GL, ALSA and GTK noise |
+| `--hidden` / `--visible` | park windows off-screen / show them |
+| `--quiet` | stderr to `/dev/null`; mutes GL, ALSA and GTK noise |
 | `--viewport WxH` | initial window size, default 1280x800 |
 | `--user-agent UA` | override the user agent |
-| `--profile DIR` | persistent cookies and storage (Linux: data in DIR; macOS: a data store keyed by DIR). Without it the HTTP cache still persists in `$XDG_CACHE_HOME/bruster/default` (cookies and storage are wiped at start; a second concurrent bruster falls back to a temp dir), so repeat visits load about 2x faster |
+| `--profile DIR` | persistent cookies and storage |
 | `--proxy URL` | `http://host:port` or `socks5://host:port` |
 | `--init-script FILE` | JavaScript run in every page before its own scripts |
 | `--insecure` | ignore TLS errors (Linux only) |
-| `--no-images` | do not load images (Linux only): pages load ~30% faster, screenshots show no pictures |
+| `--no-images` | do not load images (Linux only); pages load ~30% faster |
 
-Linux rendering is software only, which halves memory under Xvfb. The first
-tab loads `about:blank` at start so the web process is warm by the first
-`navigate`. Set `BRUSTER_NO_XVFB=1` to stop the automatic `xvfb-run`.
+Linux rendering is software only under Xvfb (halves memory). Set `BRUSTER_NO_XVFB=1` to stop automatic `xvfb-run -a`.
 
 ## Tests
 
-`tests/run_all.sh [--rounds N] [--no-e2e]` runs the whole cycle: build, unit
-tests, `tests/smoke.rs` (every method on local pages), `tests/edge.rs`
-(protocol abuse, odd documents, hanging servers, limits, memory recovery),
-a leftover-process check, `tests/mcp_launch.sh`, and `tests/e2e.rs` (public
-sites, `--ignored` so plain `cargo test` stays offline). On Linux run it
-under `xvfb-run -a`. `tests/integrations.sh <binary>` drives the server
-through the MCP TypeScript SDK, the Python SDK and the Inspector CLI, with the
-scrubbed environment desktop clients use. CI (`.github/workflows/ci.yml`) runs
-build, unit, smoke and edge on macOS arm64 and x86_64, Ubuntu x86_64 and
-arm64, Windows (build and unit only), plus e2e and the integrations on Linux,
-and publishes release archives on a `v*` tag. `bin/bruster` runs the
-development build from this checkout.
+`tests/run_all.sh [--rounds N] [--no-e2e]` runs the full suite: build, unit tests, smoke, edge, leftover-process check, MCP launch, and e2e tests. On Linux, run it under `xvfb-run -a`. CI runs builds, tests and publishes release archives on `v*` tags.
 
-## MCP
+## Protocol
 
-`--mcp` speaks Model Context Protocol on stdio. Every method below is a tool;
-`tab` is an optional argument on each. Screenshots come back as image content.
-Events are sent as `notifications/message` at level `info` with the event in
-`data`; `logging/setLevel` above `info` mutes them. `notifications/cancelled`
-drops the reply of an in-flight call.
+One JSON object per line in both directions. Elements are addressed by `{"selector": "css"}` or `{"ref": "eN"}` from the last `snapshot`/`find`. With `format: "text"`, a snapshot returns one line per element:
 
-```json
-{ "mcpServers": { "bruster": { "command": "bruster", "args": ["--mcp", "--quiet"] } } }
-```
-
-## Native protocol
-
-One JSON object per line, both directions.
-
-```
-→ {"id":1,"method":"navigate","params":{"url":"https://example.com"}}
-← {"event":"navigating","tab":1,"url":"https://example.com/"}
-← {"id":1,"result":{"url":"https://example.com/"}}
-← {"event":"load","tab":1,"url":"https://example.com/"}
-→ {"id":2,"method":"snapshot"}
-← {"id":2,"result":{"url":"...","title":"...","elements":[{"ref":"e1","role":"heading","name":"Example Domain"}, ...]}}
-→ {"id":3,"method":"click","params":{"ref":"e4"},"tab":1}
-← {"id":3,"result":null}
-→ {"id":4,"method":"click","params":{"selector":"#nope"}}
-← {"id":4,"error":"no element matches '#nope'"}
-```
-
-Elements are addressed by `{"selector": "css"}` or `{"ref": "e3"}` from the
-last `snapshot` or `find`. Refs die on the next snapshot, find or navigation.
-Selectors reach into open shadow roots and same-origin iframes. `tab` at the
-top level picks a tab; default is the current one. Tabs share one profile:
-cookies and storage set in one tab are visible in the others.
-
-Actions (`click`, `hover`, `fill`, `type`, `press` with a target, `select`,
-`check`, `drag`) wait up to `timeout` ms (default 5000) for the element to
-appear, be visible, enabled and not covered, then fail with the reason
-(`no element matches '#go'`, `<button#go> is covered by <div#overlay>`).
-`force: true` skips the visibility checks.
-
-A click or submit that starts a load makes the following calls wait for the
-new page, so `click` then `snapshot` reads the page the click led to. Calls
-that were still running when a page was replaced are re-run in the new one.
-`fill`, `type`, `select` and `check` also fail on the wrong kind of element
-(`<p#out> is not editable`, `no option matches 'x'`).
-
-Snapshots list controls, headings, links and every visible text node, so a
-`<div>Saved!</div>` shows up as `{role: "text", text: "Saved!"}` and its ref
-acts on the div. A `<li>` or `<p>` holding a single link is folded into the
-link. With `format: "text"` (the MCP default) the result is one line per
-element, about 45% smaller than JSON:
-
-```
+```text
 https://example.com/
 Example Domain
 e1 heading "Example Domain"
@@ -136,89 +159,72 @@ e3 link "Learn more" href=https://iana.org/help/example-domains
 e4 checkbox "Remember me" checked=false
 ```
 
-Same-origin hrefs lose the origin in the text format.
+> [!NOTE]
+> Same-origin hrefs lose the origin in the text format. Alerts/prompts never block — they're answered according to the current `dialog` setting and reported as `dialog` events. `beforeunload` handlers are disarmed.
 
-`alert`, `confirm` and `prompt` never block: they are answered with the
-current `dialog` setting (accept by default) and reported as a `dialog` event.
-`beforeunload` handlers are disarmed before the page installs them, so leaving
-a page never prompts.
+## API
 
 | method | params | result |
 |---|---|---|
-| `navigate` | `url`, `until?` (`load` default, `dom`, `idle`), `timeout?` ms (default 30000) | `{tab, url}` at the page's load event, at DOMContentLoaded (`dom`: 2-4x sooner on server-rendered pages, too early for SPAs), or once the network has been quiet for 500 ms after load (`idle`, capped at 10 s). Fails on a malformed url, a connection or DNS error, a download (Linux), its timeout, or when a newer navigation supersedes it |
-| `reload` `back` `forward` | | `{url}` after load finishes, `null` if there was nowhere to go |
-| `url` `title` | | string |
-| `eval` | `expression` | JSON value; an expression, or statements with `return`; promises are awaited. Compiled as script, so a page CSP without `unsafe-eval` cannot block it |
-| `snapshot` | `selector?`, `max?` (default 1000), `boxes?`, `format?` (`json` default, `text`) | `{url, title, elements[], truncated?}` or the text lines |
-| `find` | `text?` or `regex?`, plus snapshot params | snapshot filtered on name, text, value or href (each field on its own, so `^...$` works) |
-| `screenshot` | `path?`, `full?`, `clip?` `{x,y,width,height}` | `{path, bytes}` or `{png_base64}`; full pages are capped at 16000 px |
-| `rect` | target | `{x, y, width, height}` viewport-relative, feeds `clip` |
-| `click` | target or `x`,`y`; `force?`, `timeout?` | `null` |
+| `navigate` | `url`, `until?` (`load` default, `dom`, `idle`), `timeout?` ms (default 30000) | `{tab, url}` on load/DOM/idle, or fails on timeout, DNS/error, download (Linux) |
+| `reload` `back` `forward` | — | `{url}` or `null` if nowhere to go |
+| `url` `title` | — | string |
+| `eval` | `expression` | JSON value; promises awaited; compiled as script |
+| `snapshot` | `selector?`, `max?` (1000), `boxes?`, `format?` (`json` default, `text`) | `{url,title,elements[],truncated?}` or text lines |
+| `find` | `text?` or `regex?` + snapshot params | filtered snapshot |
+| `screenshot` | `path?`, `full?`, `clip?` `{x,y,width,height}` | `{path,bytes}` or `{png_base64}`; full pages capped at 16000 px |
+| `rect` | target | `{x,y,width,height}` viewport-relative |
+| `click` | target or `x,y`; `force?`, `timeout?` | `null` |
 | `hover` | target | `null` |
 | `fill` | target, `value` | `null` |
-| `fill_form` | `fields: [{selector\|ref, value}]` | `null`; checkboxes take a bool, selects a value or array |
+| `fill_form` | `fields: [{selector\|ref, value}]` | `null` (checkboxes bool, selects string/array) |
 | `type` | target, `text`, `delay?`, `submit?` | `null` |
-| `press` | target?, `key` (`Enter`, `Control+a`) | `null` (a printable key inserts its character, Enter submits the form; events carry `code`, `keyCode` and `which`) |
-| `select` | target, `value` (string or array) | selected values |
+| `press` | target?, `key` (`Enter`, `Control+a`) | `null` |
+| `select` | target, `value` | selected values |
 | `check` | target, `checked?` | bool |
-| `drag` | `from` target, `to` target | `null` (HTML5 drag events with a shared DataTransfer) |
-| `upload` | target, `paths[]` | file names set on the input |
-| `scroll` | target or `x`,`y` | `{x, y}` |
-| `resize` | `width`, `height` (1 to 16000) | `{width, height}` |
+| `drag` | `from` target, `to` target | `null` |
+| `upload` | target, `paths[]` | file names set on input |
+| `scroll` | target or `x,y` | `{x,y}` |
+| `resize` | `width`, `height` (1–16000) | `{width,height}` |
 | `text` `html` | target | string |
 | `attr` | target, `name` | string or null |
 | `count` | `selector` | number |
-| `wait_for` | `selector`/`ref` + `state?` (visible, attached, hidden), or `text`, `textGone`, `url`, `idle` (no fetch/xhr for 500 ms), `time` ms; `timeout?` ms | `null` |
-| `network` | `clear?` | `[{index, type, method, url, status, ms}]`; fetch/xhr have status and index, other resources do not |
-| `network_request` | `index` | one fetch/xhr entry with `req_headers`, `res_headers`, `body` (first 16 KB) |
-| `console` | `clear?` | `[{level, text, ms}]` console output and uncaught errors since navigation |
-| `dialog` | `accept?`, `text?`, `clear?` | dialogs seen so far; sets the answer for the next ones |
-| `cookies` | | list |
-| `set_cookie` | `name`, `value`, `domain?` (default: current host), `path?` (default `/`) | `null` |
-| `new_tab` | `url?` | `{tab}`, or `{tab, url}` after the page loads when `url` is given |
-| `tabs` | | `[{tab, url, current}]` |
+| `wait_for` | `selector`/`ref` + `state?` (visible, attached, hidden), `text`, `textGone`, `url`, `idle`, `time` ms; `timeout?` ms | `null` |
+| `network` | `clear?` | `[{index,type,method,url,status,ms}]` |
+| `network_request` | `index` | one entry with `req_headers`, `res_headers`, `body` (first 16 KB) |
+| `console` | `clear?` | `[{level,text,ms}]` console output and uncaught errors |
+| `dialog` | `accept?`, `text?`, `clear?` | dialogs seen; sets answer for next ones |
+| `cookies` | — | list |
+| `set_cookie` | `name`, `value`, `domain?`, `path?` (`/`) | `null` |
+| `new_tab` | `url?` | `{tab}` or `{tab,url}` after load if URL given |
+| `tabs` | — | `[{tab,url,current}]` |
 | `switch_tab` | `tab` | `null` |
 | `close_tab` | (uses `tab`) | `null` |
-| `close` | | exits |
+| `close` | — | exits |
 
-Events: `ready`, `navigating`, `load`, `tab_opened` (target=_blank or
-window.open landed in a new tab), `tab_closed`, `dialog` (`type`, `message`,
-`accept`), `tls_error` (Linux; the page stays blank unless `--insecure`),
-`load_failed` and `download` (Linux; downloads are cancelled, nothing is
-written to disk).
+## Events
+
+`ready`, `navigating`, `load`, `tab_opened`, `tab_closed`, `dialog` (`type`, `message`, `accept`), `tls_error` (Linux), `load_failed` and `download` (Linux).
 
 ## Limits
 
-- Input is synthetic DOM events (`isTrusted` is false): no `:hover` styles,
-  no native `<select>` popups, no OS level shortcuts, and sites that check
-  `isTrusted` will ignore it.
-- Network and console logs are in-page (patched fetch/XHR/console + Performance
-  API), so no request bodies, no blocking, and they reset on navigation. Use
-  `--proxy` for real interception.
-- Cross-origin iframes are out of reach; same-origin ones and open shadow
-  roots work.
-- `data:` and `file:` pages load but in-page calls get no reply (wry drops
-  messages whose page URL is not a valid `http::Uri`). Serve pages over
-  localhost instead.
-- Native file choosers are not intercepted; use `upload` instead of clicking
-  a file input.
-- An `eval` that keeps a `querySelectorAll` NodeList of a large page can pin
-  that page in memory until the next full GC; prefer a `TreeWalker` or
-  `count`/`snapshot`.
-- Full-page screenshot on macOS, and on Linux above cairo's 32767 px, resizes
-  the window to the document height (capped at 16000px) and back; on macOS
-  the window cannot grow past the screen, so very tall pages are cut there.
-- Without `--profile`, cookies and storage live for one session. On Linux the
-  HTTP cache is kept across sessions (exit waits up to 1.2 s after the last
-  load so WebKit can write it); on macOS the session is fully non-persistent.
-- Off-screen windows get WebKit's background timer throttling (macOS; also
-  Linux without a compositor), so `setTimeout`-driven pages run slower under
-  `--hidden`. Use `--visible` when timing matters.
-- On macOS a `navigate` to a host that refuses or does not resolve ends with
-  its `timeout` (default 30 s) instead of an immediate error; `--proxy` and
-  `back`/`forward` with `until` are verified on Linux only.
-- Snapshots prefetch DNS for the hosts of the links they list (Linux).
-- The webview starts blank; send `navigate` first.
-- Windows (WebView2): `screenshot` has no `clip`, failed loads show as
-  "load failed" (the WebView2 error page), `--quiet` is a no-op, and the
-  Linux-only flags do nothing.
+- Input is synthetic DOM events (`isTrusted` is false): no `:hover` styles, no native `<select>` popups, no OS-level shortcuts.
+- Network/console logs are patched in-page; no request bodies, reset on navigation. Use `--proxy` for real interception.
+- Cross-origin iframes are out of reach; same-origin iframes and open shadow roots work.
+- `data:` and `file:` pages load but in-page calls get no reply; serve over localhost instead.
+- Native file choosers are not intercepted; use `upload` instead of clicking a file input.
+- Without `--profile`, cookies and storage live for one session.
+- Full-page screenshots capped at 16000 px; on macOS very tall pages may be cut if exceeding screen height.
+- Windows (WebView2): `screenshot` has no `clip`, `--quiet` is a no-op, Linux-only flags have no effect.
+- Under `--hidden`, WebKit timer throttling can slow `setTimeout`-driven pages.
+
+## Development
+
+- `bin/bruster` runs the development build from this checkout.
+- `tests/run_all.sh` runs build, unit, smoke, edge, MCP launch and e2e.
+- CI (`.github/workflows/ci.yml`) builds all platforms, runs tests, and publishes release archives on `v*` tags.
+- Benchmarks: `scripts/bench.py` measures binary size, cold start, page load, snapshot and idle RSS under Xvfb.
+
+## License
+
+[MIT License](LICENSE)
