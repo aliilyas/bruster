@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>bruster  -  Native webview browser for agents</title>
+<title>bruster - Native webview browser for agents</title>
 <meta name="description" content="bruster is a native webview browser (WKWebView, WebKitGTK, WebView2) driven by an agent over JSON lines on stdio. No Chromium download, no Node, one process under 1 MB.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🖥️</text></svg>">
 <style>
@@ -113,7 +113,7 @@
       stdio. No Chromium download, no Node, one process under 1&nbsp;MB.</p>
     <p>bruster controls the engine the operating system already ships  - 
       <strong>WKWebView</strong> on macOS, <strong>WebKitGTK</strong> on Linux and
-      <strong>WebView2</strong> on Windows  -  through a small Rust binary built on
+      <strong>WebView2</strong> on Windows - through a small Rust binary built on
       <a href="https://github.com/tauri-apps/wry">wry</a>. Agents drive it with
       one JSON object per line, or over the Model Context Protocol with
       <code>--mcp</code>.</p>
@@ -135,7 +135,7 @@
 
     <h2 id="overview">Overview</h2>
     <p>bruster starts with its native protocol on stdout and reads commands from
-      stdin. It is one process  -  no bundled browser, no runtime  -  and it speaks
+      stdin. It is one process - no bundled browser, no runtime - and it speaks
       both a line-oriented JSON protocol and the Model Context Protocol. The
       same binary works for a scripted scrape, a test harness, or an agent tool
       stack.</p>
@@ -248,7 +248,7 @@ e4 checkbox "Remember me" checked=false</code></pre>
       <li>Input is synthetic DOM events (<code>isTrusted</code> is false): no <code>:hover</code> styles, no native select popups, no OS shortcuts.</li>
       <li>Network and console logs are in-page; they carry no request bodies and reset on navigation. Use <code>--proxy</code> for real interception.</li>
       <li>Cross-origin iframes are out of reach; same-origin iframes and open shadow roots work.</li>
-      <li><code>data:</code> and <code>file:</code> pages load, but in-page calls get no reply  -  serve pages over localhost instead.</li>
+      <li><code>data:</code> and <code>file:</code> pages load, but in-page calls get no reply - serve pages over localhost instead.</li>
       <li>Native file choosers are not intercepted; use <code>upload</code>.</li>
       <li>Without <code>--profile</code>, cookies and storage live for one session.</li>
       <li>On Windows (WebView2), <code>screenshot</code> has no <code>clip</code> and the Linux-only flags do nothing.</li>
@@ -299,7 +299,7 @@ fetch("./metrics.json").then(function(r){if(!r.ok)throw 0;return r.json();}).the
   if(m.snapshot_ms)get("m-snapshot").textContent=fmt(m.snapshot_ms);
   if(m.updated_utc)get("m-foot").textContent="Measured "+m.updated_utc+" · "+m.environment+(m.commit?" · commit "+m.commit.slice(0,7):"");
 }).catch(function(){
-  get("m-foot").textContent="Benchmarks pending  -  results will appear here after the next CI run on main.";
+  get("m-foot").textContent="Benchmarks pending - results will appear here after the next CI run on main.";
 });
 </script>
 </body>
