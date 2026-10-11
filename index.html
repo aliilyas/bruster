@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>bruster - Native webview browser for agents</title>
+<title>bruster: Native webview browser for agents</title>
 <meta name="description" content="bruster is a native webview browser (WKWebView, WebKitGTK, WebView2) driven by an agent over JSON lines on stdio. No Chromium download, no Node, one process under 1 MB.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🖥️</text></svg>">
 <style>
@@ -110,12 +110,12 @@
   <main class="content">
     <h1 id="top">bruster</h1>
     <p class="lead">A native webview browser driven by an agent over JSON lines on
-      stdio. No Chromium download, no Node, one process under 1&nbsp;MB.</p>
-    <p>bruster controls the engine the operating system already ships  - 
-      <strong>WKWebView</strong> on macOS, <strong>WebKitGTK</strong> on Linux and
-      <strong>WebView2</strong> on Windows - through a small Rust binary built on
+      stdio. No Chromium download. No Node. One process of less than 1&nbsp;MB.</p>
+    <p>bruster controls the engine that the operating system already ships:
+      <strong>WKWebView</strong> on macOS, <strong>WebKitGTK</strong> on Linux, and
+      <strong>WebView2</strong> on Windows. The program is a small Rust binary built on
       <a href="https://github.com/tauri-apps/wry">wry</a>. Agents drive it with
-      one JSON object per line, or over the Model Context Protocol with
+      one JSON object per line, or with the Model Context Protocol through
       <code>--mcp</code>.</p>
 
     <div class="badges">
@@ -134,34 +134,35 @@
     </div>
 
     <h2 id="overview">Overview</h2>
-    <p>bruster starts with its native protocol on stdout and reads commands from
-      stdin. It is one process - no bundled browser, no runtime - and it speaks
+    <p>bruster reads commands from stdin and writes its native protocol to
+      stdout. It is one process with no bundled browser and no runtime. It uses
       both a line-oriented JSON protocol and the Model Context Protocol. The
       same binary works for a scripted scrape, a test harness, or an agent tool
       stack.</p>
     <ul>
       <li><strong>Native engine.</strong> WKWebView, WebKitGTK 4.1 and WebView2, selected at build time.</li>
-      <li><strong>Small.</strong> A single release binary around <span id="inline-binary">1</span>&nbsp;MB; no separate browser download.</li>
+      <li><strong>Small.</strong> One release binary of about <span id="inline-binary">1</span>&nbsp;MB. There is no separate browser download.</li>
       <li><strong>Complete.</strong> Navigation, DOM snapshots, forms, screenshots, cookies, tabs, network and console logs.</li>
       <li><strong>Portable.</strong> Prebuilt for macOS (arm64, x86_64), Linux (x86_64, arm64) and Windows (x86_64).</li>
-      <li><strong>Agent-ready.</strong> <code>--mcp</code> exposes every method as a tool; page events arrive as notifications.</li>
+      <li><strong>Agent-ready.</strong> <code>--mcp</code> exposes every method as a tool. Page events arrive as notifications.</li>
     </ul>
 
     <h2 id="install">Installation</h2>
     <p>The install script downloads the build for this OS and CPU into
       <code>~/.local/bin</code>:</p>
     <pre><code>curl -fsSL https://raw.githubusercontent.com/aliilyas/bruster/main/install.sh | sh</code></pre>
-    <p>Prebuilt archives for every platform are attached to the
+    <p>Prebuilt archives for every platform are on the
       <a href="https://github.com/aliilyas/bruster/releases">releases page</a>.
-      From source, with a Rust toolchain:</p>
+      To build from source, you need a Rust toolchain:</p>
     <pre><code>cargo build --release</code></pre>
-    <div class="note"><strong>Linux runtime.</strong> WebKitGTK 4.1 is required
-      (<code>apt install libwebkit2gtk-4.1-0</code>, <code>apk add webkit2gtk-4.1</code>,
-      <code>dnf install webkit2gtk4.1</code>). Without a desktop session, bruster
-      re-runs itself under <code>xvfb-run -a</code> when no <code>DISPLAY</code> is set.</div>
+    <div class="note"><strong>Linux runtime.</strong> WebKitGTK 4.1 is necessary.
+      Install it with one of these commands: <code>apt install libwebkit2gtk-4.1-0</code>,
+      <code>apk add webkit2gtk-4.1</code>, or
+      <code>dnf install webkit2gtk4.1</code>. If there is no desktop session, bruster
+      starts again under <code>xvfb-run -a</code> when <code>DISPLAY</code> is not set.</div>
 
     <h2 id="quickstart">Quickstart</h2>
-    <p>Send one JSON object per line to stdin; read results and events from
+    <p>Send one JSON object per line to stdin. Read the results and events from
       stdout:</p>
     <pre><code>$ bruster
 → {"id":1,"method":"navigate","params":{"url":"https://example.com"}}
@@ -175,23 +176,23 @@
     <h2 id="usage">Command-line usage</h2>
     <pre><code>bruster [--mcp] [--hidden|--visible] [--quiet] [options]</code></pre>
     <table>
-      <tr><th><code>--mcp</code></th><td>speak Model Context Protocol on stdio instead of the native protocol; implies <code>--hidden</code></td></tr>
-      <tr><th><code>--hidden</code> / <code>--visible</code></th><td>park windows off-screen / show them</td></tr>
-      <tr><th><code>--quiet</code></th><td>send stderr to <code>/dev/null</code>; mutes GL, ALSA and GTK noise</td></tr>
+      <tr><th><code>--mcp</code></th><td>use the Model Context Protocol on stdio instead of the native protocol. This option also sets <code>--hidden</code></td></tr>
+      <tr><th><code>--hidden</code> / <code>--visible</code></th><td>move the windows off-screen / show the windows</td></tr>
+      <tr><th><code>--quiet</code></th><td>send stderr to <code>/dev/null</code>. This mutes GL, ALSA, and GTK noise</td></tr>
       <tr><th><code>--viewport WxH</code></th><td>initial window size, default <code>1280x800</code></td></tr>
-      <tr><th><code>--user-agent UA</code></th><td>override the user agent</td></tr>
-      <tr><th><code>--profile DIR</code></th><td>persistent cookies and storage</td></tr>
+      <tr><th><code>--user-agent UA</code></th><td>replace the user agent</td></tr>
+      <tr><th><code>--profile DIR</code></th><td>keep cookies and storage between runs</td></tr>
       <tr><th><code>--proxy URL</code></th><td><code>http://host:port</code> or <code>socks5://host:port</code></td></tr>
-      <tr><th><code>--init-script FILE</code></th><td>JavaScript run in every page before its own scripts</td></tr>
+      <tr><th><code>--init-script FILE</code></th><td>JavaScript that runs in every page before its own scripts</td></tr>
       <tr><th><code>--insecure</code></th><td>ignore TLS errors (Linux only)</td></tr>
-      <tr><th><code>--no-images</code></th><td>do not load images; pages load about 30% faster (Linux only)</td></tr>
+      <tr><th><code>--no-images</code></th><td>do not load images. Pages load about 30% faster (Linux only)</td></tr>
     </table>
 
     <h2 id="mcp">Model Context Protocol</h2>
-    <p>With <code>--mcp</code>, every method below becomes a tool, and page
-      events are delivered as <code>notifications/message</code>. Buttons
-      remain hidden unless <code>--visible</code> is added.</p>
-    <p>opencode, Claude Desktop, Cursor, Windsurf and Zed share one shape:</p>
+    <p>With <code>--mcp</code>, every method below becomes a tool. Page events
+      are delivered as <code>notifications/message</code>. The windows stay hidden
+      unless you add <code>--visible</code>.</p>
+    <p>opencode, Claude Desktop, Cursor, Windsurf, and Zed use the same shape:</p>
     <pre><code>{ "mcpServers": { "bruster": { "command": "bruster", "args": ["--mcp", "--quiet"] } } }</code></pre>
     <pre><code>claude mcp add bruster -- bruster --mcp --quiet
 codex mcp add bruster -- bruster --mcp --quiet</code></pre>
@@ -200,12 +201,12 @@ codex mcp add bruster -- bruster --mcp --quiet</code></pre>
 
     <h2 id="protocol">Native protocol</h2>
     <p>One JSON object per line, in both directions. A request carries
-      <code>id</code>, <code>method</code> and optional <code>params</code>; the
-      reply carries the same <code>id</code> with a <code>result</code> or
-      <code>error</code>. Elements are addressed by
-      <code>{"selector": "css"}</code> or by a <code>ref</code> from the last
-      snapshot. With <code>format: "text"</code> a snapshot renders as one line
-      per element, about 45% smaller than JSON:</p>
+      <code>id</code>, <code>method</code>, and optional <code>params</code>. The
+      reply carries the same <code>id</code> with a <code>result</code> or an
+      <code>error</code>. You can address elements with
+      <code>{"selector": "css"}</code> or with a <code>ref</code> from the last
+      snapshot. With <code>format: "text"</code>, a snapshot renders as one line
+      per element. This is about 45% smaller than JSON:</p>
     <pre><code>https://example.com/
 Example Domain
 e1 heading "Example Domain"
@@ -245,36 +246,37 @@ e4 checkbox "Remember me" checked=false</code></pre>
 
     <h2 id="limits">Limitations</h2>
     <ul>
-      <li>Input is synthetic DOM events (<code>isTrusted</code> is false): no <code>:hover</code> styles, no native select popups, no OS shortcuts.</li>
-      <li>Network and console logs are in-page; they carry no request bodies and reset on navigation. Use <code>--proxy</code> for real interception.</li>
-      <li>Cross-origin iframes are out of reach; same-origin iframes and open shadow roots work.</li>
-      <li><code>data:</code> and <code>file:</code> pages load, but in-page calls get no reply - serve pages over localhost instead.</li>
-      <li>Native file choosers are not intercepted; use <code>upload</code>.</li>
-      <li>Without <code>--profile</code>, cookies and storage live for one session.</li>
+      <li>Input uses synthetic DOM events (<code>isTrusted</code> is false). You do not get <code>:hover</code> styles, native select popups, or OS shortcuts.</li>
+      <li>Network and console logs are in the page. They carry no request bodies and they reset on navigation. Use <code>--proxy</code> for real interception.</li>
+      <li>Cross-origin iframes are out of reach. Same-origin iframes and open shadow roots work.</li>
+      <li><code>data:</code> and <code>file:</code> pages load, but in-page calls get no reply. Serve the pages over localhost instead.</li>
+      <li>bruster does not intercept native file choosers. Use <code>upload</code>.</li>
+      <li>Without <code>--profile</code>, cookies and storage last for one session.</li>
       <li>On Windows (WebView2), <code>screenshot</code> has no <code>clip</code> and the Linux-only flags do nothing.</li>
     </ul>
 
     <h2 id="performance">Performance</h2>
-    <p>Numbers are measured in CI on every push to <code>main</code> by
-      <code>scripts/bench.py</code>: a release build on Ubuntu 24.04 x86_64,
-      running under Xvfb with WebKitGTK 4.1.</p>
+    <p>CI measures these numbers on every push to <code>main</code> with
+      <code>scripts/bench.py</code>. The environment is a release build on
+      Ubuntu 24.04 x86_64 under Xvfb with WebKitGTK 4.1.</p>
     <table class="metrics">
       <tr><th>Metric</th><th>Value</th></tr>
-      <tr><td>Release binary size</td><td><span id="m-binary"> - </span> MB</td></tr>
-      <tr><td>Idle memory (RSS)</td><td><span id="m-rss"> - </span> MB</td></tr>
-      <tr><td>Page load (local file)</td><td><span id="m-page"> - </span> ms</td></tr>
-      <tr><td>Cold start → ready</td><td><span id="m-cold"> - </span> ms</td></tr>
-      <tr><td>Snapshot round-trip</td><td><span id="m-snapshot"> - </span> ms</td></tr>
+      <tr><td>Release binary size</td><td><span id="m-binary">n/a</span> MB</td></tr>
+      <tr><td>Idle memory (RSS)</td><td><span id="m-rss">n/a</span> MB</td></tr>
+      <tr><td>Page load (local file)</td><td><span id="m-page">n/a</span> ms</td></tr>
+      <tr><td>Cold start to ready</td><td><span id="m-cold">n/a</span> ms</td></tr>
+      <tr><td>Snapshot round-trip</td><td><span id="m-snapshot">n/a</span> ms</td></tr>
     </table>
-    <p id="m-foot" style="font-size:.85rem;color:#6a737d">Benchmarks run automatically; results are published here on the next CI run.</p>
+    <p id="m-foot" style="font-size:.85rem;color:#6a737d">Benchmarks run automatically. The results are published here after the next CI run.</p>
 
     <h2 id="development">Development</h2>
     <p><code>bin/bruster</code> runs the development build from a checkout.
-      <code>tests/run_all.sh [--rounds N] [--no-e2e]</code> runs the whole
-      cycle: build, unit tests, the smoke and edge suites, a leftover-process
-      check, the MCP launch check and the public-site end-to-end tests. On
-      Linux, run it under <code>xvfb-run -a</code>. CI builds and tests every
-      platform and publishes release archives on a <code>v*</code> tag.</p>
+      <code>tests/run_all.sh [--rounds N] [--no-e2e]</code> runs the full
+      cycle. The cycle does a build, unit tests, smoke tests, edge tests, a
+      leftover-process check, the MCP launch check, and the public-site
+      end-to-end tests. On Linux, run the script under <code>xvfb-run -a</code>.
+      CI builds and tests every platform. CI also publishes release archives on
+      a <code>v*</code> tag.</p>
 
     <h2 id="license">License</h2>
     <p>bruster is released under the <a href="https://github.com/aliilyas/bruster/blob/main/LICENSE">MIT License</a>.</p>
@@ -299,7 +301,7 @@ fetch("./metrics.json").then(function(r){if(!r.ok)throw 0;return r.json();}).the
   if(m.snapshot_ms)get("m-snapshot").textContent=fmt(m.snapshot_ms);
   if(m.updated_utc)get("m-foot").textContent="Measured "+m.updated_utc+" · "+m.environment+(m.commit?" · commit "+m.commit.slice(0,7):"");
 }).catch(function(){
-  get("m-foot").textContent="Benchmarks pending - results will appear here after the next CI run on main.";
+  get("m-foot").textContent="Benchmarks pending. Results appear here after the next CI run on main.";
 });
 </script>
 </body>
