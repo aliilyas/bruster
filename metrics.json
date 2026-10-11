@@ -1,1 +1,10 @@
-{"updated_utc": "pending", "environment": "first benchmark run in progress", "binary_kb": 0, "cold_start_ms": 0, "page_load_ms": 0, "snapshot_ms": 0, "idle_rss_mb": 0, "commit": ""}
+{
+  "updated_utc": "2026-10-11 22:18 UTC",
+  "commit": "e226fae985c2cd7d50812b73195dac2b8ddd873c",
+  "environment": "GitHub Actions \u00b7 ubuntu-24.04 x86_64",
+  "binary_kb": 1347.2,
+  "cold_start_ms": 32116,
+  "page_load_ms": -9,
+  "snapshot_ms": 2,
+  "idle_rss_mb": 172.0
+}
