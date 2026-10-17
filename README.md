@@ -119,7 +119,10 @@ codex mcp add bruster -- bruster --mcp --quiet           # Codex CLI
 { "servers": { "bruster": { "type": "stdio", "command": "bruster", "args": ["--mcp", "--quiet"] } } }
 ```
 
-`--mcp` keeps the windows hidden. Add `--visible` to see the browser.
+`--mcp` keeps the windows off-screen. Add `--visible` to see the browser.
+`--hidden` is not true headless mode: on Linux, WebKitGTK still requires an
+X11/Wayland display or Xvfb. When no display is set, Bruster automatically tries
+`xvfb-run`; install Xvfb if it is unavailable.
 
 ## Run
 

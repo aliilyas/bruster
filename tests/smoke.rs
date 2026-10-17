@@ -1369,6 +1369,9 @@ fn launch_options() {
             b.ok("eval", json!({ "expression": "window.__injected" })),
             42
         );
+        // Make the last load older than the cache grace period: shutdown must
+        // also preserve storage written immediately before close, not just load data.
+        b.ok("wait_for", json!({ "time": 1500 }));
         b.ok(
             "eval",
             json!({ "expression": "localStorage.setItem('k', 'kept')" }),
@@ -1385,6 +1388,32 @@ fn launch_options() {
     drop(b);
     let _ = std::fs::remove_file(&init);
     let _ = std::fs::remove_dir_all(&profile);
+}
+
+#[test]
+#[cfg(target_os = "linux")]
+fn missing_display_fails_cleanly() {
+    for mode in ["--hidden", "--mcp"] {
+        for no_xvfb in [false, true] {
+            let mut command = Command::new(env!("CARGO_BIN_EXE_bruster"));
+            command
+                .args([mode, "--quiet"])
+                .env_remove("DISPLAY")
+                .env_remove("WAYLAND_DISPLAY")
+                .env_remove("BRUSTER_NO_XVFB")
+                .env("PATH", "");
+            if no_xvfb {
+                command.env("BRUSTER_NO_XVFB", "1");
+            }
+            let output = command.output().unwrap();
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            assert_eq!(output.status.code(), Some(1), "{stderr}");
+            assert!(stderr.contains("WebKitGTK requires a display"), "{stderr}");
+            assert!(stderr.contains("install Xvfb"), "{stderr}");
+            assert!(!stderr.contains("panicked"), "{stderr}");
+            assert!(output.stdout.is_empty());
+        }
+    }
 }
 
 #[test]

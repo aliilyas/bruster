@@ -7,6 +7,13 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 
+def is_error(result):
+    """Accept the current SDK field and older snake_case wrappers."""
+    if hasattr(result, 'isError'):
+        return result.isError
+    return result.is_error
+
+
 async def main(command, args):
     params = StdioServerParameters(command=command, args=args)
     async with stdio_client(params, errlog=open('/dev/null', 'w')) as (read, write):
@@ -21,7 +28,7 @@ async def main(command, args):
             tabs = await s.call_tool('new_tab', {'url': 'https://example.com/'})
             assert '"tab"' in tabs.content[0].text, tabs
             bad = await s.call_tool('eval', {'expression': 'throw new Error("boom")'})
-            assert bad.is_error and 'boom' in bad.content[0].text, bad
+            assert is_error(bad) and 'boom' in bad.content[0].text, bad
             print('PASS py-sdk', len(tools), 'tools')
 
 

@@ -531,18 +531,22 @@ fn ensure_display(args: &[String]) {
     let has_display = ["DISPLAY", "WAYLAND_DISPLAY"]
         .iter()
         .any(|v| std::env::var_os(v).is_some_and(|d| !d.is_empty()));
-    if has_display || std::env::var_os("BRUSTER_NO_XVFB").is_some() {
+    if has_display {
         return;
     }
-    let Ok(me) = std::env::current_exe() else {
-        return;
-    };
-    // exec only returns on failure; then try without a display and let GTK complain.
-    let _ = std::process::Command::new("xvfb-run")
-        .arg("-a")
-        .arg(me)
-        .args(args)
-        .exec();
+    if std::env::var_os("BRUSTER_NO_XVFB").is_none() {
+        if let Ok(me) = std::env::current_exe() {
+            // exec only returns on failure. Never continue into GTK without a display.
+            let error = std::process::Command::new("xvfb-run")
+                .arg("-a")
+                .arg(me)
+                .args(args)
+                .exec();
+            eprintln!("bruster: could not start xvfb-run: {error}");
+        }
+    }
+    eprintln!("bruster: WebKitGTK requires a display, even with --hidden/--mcp; set DISPLAY or WAYLAND_DISPLAY, or install Xvfb (xvfb-run).");
+    std::process::exit(1);
 }
 
 #[cfg(not(target_os = "linux"))]
@@ -634,6 +638,10 @@ impl App {
     }
 
     fn close_tab(&mut self, id: TabId) -> bool {
+        self.close_tab_inner(id, true)
+    }
+
+    fn close_tab_inner(&mut self, id: TabId, _terminate: bool) -> bool {
         let Some(tab) = self.tabs.remove(&id) else {
             return false;
         };
@@ -650,7 +658,7 @@ impl App {
         // denied and opened through open_tab). Release this tab's web process
         // instead of leaving it in WebKit's idle process cache after close.
         #[cfg(target_os = "linux")]
-        {
+        if _terminate {
             use webkit2gtk::WebViewExt;
             use wry::WebViewExtUnix;
             tab.webview.webview().terminate_web_process();
@@ -667,8 +675,15 @@ impl App {
     /// Fails every request still waiting on a tab before the process exits,
     /// instead of dropping the stdout pipe out from under them.
     fn shutdown(&mut self) {
+        let persistent = self.opts.profile.is_some();
+        if persistent {
+            // Storage may have changed long after the last load. Let WebKit's
+            // processes persist it while the views are still alive, and do not
+            // forcibly kill them on this graceful profile shutdown path.
+            std::thread::sleep(CACHE_FLUSH_DELAY);
+        }
         for id in self.tabs.keys().copied().collect::<Vec<_>>() {
-            self.close_tab(id);
+            self.close_tab_inner(id, !persistent);
         }
         match &self.scratch {
             Some(dir) => {
