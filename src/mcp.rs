@@ -27,7 +27,16 @@ const METHOD_NOT_FOUND: i64 = -32601;
 const INVALID_PARAMS: i64 = -32602;
 
 /// RFC 5424 order, as used by logging/setLevel. Events are sent at info.
-const LOG_LEVELS: &[&str] = &["debug", "info", "notice", "warning", "error", "critical", "alert", "emergency"];
+const LOG_LEVELS: &[&str] = &[
+    "debug",
+    "info",
+    "notice",
+    "warning",
+    "error",
+    "critical",
+    "alert",
+    "emergency",
+];
 const EVENT_LEVEL: usize = 1;
 
 static ENABLED: AtomicBool = AtomicBool::new(false);
@@ -59,13 +68,17 @@ fn rpc_result(id: Value, result: Value) {
 }
 
 fn rpc_error(id: Value, code: i64, msg: impl ToString) {
-    write(json!({ "jsonrpc": JSONRPC, "id": id, "error": { "code": code, "message": msg.to_string() } }));
+    write(
+        json!({ "jsonrpc": JSONRPC, "id": id, "error": { "code": code, "message": msg.to_string() } }),
+    );
 }
 
 /// Parses one stdin line. `Ok(None)` means it was consumed here.
 pub fn incoming(line: &str) -> Result<Option<Request>, String> {
     if !enabled() {
-        return serde_json::from_str(line).map(Some).map_err(|e| e.to_string());
+        return serde_json::from_str(line)
+            .map(Some)
+            .map_err(|e| e.to_string());
     }
 
     let msg: Value = match serde_json::from_str(line) {
@@ -82,7 +95,9 @@ pub fn incoming(line: &str) -> Result<Option<Request>, String> {
     match method {
         "initialize" => {
             let wanted = params.get("protocolVersion").and_then(Value::as_str);
-            let version = wanted.filter(|v| SUPPORTED_VERSIONS.contains(v)).unwrap_or(SUPPORTED_VERSIONS[0]);
+            let version = wanted
+                .filter(|v| SUPPORTED_VERSIONS.contains(v))
+                .unwrap_or(SUPPORTED_VERSIONS[0]);
             rpc_result(
                 id,
                 json!({
@@ -104,15 +119,29 @@ pub fn incoming(line: &str) -> Result<Option<Request>, String> {
                 return Ok(None);
             }
             let mut args = params.get("arguments").cloned().unwrap_or(json!({}));
-            let tab = args.as_object_mut().and_then(|o| o.remove("tab")).and_then(|t| t.as_u64()).map(|t| t as u32);
+            let tab = args
+                .as_object_mut()
+                .and_then(|o| o.remove("tab"))
+                .and_then(|t| t.as_u64())
+                .map(|t| t as u32);
             // The model reads the result as text anyway; the line format is ~40% smaller than JSON.
             if matches!(name, "snapshot" | "find") && args.get("format").is_none() {
                 args["format"] = json!("text");
             }
 
             let internal = NEXT_ID.fetch_add(1, Ordering::Relaxed);
-            IN_FLIGHT.lock().unwrap().as_mut().unwrap().insert(internal, id);
-            return Ok(Some(Request { id: internal, method: name.to_owned(), params: args, tab }));
+            IN_FLIGHT
+                .lock()
+                .unwrap()
+                .as_mut()
+                .unwrap()
+                .insert(internal, id);
+            return Ok(Some(Request {
+                id: internal,
+                method: name.to_owned(),
+                params: args,
+                tab,
+            }));
         }
         "logging/setLevel" => {
             let level = params.get("level").and_then(Value::as_str).unwrap_or("");
@@ -127,7 +156,9 @@ pub fn incoming(line: &str) -> Result<Option<Request>, String> {
         "notifications/initialized" => INITIALIZED.store(true, Ordering::Relaxed),
         // The browser still finishes the work; its answer is dropped in outgoing().
         "notifications/cancelled" => {
-            let Some(rpc_id) = params.get("requestId") else { return Ok(None) };
+            let Some(rpc_id) = params.get("requestId") else {
+                return Ok(None);
+            };
             if let Some(map) = IN_FLIGHT.lock().unwrap().as_mut() {
                 map.retain(|_, v| *v != *rpc_id);
             }
@@ -209,6 +240,11 @@ fn tools() -> Vec<Value> {
         ("upload", "Set files on a file input from local paths.", "target,paths", &["paths"]),
         ("scroll", "Scroll an element into view, or by x/y.", "target,x,y", &[]),
         ("resize", "Resize the viewport.", "width,height", &["width", "height"]),
+        ("maximize", "Maximize this window and persist the requested mode for future runs. Hidden windows only persist the mode.", "", &[]),
+        ("minimize", "Hide this native window and persist minimized mode. Hidden windows stay off-screen and only persist the mode.", "", &[]),
+        ("dark", "Persist dark color-scheme for all existing and future pages.", "", &[]),
+        ("light", "Persist light color-scheme for all existing and future pages.", "", &[]),
+        ("close", "Shut down Bruster, closing all tabs and the stdio server. Use close_tab to close only one tab.", "", &[]),
         ("text", "innerText of an element, truncated to max characters.", "target,max", &[]),
         ("html", "outerHTML of an element.", TARGET, &[]),
         ("attr", "Attribute value of an element.", "target,name", &["name"]),
@@ -233,20 +269,28 @@ fn tools() -> Vec<Value> {
         ("close_tab", "Close a tab.", "", &[]),
     ];
 
-
     specs
         .iter()
         .map(|(name, desc, props, required)| {
             let mut properties = serde_json::Map::new();
             for p in props.split(',').filter(|p| !p.is_empty()) {
                 if p == TARGET {
-                    properties.insert("selector".into(), json!({ "type": "string", "description": "CSS selector" }));
-                    properties.insert("ref".into(), json!({ "type": "string", "description": "ref from snapshot, e.g. e3" }));
+                    properties.insert(
+                        "selector".into(),
+                        json!({ "type": "string", "description": "CSS selector" }),
+                    );
+                    properties.insert(
+                        "ref".into(),
+                        json!({ "type": "string", "description": "ref from snapshot, e.g. e3" }),
+                    );
                     continue;
                 }
                 properties.insert(p.into(), prop_schema(p));
             }
-            properties.insert("tab".into(), json!({ "type": "integer", "description": "tab id, defaults to current" }));
+            properties.insert(
+                "tab".into(),
+                json!({ "type": "integer", "description": "tab id, defaults to current" }),
+            );
 
             json!({
                 "name": name,
@@ -259,9 +303,15 @@ fn tools() -> Vec<Value> {
 
 fn prop_schema(name: &str) -> Value {
     match name {
-        "full" | "clear" | "checked" | "force" | "boxes" | "submit" | "idle" | "accept" => json!({ "type": "boolean" }),
-        "timeout" | "delay" | "x" | "y" | "tab" | "max" | "width" | "height" | "time" | "index" => json!({ "type": "integer" }),
-        "paths" => json!({ "type": "array", "items": { "type": "string" }, "description": "local file paths" }),
+        "full" | "clear" | "checked" | "force" | "boxes" | "submit" | "idle" | "accept" => {
+            json!({ "type": "boolean" })
+        }
+        "timeout" | "delay" | "x" | "y" | "tab" | "max" | "width" | "height" | "time" | "index" => {
+            json!({ "type": "integer" })
+        }
+        "paths" => {
+            json!({ "type": "array", "items": { "type": "string" }, "description": "local file paths" })
+        }
         "fields" => json!({ "type": "array", "items": { "type": "object", "properties": {
             "selector": { "type": "string" }, "ref": { "type": "string" }, "value": {} } } }),
         "from" | "to" => json!({ "type": "object", "properties": {
@@ -271,8 +321,30 @@ fn prop_schema(name: &str) -> Value {
             "width": { "type": "number" }, "height": { "type": "number" } } }),
         "value" => json!({ "description": "string, or array of strings for multi-select" }),
         "state" => json!({ "type": "string", "enum": ["visible", "attached", "hidden"] }),
-        "format" => json!({ "type": "string", "enum": ["text", "json"], "description": "text (default) or json" }),
-        "until" => json!({ "type": "string", "enum": ["dom", "load", "idle"], "description": "page milestone to wait for, default load" }),
+        "format" => {
+            json!({ "type": "string", "enum": ["text", "json"], "description": "text (default) or json" })
+        }
+        "until" => {
+            json!({ "type": "string", "enum": ["dom", "load", "idle"], "description": "page milestone to wait for, default load" })
+        }
         _ => json!({ "type": "string" }),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn window_controls_are_exposed() {
+        let tools = super::tools();
+        for name in [
+            "maximize",
+            "minimize",
+            "dark",
+            "light",
+            "close",
+            "close_tab",
+        ] {
+            assert!(tools.iter().any(|t| t["name"] == name), "missing {name}");
+        }
     }
 }

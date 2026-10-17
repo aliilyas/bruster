@@ -12,25 +12,48 @@ use common::*;
 
 /// RSS in MB of the bruster process tree (Linux only; 0 elsewhere).
 fn rss_mb(root: u32) -> u64 {
-    let Ok(procs) = std::fs::read_dir("/proc") else { return 0 };
+    let Ok(procs) = std::fs::read_dir("/proc") else {
+        return 0;
+    };
     let mut parent = std::collections::HashMap::new();
     for e in procs.flatten() {
-        let Ok(pid) = e.file_name().to_string_lossy().parse::<u32>() else { continue };
-        let Ok(stat) = std::fs::read_to_string(e.path().join("stat")) else { continue };
-        let ppid = stat.rsplit(')').next().and_then(|s| s.split_whitespace().nth(1)).and_then(|p| p.parse::<u32>().ok());
+        let Ok(pid) = e.file_name().to_string_lossy().parse::<u32>() else {
+            continue;
+        };
+        let Ok(stat) = std::fs::read_to_string(e.path().join("stat")) else {
+            continue;
+        };
+        let ppid = stat
+            .rsplit(')')
+            .next()
+            .and_then(|s| s.split_whitespace().nth(1))
+            .and_then(|p| p.parse::<u32>().ok());
         parent.insert(pid, ppid.unwrap_or(0));
     }
     let mut total = 0;
     for (&pid, _) in &parent {
         let mut p = pid;
         let mine = loop {
-            if p == root { break true }
-            match parent.get(&p) { Some(&pp) if pp > 1 => p = pp, _ => break false }
+            if p == root {
+                break true;
+            }
+            match parent.get(&p) {
+                Some(&pp) if pp > 1 => p = pp,
+                _ => break false,
+            }
         };
-        if !mine { continue }
-        let Ok(status) = std::fs::read_to_string(format!("/proc/{pid}/status")) else { continue };
+        if !mine {
+            continue;
+        }
+        let Ok(status) = std::fs::read_to_string(format!("/proc/{pid}/status")) else {
+            continue;
+        };
         if let Some(l) = status.lines().find(|l| l.starts_with("VmRSS:")) {
-            total += l.split_whitespace().nth(1).and_then(|v| v.parse::<u64>().ok()).unwrap_or(0);
+            total += l
+                .split_whitespace()
+                .nth(1)
+                .and_then(|v| v.parse::<u64>().ok())
+                .unwrap_or(0);
         }
     }
     total / 1024
@@ -43,7 +66,11 @@ fn beforeunload_does_not_block() {
     b.open(&format!("{base}/beforeunload"));
 
     b.ok("click", json!({ "selector": "#l" }));
-    assert_eq!(b.ok("title", json!({})), "other", "beforeunload prompt blocked the tab");
+    assert_eq!(
+        b.ok("title", json!({})),
+        "other",
+        "beforeunload prompt blocked the tab"
+    );
 }
 
 #[test]
@@ -54,7 +81,10 @@ fn navigate_times_out_and_is_superseded() {
 
     // A server that never answers: navigate fails at its timeout, the tab still works.
     let t = Instant::now();
-    let err = b.err("navigate", json!({ "url": format!("{base}/hang"), "timeout": 1000 }));
+    let err = b.err(
+        "navigate",
+        json!({ "url": format!("{base}/hang"), "timeout": 1000 }),
+    );
     assert!(err.contains("timed out"), "{err}");
     assert!(t.elapsed() >= Duration::from_millis(900) && t.elapsed() < Duration::from_secs(5));
     assert_eq!(b.ok("title", json!({})), "other");
@@ -77,7 +107,11 @@ fn odd_documents() {
     assert!(snap.as_str().unwrap().contains("x"), "{snap}");
     b.open(&format!("{base}/json"));
     // WebView2 pretty-prints JSON, so only the key is stable across engines.
-    assert!(b.ok("text", json!({ "selector": "body" })).as_str().unwrap().contains("\"a\""));
+    assert!(b
+        .ok("text", json!({ "selector": "body" }))
+        .as_str()
+        .unwrap()
+        .contains("\"a\""));
 
     // Redirects land on the final url.
     let r = b.ok("navigate", json!({ "url": format!("{base}/redirect") }));
@@ -86,7 +120,11 @@ fn odd_documents() {
     // pushState navigation: url follows, back returns, no load event needed.
     b.open(&format!("{base}/spa"));
     b.ok("click", json!({ "selector": "#go" }));
-    assert!(b.ok("url", json!({})).as_str().unwrap().ends_with("/spa/about"));
+    assert!(b
+        .ok("url", json!({}))
+        .as_str()
+        .unwrap()
+        .ends_with("/spa/about"));
     assert_eq!(b.ok("text", json!({ "selector": "#p" })), "about");
     b.ok("back", json!({}));
     assert!(b.ok("url", json!({})).as_str().unwrap().ends_with("/spa"));
@@ -111,23 +149,44 @@ fn protocol_abuse_keeps_serving() {
         r#"null"#,
     ] {
         writeln!(b.stdin, "{line}").unwrap();
-        let v = b.take("bad request error", |v| v["error"].as_str().is_some_and(|e| e.starts_with("bad request")));
+        let v = b.take("bad request error", |v| {
+            v["error"]
+                .as_str()
+                .is_some_and(|e| e.starts_with("bad request"))
+        });
         assert!(v.get("id").is_none(), "{v}");
     }
-    assert!(b.err("title", json!([1, 2])).contains("params must be an object"));
-    assert!(b.err("click", json!("x")).contains("params must be an object"));
-    assert!(b.err("click", json!({ "selector": "###", "timeout": 100 })).contains("not a valid selector"));
-    assert!(b.err("find", json!({ "regex": "(" })).contains("regular expression"));
+    assert!(b
+        .err("title", json!([1, 2]))
+        .contains("params must be an object"));
+    assert!(b
+        .err("click", json!("x"))
+        .contains("params must be an object"));
+    assert!(b
+        .err("click", json!({ "selector": "###", "timeout": 100 }))
+        .contains("not a valid selector"));
+    assert!(b
+        .err("find", json!({ "regex": "(" }))
+        .contains("regular expression"));
     assert!(b.err("attr", json!({ "selector": "p" })).contains("name"));
-    assert!(b.err("navigate", json!({ "url": "nope" })).contains("invalid url"));
-    assert!(b.err("new_tab", json!({ "url": "nope" })).contains("invalid url"));
+    assert!(b
+        .err("navigate", json!({ "url": "nope" }))
+        .contains("invalid url"));
+    assert!(b
+        .err("new_tab", json!({ "url": "nope" }))
+        .contains("invalid url"));
 
     // A 3 MB line is fine.
     let long = "x".repeat(3_000_000);
-    assert_eq!(b.ok("eval", json!({ "expression": format!("'{long}'.length") })), 3_000_000);
+    assert_eq!(
+        b.ok("eval", json!({ "expression": format!("'{long}'.length") })),
+        3_000_000
+    );
 
     // 20 requests sent without waiting come back in order.
-    let ids: Vec<u64> = (0..20).map(|i| b.send("eval", json!({ "expression": i.to_string() }))).collect();
+    let ids: Vec<u64> = (0..20)
+        .map(|i| b.send("eval", json!({ "expression": i.to_string() })))
+        .collect();
     for (i, id) in ids.iter().enumerate() {
         assert_eq!(b.recv(*id).unwrap(), i);
     }
@@ -142,10 +201,20 @@ fn limits() {
 
     // Oversized windows crash WebKit; refuse them.
     for (w, h) in [(30000, 30000), (0, 0), (1, 100000)] {
-        assert!(b.err("resize", json!({ "width": w, "height": h })).contains("between"), "{w}x{h}");
+        assert!(
+            b.err("resize", json!({ "width": w, "height": h }))
+                .contains("between"),
+            "{w}x{h}"
+        );
     }
-    assert_eq!(b.ok("resize", json!({ "width": 320, "height": 200 }))["width"], 320);
-    assert_eq!(b.ok("resize", json!({ "width": 1280, "height": 800 }))["width"], 1280);
+    assert_eq!(
+        b.ok("resize", json!({ "width": 320, "height": 200 }))["width"],
+        320
+    );
+    assert_eq!(
+        b.ok("resize", json!({ "width": 1280, "height": 800 }))["width"],
+        1280
+    );
 
     // 10000 elements: default snapshot caps and flags it, full one is bounded in time.
     b.open(&format!("{base}/big"));
@@ -156,9 +225,18 @@ fn limits() {
     let all = b.ok("snapshot", json!({ "max": 100000 }));
     assert_eq!(all["elements"].as_array().unwrap().len(), 10000);
     assert!(t.elapsed() < Duration::from_secs(3), "{:?}", t.elapsed());
-    assert_eq!(b.ok("find", json!({ "text": "link 4999" }))["elements"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        b.ok("find", json!({ "text": "link 4999" }))["elements"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
     b.ok("click", json!({ "selector": "#i4999" }));
-    assert_eq!(b.ok("eval", json!({ "expression": "document.activeElement.id" })), "i4999");
+    assert_eq!(
+        b.ok("eval", json!({ "expression": "document.activeElement.id" })),
+        "i4999"
+    );
 
     // Unicode survives fill and type.
     b.open(&format!("{base}/form"));
@@ -178,16 +256,30 @@ fn tabs_and_memory_recover() {
     let before = rss_mb(pid);
 
     // Ten tabs, then closed: memory comes back.
-    let tabs: Vec<u64> = (0..10).map(|_| b.ok("new_tab", json!({ "url": format!("{base}/other") }))["tab"].as_u64().unwrap()).collect();
+    let tabs: Vec<u64> = (0..10)
+        .map(|_| {
+            b.ok("new_tab", json!({ "url": format!("{base}/other") }))["tab"]
+                .as_u64()
+                .unwrap()
+        })
+        .collect();
     assert_eq!(b.ok("tabs", json!({})).as_array().unwrap().len(), 11);
     let peak = rss_mb(pid);
     for t in tabs {
         b.ok("close_tab", json!({ "tab": t }));
+        assert_eq!(
+            b.ok("title", json!({})),
+            "other",
+            "closing a tab terminated the surviving view"
+        );
     }
     b.ok("wait_for", json!({ "time": 2000 }));
     let after = rss_mb(pid);
     if before > 0 {
-        assert!(after < before + (peak - before) / 4, "before {before} peak {peak} after {after}");
+        assert!(
+            after < before + (peak - before) / 4,
+            "before {before} peak {peak} after {after}"
+        );
     }
 
     // Closing the last tab leaves no current one; new_tab makes it current again.
@@ -199,7 +291,10 @@ fn tabs_and_memory_recover() {
     // 30 navigations with snapshots, then idle: the web process gives memory back.
     let start = rss_mb(pid);
     for i in 0..30 {
-        b.open(&format!("{base}/{}", if i % 2 == 0 { "big" } else { "other" }));
+        b.open(&format!(
+            "{base}/{}",
+            if i % 2 == 0 { "big" } else { "other" }
+        ));
         b.ok("snapshot", json!({}));
     }
     let busy = rss_mb(pid);
@@ -211,7 +306,10 @@ fn tabs_and_memory_recover() {
             b.ok("wait_for", json!({ "time": 2000 }));
             settled = rss_mb(pid);
         }
-        assert!(settled < start + (busy - start) / 2, "start {start} busy {busy} settled {settled}");
+        assert!(
+            settled < start + (busy - start) / 2,
+            "start {start} busy {busy} settled {settled}"
+        );
     }
 }
 
@@ -224,6 +322,79 @@ fn stdin_eof_exits_cleanly() {
     b.close_stdin();
     let status = b.child.wait().unwrap();
     assert!(status.success(), "{status}");
+}
+
+#[test]
+fn window_commands_persist_in_hidden_runs() {
+    let root = std::env::temp_dir().join(format!("bruster-window-edge-{}", std::process::id()));
+    std::fs::create_dir_all(&root).unwrap();
+    let profile = root.join("profile");
+    let metadata = root.join("profile.bruster-window.json");
+    for command in ["maximize", "minimize", "maximize"] {
+        let mut b = Browser::spawn_with(&["--profile", profile.to_str().unwrap()]);
+        let expected = if command == "maximize" {
+            "maximized"
+        } else {
+            "minimized"
+        };
+        assert!(b
+            .err(command, json!({ "tab": 999 }))
+            .contains("no such tab"));
+        assert_eq!(b.ok(command, json!({})), expected);
+        assert_eq!(
+            serde_json::from_slice::<Value>(&std::fs::read(&metadata).unwrap()).unwrap()["state"],
+            expected
+        );
+        b.ok("close", json!({}));
+        b.closed = true;
+        assert!(b.child.wait().unwrap().success());
+    }
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn dark_and_light_persist_across_pages_and_runs() {
+    let root = std::env::temp_dir().join(format!("bruster-dark-edge-{}", std::process::id()));
+    std::fs::create_dir_all(&root).unwrap();
+    let profile = root.join("profile");
+    let script = root.join("init.js");
+    std::fs::write(&script, "window.customInit = 42;").unwrap();
+    let base = serve();
+    for (flags, expected) in [(true, "dark"), (false, "dark"), (false, "light")] {
+        let mut args = vec![
+            "--profile",
+            profile.to_str().unwrap(),
+            "--init-script",
+            script.to_str().unwrap(),
+        ];
+        if flags {
+            args.push("--dark");
+        }
+        let mut b = Browser::spawn_with(&args);
+        b.open(&format!("{base}/other"));
+        let scheme = "getComputedStyle(document.documentElement).colorScheme";
+        assert_eq!(b.ok("eval", json!({"expression": scheme})), expected);
+        assert_eq!(b.ok("eval", json!({"expression": "customInit"})), 42);
+        for mode in ["dark", "light"] {
+            assert_eq!(b.ok(mode, json!({})), mode);
+            assert_eq!(b.ok("eval", json!({"expression": scheme})), mode);
+            b.open(&format!("{base}/form"));
+            assert_eq!(b.ok("eval", json!({"expression": scheme})), mode);
+            let tab = b.ok("new_tab", json!({"url": format!("{base}/other")}))["tab"].clone();
+            assert_eq!(
+                b.ok("eval", json!({"tab": tab, "expression": scheme})),
+                mode
+            );
+            b.ok("close_tab", json!({"tab": tab}));
+        }
+        if flags {
+            b.ok("dark", json!({}));
+        }
+        b.ok("close", json!({}));
+        b.closed = true;
+        assert!(b.child.wait().unwrap().success());
+    }
+    std::fs::remove_dir_all(root).unwrap();
 }
 
 #[test]
@@ -244,7 +415,13 @@ fn text_and_value_edges() {
     let mut b = Browser::spawn();
     let base = serve();
     b.open(&format!("{base}/form"));
-    assert_eq!(b.ok("type", json!({ "selector": "#q", "text": "" })), Value::Null);
+    assert_eq!(
+        b.ok("type", json!({ "selector": "#q", "text": "" })),
+        Value::Null
+    );
     assert_eq!(b.ok("press", json!({ "key": "Escape" })), Value::Null);
-    assert_eq!(b.ok("wait_for", json!({ "idle": true, "timeout": 3000 })), Value::Null);
+    assert_eq!(
+        b.ok("wait_for", json!({ "idle": true, "timeout": 3000 })),
+        Value::Null
+    );
 }

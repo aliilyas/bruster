@@ -137,6 +137,23 @@ bruster [--mcp] [--hidden|--visible] [--quiet] [options]
 | `--profile DIR` | keep cookies and storage between runs |
 | `--proxy URL` | `http://host:port` or `socks5://host:port` |
 | `--init-script FILE` | JavaScript that runs in every page before its own scripts |
+| `--dark` | persist dark color-scheme for this profile (or the default state); use `light` to reset |
+
+### Window and color controls
+
+Native commands and MCP tools `minimize` and `maximize` persist the requested
+window mode. `minimize` hides the native window (rather than iconifying it);
+`maximize` restores visibility and maximizes. In hidden/MCP mode both commands
+are accepted and saved, but windows stay off-screen for rendering.
+
+`dark` and `light` persist a color preference independently of window mode and
+apply it to all existing tabs, new tabs, and subsequent navigations. The portable
+page-level fallback sets the root CSS `color-scheme` (including native controls
+and default page colors); it does not emulate `prefers-color-scheme` media queries
+or recolor a site's explicit colors. Custom `--init-script` scripts still run.
+Preferences are stored outside WebView data, per profile or in the default
+platform state directory; legacy window-only state files are still accepted.
+`close` still shuts down the server and all tabs; `close_tab` closes only a tab.
 | `--insecure` | ignore TLS errors (Linux only) |
 | `--no-images` | do not load images. Pages load about 30% faster (Linux only) |
 

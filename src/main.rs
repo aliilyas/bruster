@@ -29,10 +29,14 @@ use serde_json::{json, Value};
 use tao::event::{Event, WindowEvent};
 use tao::event_loop::{ControlFlow, EventLoopBuilder, EventLoopProxy, EventLoopWindowTarget};
 use tao::window::{Window, WindowBuilder, WindowId};
-use wry::{NewWindowResponse, PageLoadEvent, ProxyConfig, ProxyEndpoint, WebContext, WebView, WebViewBuilder};
+use wry::{
+    NewWindowResponse, PageLoadEvent, ProxyConfig, ProxyEndpoint, WebContext, WebView,
+    WebViewBuilder,
+};
 
 mod mcp;
 mod screenshot;
+mod window_state;
 
 use screenshot::{Clip, Region};
 
@@ -48,13 +52,23 @@ const USER_AGENT_OPT: &str = "--user-agent";
 const PROFILE_OPT: &str = "--profile";
 const PROXY_OPT: &str = "--proxy";
 const INIT_SCRIPT_OPT: &str = "--init-script";
+const DARK_FLAG: &str = "--dark";
 const DEFAULT_VIEWPORT: (u32, u32) = (1280, 800);
 const OFFSCREEN: i32 = -20_000;
 /// Content types for `upload` by extension; anything else is octet-stream.
 const MIME_TYPES: &[(&str, &str)] = &[
-    ("png", "image/png"), ("jpg", "image/jpeg"), ("jpeg", "image/jpeg"), ("gif", "image/gif"), ("webp", "image/webp"),
-    ("svg", "image/svg+xml"), ("pdf", "application/pdf"), ("txt", "text/plain"), ("csv", "text/csv"),
-    ("json", "application/json"), ("html", "text/html"), ("zip", "application/zip"),
+    ("png", "image/png"),
+    ("jpg", "image/jpeg"),
+    ("jpeg", "image/jpeg"),
+    ("gif", "image/gif"),
+    ("webp", "image/webp"),
+    ("svg", "image/svg+xml"),
+    ("pdf", "application/pdf"),
+    ("txt", "text/plain"),
+    ("csv", "text/csv"),
+    ("json", "application/json"),
+    ("html", "text/html"),
+    ("zip", "application/zip"),
 ];
 const OCTET_STREAM: &str = "application/octet-stream";
 /// Full-page screenshots resize the window to the document height; cap it.
@@ -100,24 +114,51 @@ enum UserEvent {
     /// A page asked for a new window (target=_blank, window.open).
     OpenTab(String),
     /// macOS only: document height arrived, window can be resized for a full capture.
-    FullShot { tab: TabId, id: u64, path: Option<String>, height: f64 },
+    FullShot {
+        tab: TabId,
+        id: u64,
+        path: Option<String>,
+        height: f64,
+    },
     /// Puts the window back to the viewport size after a full capture.
     RestoreSize(TabId),
     /// Linux: the window was resized for a tall capture; poll until the page sees the new height.
-    TallShot { tab: TabId, id: u64, path: Option<String>, height: f64, tries: u8 },
-    TallShotReady { tab: TabId, id: u64, path: Option<String> },
+    TallShot {
+        tab: TabId,
+        id: u64,
+        path: Option<String>,
+        height: f64,
+        tries: u8,
+    },
+    TallShotReady {
+        tab: TabId,
+        id: u64,
+        path: Option<String>,
+    },
     /// back/forward/reload gave the webview HISTORY_START_TIMEOUT to start loading.
-    HistoryTimeout { tab: TabId, id: u64 },
+    HistoryTimeout {
+        tab: TabId,
+        id: u64,
+    },
     /// A navigate ran out of time.
-    NavigateTimeout { tab: TabId, id: u64 },
+    NavigateTimeout {
+        tab: TabId,
+        id: u64,
+    },
     /// A load finished: run the requests that waited for it.
     Flush(TabId),
     /// A hinted navigation never started.
     HintTimeout(TabId),
     /// The eval wrapper did not compile as an expression; try the statement form.
-    EvalRetry { tab: TabId, id: u64 },
+    EvalRetry {
+        tab: TabId,
+        id: u64,
+    },
     /// Neither form compiled.
-    EvalFailed { tab: TabId, id: u64 },
+    EvalFailed {
+        tab: TabId,
+        id: u64,
+    },
     Eof,
 }
 
@@ -189,12 +230,24 @@ fn page_loaded(p: &mut Pending, tab: TabId, url: &str, proxy: &EventLoopProxy<Us
 /// The page reached `stage`: answer a navigate that asked for it and release
 /// the held requests. `load` always releases them, so a page that never
 /// reaches idle still serves the agent.
-fn milestone(p: &mut Pending, stage: Until, tab: TabId, url: &str, proxy: &EventLoopProxy<UserEvent>) {
+fn milestone(
+    p: &mut Pending,
+    stage: Until,
+    tab: TabId,
+    url: &str,
+    proxy: &EventLoopProxy<UserEvent>,
+) {
     if let Some((id, true)) = p.navigate {
         // WebView2 shows its error page as a normal load; that is a failed navigate.
         if url.starts_with(CHROME_ERROR_SCHEME) {
             p.navigate = None;
-            fail(id, format!("navigate {}: load failed", p.navigate_url.take().unwrap_or_default()));
+            fail(
+                id,
+                format!(
+                    "navigate {}: load failed",
+                    p.navigate_url.take().unwrap_or_default()
+                ),
+            );
         } else if p.navigate_until == stage {
             p.navigate = None;
             // The rest of this load may still be cancelled by the agent's next
@@ -212,8 +265,8 @@ fn milestone(p: &mut Pending, stage: Until, tab: TabId, url: &str, proxy: &Event
 type Shared = Rc<RefCell<Pending>>;
 
 struct Tab {
-    window: Window,
     webview: WebView,
+    window: Window,
     pending: Shared,
 }
 
@@ -222,6 +275,7 @@ struct Tab {
 #[cfg_attr(not(target_os = "linux"), allow(dead_code))] // some only apply to WebKitGTK
 struct Opts {
     hidden: bool,
+    dark: bool,
     insecure: bool,
     no_images: bool,
     user_agent: Option<String>,
@@ -237,6 +291,7 @@ struct Opts {
 }
 
 struct App {
+    window_state: window_state::Store,
     tabs: HashMap<TabId, Tab>,
     next_tab: TabId,
     current: TabId,
@@ -270,7 +325,10 @@ fn fail(id: u64, msg: impl ToString) {
 
 /// Value following `--name`, if any.
 fn opt(args: &[String], name: &str) -> Option<String> {
-    args.iter().position(|a| a == name).and_then(|i| args.get(i + 1)).cloned()
+    args.iter()
+        .position(|a| a == name)
+        .and_then(|i| args.get(i + 1))
+        .cloned()
 }
 
 /// "1280x800" -> (1280, 800).
@@ -289,12 +347,15 @@ fn main() -> wry::Result<()> {
     }
 
     let init_script = match opt(&args, INIT_SCRIPT_OPT) {
-        Some(p) => Some(std::fs::read_to_string(&p).unwrap_or_else(|e| panic!("{INIT_SCRIPT_OPT} {p}: {e}"))),
+        Some(p) => Some(
+            std::fs::read_to_string(&p).unwrap_or_else(|e| panic!("{INIT_SCRIPT_OPT} {p}: {e}")),
+        ),
         None => None,
     };
     let opts = Opts {
         // MCP clients never want windows on the desktop; --visible brings them back.
         hidden: (has(HIDDEN_FLAG) || has(MCP_FLAG)) && !has(VISIBLE_FLAG),
+        dark: has(DARK_FLAG),
         insecure: has(INSECURE_FLAG),
         no_images: has(NO_IMAGES_FLAG),
         user_agent: opt(&args, USER_AGENT_OPT),
@@ -305,7 +366,9 @@ fn main() -> wry::Result<()> {
         #[cfg(target_os = "macos")]
         session_store: session_store_id(),
     };
-    let viewport = opt(&args, VIEWPORT_OPT).map(|v| parse_viewport(&v).expect("--viewport WxH")).unwrap_or(DEFAULT_VIEWPORT);
+    let viewport = opt(&args, VIEWPORT_OPT)
+        .map(|v| parse_viewport(&v).expect("--viewport WxH"))
+        .unwrap_or(DEFAULT_VIEWPORT);
 
     // Must be set before GTK/WebKit initialise. Software rendering saves ~200 MB
     // under Xvfb and speeds up loads; agents do not need GPU compositing.
@@ -332,7 +395,13 @@ fn main() -> wry::Result<()> {
             }
         },
     };
+    let mut window_state = window_state::Store::load(opts.profile.as_deref());
+    if opts.dark {
+        window_state.save_dark(true)?;
+    }
+    opts.dark = window_state.dark;
     let mut app = App {
+        window_state,
         tabs: HashMap::new(),
         next_tab: 1,
         current: 1,
@@ -361,7 +430,11 @@ fn main() -> wry::Result<()> {
                 app.shutdown();
                 *control_flow = ControlFlow::Exit;
             }
-            Event::WindowEvent { event: WindowEvent::CloseRequested, window_id, .. } => {
+            Event::WindowEvent {
+                event: WindowEvent::CloseRequested,
+                window_id,
+                ..
+            } => {
                 app.close_window(window_id);
             }
             Event::UserEvent(UserEvent::OpenTab(url)) => {
@@ -369,10 +442,21 @@ fn main() -> wry::Result<()> {
                     emit(json!({ "event": "tab_opened", "tab": id, "url": url }));
                 }
             }
-            Event::UserEvent(UserEvent::FullShot { tab, id, path, height }) => {
+            Event::UserEvent(UserEvent::FullShot {
+                tab,
+                id,
+                path,
+                height,
+            }) => {
                 app.full_shot(tab, id, path, height);
             }
-            Event::UserEvent(UserEvent::TallShot { tab, id, path, height, tries }) => {
+            Event::UserEvent(UserEvent::TallShot {
+                tab,
+                id,
+                path,
+                height,
+                tries,
+            }) => {
                 app.tall_shot_poll(tab, id, path, height, tries);
             }
             Event::UserEvent(UserEvent::TallShotReady { tab, id, path }) => {
@@ -380,7 +464,8 @@ fn main() -> wry::Result<()> {
             }
             Event::UserEvent(UserEvent::RestoreSize(tab)) => {
                 if let Some(t) = app.tabs.get(&tab) {
-                    t.window.set_inner_size(tao::dpi::LogicalSize::new(app.viewport.0, app.viewport.1));
+                    t.window
+                        .set_inner_size(tao::dpi::LogicalSize::new(app.viewport.0, app.viewport.1));
                 }
             }
             Event::UserEvent(UserEvent::Flush(tab)) => {
@@ -441,13 +526,21 @@ fn main() -> wry::Result<()> {
 #[cfg(target_os = "linux")]
 fn ensure_display(args: &[String]) {
     use std::os::unix::process::CommandExt;
-    let has_display = ["DISPLAY", "WAYLAND_DISPLAY"].iter().any(|v| std::env::var_os(v).is_some_and(|d| !d.is_empty()));
+    let has_display = ["DISPLAY", "WAYLAND_DISPLAY"]
+        .iter()
+        .any(|v| std::env::var_os(v).is_some_and(|d| !d.is_empty()));
     if has_display || std::env::var_os("BRUSTER_NO_XVFB").is_some() {
         return;
     }
-    let Ok(me) = std::env::current_exe() else { return };
+    let Ok(me) = std::env::current_exe() else {
+        return;
+    };
     // exec only returns on failure; then try without a display and let GTK complain.
-    let _ = std::process::Command::new("xvfb-run").arg("-a").arg(me).args(args).exec();
+    let _ = std::process::Command::new("xvfb-run")
+        .arg("-a")
+        .arg(me)
+        .args(args)
+        .exec();
 }
 
 #[cfg(not(target_os = "linux"))]
@@ -489,7 +582,11 @@ fn spawn_stdin_reader(proxy: EventLoopProxy<UserEvent>) {
 }
 
 impl App {
-    fn open_tab(&mut self, target: &EventLoopWindowTarget<UserEvent>, url: Option<&str>) -> wry::Result<TabId> {
+    fn open_tab(
+        &mut self,
+        target: &EventLoopWindowTarget<UserEvent>,
+        url: Option<&str>,
+    ) -> wry::Result<TabId> {
         let id = self.next_tab;
         self.next_tab += 1;
 
@@ -504,12 +601,30 @@ impl App {
                 .with_decorations(false);
         }
         let window = builder.build(target).expect("window");
+        if !self.opts.hidden {
+            self.window_state.state.apply(&window);
+        }
 
         let pending: Shared = Rc::default();
         pending.borrow_mut().warming = url.is_none();
-        let webview = build_webview(&window, id, pending.clone(), self.proxy.clone(), url, &self.opts, &mut self.context)?;
+        let webview = build_webview(
+            &window,
+            id,
+            pending.clone(),
+            self.proxy.clone(),
+            url,
+            &self.opts,
+            &mut self.context,
+        )?;
 
-        self.tabs.insert(id, Tab { window, webview, pending });
+        self.tabs.insert(
+            id,
+            Tab {
+                window,
+                webview,
+                pending,
+            },
+        );
         if self.tabs.len() == 1 {
             self.current = id;
         }
@@ -517,7 +632,9 @@ impl App {
     }
 
     fn close_tab(&mut self, id: TabId) -> bool {
-        let Some(tab) = self.tabs.remove(&id) else { return false };
+        let Some(tab) = self.tabs.remove(&id) else {
+            return false;
+        };
         let mut pending = tab.pending.borrow_mut();
         let Pending { js, queue, .. } = &mut *pending;
         for (js, _) in js.drain().chain(queue.drain(..)) {
@@ -527,6 +644,18 @@ impl App {
             fail(nav_id, "tab closed");
         }
         drop(pending);
+        // Wry creates independent views, not related-view children (popups are
+        // denied and opened through open_tab). Release this tab's web process
+        // instead of leaving it in WebKit's idle process cache after close.
+        #[cfg(target_os = "linux")]
+        {
+            use webkit2gtk::WebViewExt;
+            use wry::WebViewExtUnix;
+            tab.webview.webview().terminate_web_process();
+        }
+        // Tab declares the WebView before its parent window, so Wry's own
+        // destructor destroys the native child before Tao tears down the parent.
+        drop(tab);
         if self.current == id {
             self.current = self.tabs.keys().min().copied().unwrap_or(0);
         }
@@ -558,6 +687,9 @@ impl App {
     /// Runs the requests that waited for a load to finish.
     fn flush(&self, t: TabId) {
         let Some(tab) = self.tabs.get(&t) else { return };
+        let _ = tab
+            .webview
+            .evaluate_script(&color_scheme_script(self.opts.dark));
         let queued = std::mem::take(&mut tab.pending.borrow_mut().queue);
         for (id, q) in queued {
             tab_dispatch(tab, t, id, &q.method, q.params, q.retries, &self.proxy);
@@ -567,7 +699,9 @@ impl App {
     /// Second try of an eval whose expression form did not compile.
     fn eval_retry(&self, t: TabId, id: u64) {
         let Some(tab) = self.tabs.get(&t) else { return };
-        let Some(q) = tab.pending.borrow().js.get(&id).cloned() else { return };
+        let Some(q) = tab.pending.borrow().js.get(&id).cloned() else {
+            return;
+        };
         let expr = q.params["expression"].as_str().unwrap_or("");
         let proxy = self.proxy.clone();
         let done = move |compiled: String| {
@@ -585,12 +719,19 @@ impl App {
     fn eval_failed(&self, t: TabId, id: u64) {
         let Some(tab) = self.tabs.get(&t) else { return };
         if tab.pending.borrow_mut().js.remove(&id).is_some() {
-            fail(id, "eval: not valid JavaScript (as an expression or as statements)");
+            fail(
+                id,
+                "eval: not valid JavaScript (as an expression or as statements)",
+            );
         }
     }
 
     fn close_window(&mut self, wid: WindowId) {
-        let id = self.tabs.iter().find(|(_, t)| t.window.id() == wid).map(|(id, _)| *id);
+        let id = self
+            .tabs
+            .iter()
+            .find(|(_, t)| t.window.id() == wid)
+            .map(|(id, _)| *id);
         if let Some(id) = id {
             self.close_tab(id);
             emit(json!({ "event": "tab_closed", "tab": id }));
@@ -598,7 +739,12 @@ impl App {
     }
 
     fn dispatch(&mut self, target: &EventLoopWindowTarget<UserEvent>, req: Request) {
-        let Request { id, method, params, tab } = req;
+        let Request {
+            id,
+            method,
+            params,
+            tab,
+        } = req;
         if !params.is_null() && !params.is_object() {
             return fail(id, format!("{method}: params must be an object"));
         }
@@ -612,7 +758,9 @@ impl App {
                 }
                 return match self.open_tab(target, url) {
                     // With a url the load handler answers {tab, url} once the page is in.
-                    Ok(t) if url.is_some() => self.tabs[&t].pending.borrow_mut().navigate = Some((id, false)),
+                    Ok(t) if url.is_some() => {
+                        self.tabs[&t].pending.borrow_mut().navigate = Some((id, false))
+                    }
                     Ok(t) => reply(id, json!({ "tab": t })),
                     Err(e) => fail(id, e),
                 };
@@ -626,7 +774,12 @@ impl App {
             }
             "switch_tab" => {
                 // MCP lifts `tab` out of the arguments, so accept it at either level.
-                let Some(t) = params.get("tab").and_then(Value::as_u64).map(|t| t as TabId).or(tab) else {
+                let Some(t) = params
+                    .get("tab")
+                    .and_then(Value::as_u64)
+                    .map(|t| t as TabId)
+                    .or(tab)
+                else {
                     return fail(id, "switch_tab: missing params.tab");
                 };
                 if !self.tabs.contains_key(&t) {
@@ -652,6 +805,30 @@ impl App {
             return fail(id, format!("no such tab {t}"));
         };
 
+        if let Some(state) = window_state::State::command(&method) {
+            if let Err(e) = self.window_state.save(state) {
+                return fail(id, format!("{method}: save window state: {e}"));
+            }
+            if !self.opts.hidden {
+                state.apply(&tab.window);
+            }
+            return reply(id, json!(state));
+        }
+
+        if matches!(method.as_str(), "dark" | "light") {
+            let dark = method == "dark";
+            if let Err(e) = self.window_state.save_dark(dark) {
+                return fail(id, format!("{method}: save color preference: {e}"));
+            }
+            self.opts.dark = dark;
+            for tab in self.tabs.values() {
+                if let Err(e) = tab.webview.evaluate_script(&color_scheme_script(dark)) {
+                    return fail(id, e);
+                }
+            }
+            return reply(id, json!(method));
+        }
+
         if method == "screenshot" {
             return self.screenshot(t, id, &params);
         }
@@ -662,7 +839,10 @@ impl App {
                 return fail(id, "resize: need width and height");
             };
             if !(1..=MAX_VIEWPORT_SIDE).contains(&w) || !(1..=MAX_VIEWPORT_SIDE).contains(&h) {
-                return fail(id, format!("resize: width and height must be between 1 and {MAX_VIEWPORT_SIDE}"));
+                return fail(
+                    id,
+                    format!("resize: width and height must be between 1 and {MAX_VIEWPORT_SIDE}"),
+                );
             }
             self.viewport = (w, h);
             tab.window.set_inner_size(tao::dpi::LogicalSize::new(w, h));
@@ -683,15 +863,25 @@ impl App {
 
     fn screenshot(&self, t: TabId, id: u64, params: &Value) {
         let tab = &self.tabs[&t];
-        let path = params.get("path").and_then(Value::as_str).map(str::to_owned);
+        let path = params
+            .get("path")
+            .and_then(Value::as_str)
+            .map(str::to_owned);
         let full = params.get("full").and_then(Value::as_bool).unwrap_or(false);
 
         let region = match params.get("clip") {
             Some(c) => {
                 let f = |k: &str| c.get(k).and_then(Value::as_f64);
                 match (f("x"), f("y"), f("width"), f("height")) {
-                    (Some(x), Some(y), Some(width), Some(height)) if width >= 1.0 && height >= 1.0 => {
-                        Region::Clip(Clip { x, y, width, height })
+                    (Some(x), Some(y), Some(width), Some(height))
+                        if width >= 1.0 && height >= 1.0 =>
+                    {
+                        Region::Clip(Clip {
+                            x,
+                            y,
+                            width,
+                            height,
+                        })
                     }
                     _ => return fail(id, "screenshot: clip needs x, y and non-zero width, height"),
                 }
@@ -709,7 +899,12 @@ impl App {
                 "Math.max(document.documentElement.scrollHeight, document.body.scrollHeight)",
                 move |h| {
                     let height = h.parse::<f64>().unwrap_or(fallback);
-                    let _ = proxy.send_event(UserEvent::FullShot { tab: t, id, path: path.clone(), height });
+                    let _ = proxy.send_event(UserEvent::FullShot {
+                        tab: t,
+                        id,
+                        path: path.clone(),
+                        height,
+                    });
                 },
             );
             if let Err(e) = res {
@@ -732,11 +927,18 @@ impl App {
         }
 
         let height = height.min(MAX_FULL_HEIGHT);
-        tab.window.set_inner_size(tao::dpi::LogicalSize::new(self.viewport.0 as f64, height));
+        tab.window
+            .set_inner_size(tao::dpi::LogicalSize::new(self.viewport.0 as f64, height));
 
         // GTK applies the resize asynchronously; WKWebView is ready right away.
         if cfg!(target_os = "linux") {
-            let _ = self.proxy.send_event(UserEvent::TallShot { tab: t, id, path, height, tries: 0 });
+            let _ = self.proxy.send_event(UserEvent::TallShot {
+                tab: t,
+                id,
+                path,
+                height,
+                tries: 0,
+            });
             return;
         }
         self.viewport_shot_then_restore(t, id, path);
@@ -748,16 +950,28 @@ impl App {
             return fail(id, format!("no such tab {t}"));
         };
         let proxy = self.proxy.clone();
-        let res = tab.webview.evaluate_script_with_callback("innerHeight", move |h| {
-            let seen = h.parse::<f64>().unwrap_or(0.0);
-            let ev = if seen >= height - 1.0 || tries >= TALL_SHOT_TRIES {
-                UserEvent::TallShotReady { tab: t, id, path: path.clone() }
-            } else {
-                std::thread::sleep(TALL_SHOT_POLL);
-                UserEvent::TallShot { tab: t, id, path: path.clone(), height, tries: tries + 1 }
-            };
-            let _ = proxy.send_event(ev);
-        });
+        let res = tab
+            .webview
+            .evaluate_script_with_callback("innerHeight", move |h| {
+                let seen = h.parse::<f64>().unwrap_or(0.0);
+                let ev = if seen >= height - 1.0 || tries >= TALL_SHOT_TRIES {
+                    UserEvent::TallShotReady {
+                        tab: t,
+                        id,
+                        path: path.clone(),
+                    }
+                } else {
+                    std::thread::sleep(TALL_SHOT_POLL);
+                    UserEvent::TallShot {
+                        tab: t,
+                        id,
+                        path: path.clone(),
+                        height,
+                        tries: tries + 1,
+                    }
+                };
+                let _ = proxy.send_event(ev);
+            });
         if let Err(e) = res {
             fail(id, e);
         }
@@ -809,6 +1023,7 @@ fn build_webview(
 
     let mut builder = WebViewBuilder::new_with_web_context(context);
     builder = builder
+        .with_initialization_script(color_scheme_script(opts.dark))
         .with_initialization_script(RUNTIME_JS)
         .with_ipc_handler(move |req| {
             // runtime.js answers with {"id":..,"result":..} or {"id":..,"error":..},
@@ -841,7 +1056,11 @@ fn build_webview(
             if let Some(id) = body.get("id").and_then(Value::as_u64) {
                 let mut p = ipc_pending.borrow_mut();
                 p.js.remove(&id);
-                if body.as_object_mut().and_then(|o| o.remove("navigating")).is_some() {
+                if body
+                    .as_object_mut()
+                    .and_then(|o| o.remove("navigating"))
+                    .is_some()
+                {
                     p.loading = true;
                     p.hinted = true;
                     let proxy = ipc_proxy.clone();
@@ -910,7 +1129,12 @@ fn build_webview(
     #[cfg(target_os = "macos")]
     {
         use wry::WebViewBuilderExtDarwin;
-        builder = builder.with_data_store_identifier(opts.profile.as_deref().map(profile_id).unwrap_or(opts.session_store));
+        builder = builder.with_data_store_identifier(
+            opts.profile
+                .as_deref()
+                .map(profile_id)
+                .unwrap_or(opts.session_store),
+        );
     }
 
     #[cfg(not(target_os = "linux"))]
@@ -929,6 +1153,24 @@ fn build_webview(
     };
 
     Ok(webview)
+}
+
+/// Portable fallback: request native dark/light form controls and page defaults.
+/// Do not spoof matchMedia: CSS media queries would disagree with that shim.
+fn color_scheme_script(dark: bool) -> String {
+    let scheme = if dark { "dark" } else { "light" };
+    format!(
+        r#"(() => {{
+        const apply = () => document.documentElement.style.setProperty('color-scheme', '{scheme}', 'important');
+        if (document.documentElement) apply();
+        else {{
+            const observer = new MutationObserver(() => {{
+                if (document.documentElement) {{ apply(); observer.disconnect(); }}
+            }});
+            observer.observe(document, {{childList: true, subtree: true}});
+        }}
+    }})()"#
+    )
 }
 
 /// `$XDG_CACHE_HOME/bruster/default` (or `~/.cache/...`) with an exclusive
@@ -971,7 +1213,9 @@ fn prefetch_dns<'a>(_hosts: impl Iterator<Item = &'a str>) {}
 
 /// Absolute url with a scheme and a host, or an about: page.
 fn valid_url(url: &str) -> bool {
-    let Ok(uri) = url.parse::<wry::http::Uri>() else { return false };
+    let Ok(uri) = url.parse::<wry::http::Uri>() else {
+        return false;
+    };
     match uri.scheme_str() {
         Some("about") => true,
         Some(_) => uri.host().is_some(),
@@ -991,10 +1235,20 @@ fn stop_loading(_wv: &WebView) {}
 
 /// "http://host:port" or "socks5://host:port".
 fn parse_proxy(s: &str) -> wry::Result<ProxyConfig> {
-    let bad = || wry::Error::Io(std::io::Error::other(format!("{PROXY_OPT}: expected http://host:port or socks5://host:port, got {s}")));
+    let bad = || {
+        wry::Error::Io(std::io::Error::other(format!(
+            "{PROXY_OPT}: expected http://host:port or socks5://host:port, got {s}"
+        )))
+    };
     let (scheme, rest) = s.split_once("://").ok_or_else(bad)?;
-    let (host, port) = rest.trim_end_matches('/').rsplit_once(':').ok_or_else(bad)?;
-    let endpoint = ProxyEndpoint { host: host.to_owned(), port: port.to_owned() };
+    let (host, port) = rest
+        .trim_end_matches('/')
+        .rsplit_once(':')
+        .ok_or_else(bad)?;
+    let endpoint = ProxyEndpoint {
+        host: host.to_owned(),
+        port: port.to_owned(),
+    };
     match scheme {
         "http" => Ok(ProxyConfig::Http(endpoint)),
         "socks5" => Ok(ProxyConfig::Socks5(endpoint)),
@@ -1012,7 +1266,10 @@ const STORE_REMOVE_WAIT: Duration = Duration::from_millis(500);
 /// Per-process data store id: marker plus the pid and start time.
 #[cfg(target_os = "macos")]
 fn session_store_id() -> [u8; 16] {
-    let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.subsec_nanos()).unwrap_or(0);
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.subsec_nanos())
+        .unwrap_or(0);
     let mut id = [0u8; 16];
     id[..8].copy_from_slice(&SESSION_STORE_MARK);
     id[8..12].copy_from_slice(&std::process::id().to_le_bytes());
@@ -1025,7 +1282,10 @@ fn session_store_id() -> [u8; 16] {
 fn remove_stale_session_stores(keep: [u8; 16]) {
     use wry::WebViewExtDarwin;
     let _ = WebView::fetch_data_store_identifiers(move |ids| {
-        for id in ids.into_iter().filter(|id| id[..8] == SESSION_STORE_MARK && *id != keep) {
+        for id in ids
+            .into_iter()
+            .filter(|id| id[..8] == SESSION_STORE_MARK && *id != keep)
+        {
             WebView::remove_data_store(&id, |_| {});
         }
     });
@@ -1035,7 +1295,9 @@ fn remove_stale_session_stores(keep: [u8; 16]) {
 #[cfg(target_os = "macos")]
 fn profile_id(dir: &Path) -> [u8; 16] {
     let fnv = |seed: u64| {
-        dir.to_string_lossy().bytes().fold(seed, |h, b| (h ^ b as u64).wrapping_mul(0x100000001b3))
+        dir.to_string_lossy()
+            .bytes()
+            .fold(seed, |h, b| (h ^ b as u64).wrapping_mul(0x100000001b3))
     };
     let mut id = [0u8; 16];
     id[..8].copy_from_slice(&fnv(0xcbf29ce484222325).to_le_bytes());
@@ -1045,14 +1307,23 @@ fn profile_id(dir: &Path) -> [u8; 16] {
 
 /// Reads `paths` and adds `files: [{name, type, data}]` for runtime.js.
 fn attach_files(mut params: Value) -> Result<Value, String> {
-    let paths: Vec<String> = serde_json::from_value(params.get("paths").cloned().unwrap_or(Value::Null))
-        .map_err(|_| "upload: need params.paths (array of file paths)")?;
+    let paths: Vec<String> =
+        serde_json::from_value(params.get("paths").cloned().unwrap_or(Value::Null))
+            .map_err(|_| "upload: need params.paths (array of file paths)")?;
     let mut files = Vec::with_capacity(paths.len());
     for p in &paths {
         let path = Path::new(p);
         let bytes = std::fs::read(path).map_err(|e| format!("upload {p}: {e}"))?;
-        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
-        let mime = MIME_TYPES.iter().find(|(e, _)| *e == ext).map(|(_, m)| *m).unwrap_or(OCTET_STREAM);
+        let ext = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("")
+            .to_ascii_lowercase();
+        let mime = MIME_TYPES
+            .iter()
+            .find(|(e, _)| *e == ext)
+            .map(|(_, m)| *m)
+            .unwrap_or(OCTET_STREAM);
         files.push(json!({
             "name": path.file_name().and_then(|n| n.to_str()).unwrap_or("file"),
             "type": mime,
@@ -1064,19 +1335,38 @@ fn attach_files(mut params: Value) -> Result<Value, String> {
 }
 
 /// `retries` counts how many navigations this request has already outlived.
-fn tab_dispatch(tab: &Tab, t: TabId, id: u64, method: &str, params: Value, retries: u8, proxy: &EventLoopProxy<UserEvent>) {
+fn tab_dispatch(
+    tab: &Tab,
+    t: TabId,
+    id: u64,
+    method: &str,
+    params: Value,
+    retries: u8,
+    proxy: &EventLoopProxy<UserEvent>,
+) {
     let wv = &tab.webview;
     let pending = &tab.pending;
 
     // Answered by the load handler once the new page finishes. Registered
     // before the call in case the webview reports Started synchronously.
     let await_load = |url: Option<&str>, go: &dyn Fn() -> wry::Result<()>| {
-        let until = Until::parse(params.get("until")).map_err(|e| wry::Error::Io(std::io::Error::other(format!("{method}: {e}"))))?;
-        let timeout = params.get("timeout").and_then(Value::as_u64).map(Duration::from_millis).unwrap_or(NAVIGATE_TIMEOUT);
+        let until = Until::parse(params.get("until"))
+            .map_err(|e| wry::Error::Io(std::io::Error::other(format!("{method}: {e}"))))?;
+        let timeout = params
+            .get("timeout")
+            .and_then(Value::as_u64)
+            .map(Duration::from_millis)
+            .unwrap_or(NAVIGATE_TIMEOUT);
         let mut p = pending.borrow_mut();
         // One pending navigation per tab: a new one takes over, the old one hears about it.
         if let Some((old, _)) = p.navigate.take() {
-            fail(old, format!("navigate {}: superseded by a new navigation", p.navigate_url.take().unwrap_or_default()));
+            fail(
+                old,
+                format!(
+                    "navigate {}: superseded by a new navigation",
+                    p.navigate_url.take().unwrap_or_default()
+                ),
+            );
         }
         p.navigate = Some((id, false));
         p.navigate_until = until;
@@ -1094,10 +1384,24 @@ fn tab_dispatch(tab: &Tab, t: TabId, id: u64, method: &str, params: Value, retri
     // like an agent expects after clicking a link.
     let in_page = |p: &mut Pending| -> bool {
         if !p.loading {
-            p.js.insert(id, Queued { method: method.to_owned(), params: params.clone(), retries });
+            p.js.insert(
+                id,
+                Queued {
+                    method: method.to_owned(),
+                    params: params.clone(),
+                    retries,
+                },
+            );
             return true;
         }
-        p.queue.push((id, Queued { method: method.to_owned(), params: params.clone(), retries }));
+        p.queue.push((
+            id,
+            Queued {
+                method: method.to_owned(),
+                params: params.clone(),
+                retries,
+            },
+        ));
         false
     };
 
@@ -1139,7 +1443,8 @@ fn tab_dispatch(tab: &Tab, t: TabId, id: u64, method: &str, params: Value, retri
                 return;
             }
             let proxy = proxy.clone();
-            let src = format!("(__bruster.evalFn({id}, async () => (\n{expr}\n)), {EVAL_COMPILED})");
+            let src =
+                format!("(__bruster.evalFn({id}, async () => (\n{expr}\n)), {EVAL_COMPILED})");
             wv.evaluate_script_with_callback(&src, move |compiled| {
                 if compiled != EVAL_COMPILED {
                     let _ = proxy.send_event(UserEvent::EvalRetry { tab: t, id });
@@ -1189,24 +1494,44 @@ fn cookies_json(cookies: &[wry::cookie::Cookie<'_>]) -> Value {
 fn set_cookie(wv: &WebView, params: &Value) -> wry::Result<()> {
     let s = |k: &str| params.get(k).and_then(Value::as_str).map(str::to_owned);
     let (Some(name), Some(value)) = (s("name"), s("value")) else {
-        return Err(wry::Error::Io(std::io::Error::other("set_cookie: need name and value")));
+        return Err(wry::Error::Io(std::io::Error::other(
+            "set_cookie: need name and value",
+        )));
     };
 
     // Without a domain the store keeps an orphan the page never sees, so
     // default to the current page's host and root path.
-    let host = wv.url()?.parse::<wry::http::Uri>().ok().and_then(|u| u.host().map(str::to_owned));
+    let host = wv
+        .url()?
+        .parse::<wry::http::Uri>()
+        .ok()
+        .and_then(|u| u.host().map(str::to_owned));
     let Some(domain) = s("domain").or(host) else {
-        return Err(wry::Error::Io(std::io::Error::other("set_cookie: need domain when no page is loaded")));
+        return Err(wry::Error::Io(std::io::Error::other(
+            "set_cookie: need domain when no page is loaded",
+        )));
     };
-    let b = wry::cookie::Cookie::build((name, value)).domain(domain).path(s("path").unwrap_or_else(|| "/".into()));
+    let b = wry::cookie::Cookie::build((name, value))
+        .domain(domain)
+        .path(s("path").unwrap_or_else(|| "/".into()));
     wv.set_cookie(&b.build())
 }
 
 /// Software rendering and a document-viewer cache model. An agent browser
 /// has no GPU to speak of and never goes back/forward through cached pages.
 #[cfg(target_os = "linux")]
-fn trim_webkit(wv: &WebView, tab: TabId, opts: &Opts, pending: Shared, proxy: EventLoopProxy<UserEvent>) {
-    use webkit2gtk::{gio, glib, CacheModel, DownloadExt, HardwareAccelerationPolicy, LoadEvent, NetworkError, PolicyError, ScriptDialogType, SettingsExt, WebsiteDataManagerExtManual, WebsiteDataTypes, TLSErrorsPolicy, URIRequestExt, WebContextExt, WebViewExt, WebsiteDataManagerExt};
+fn trim_webkit(
+    wv: &WebView,
+    tab: TabId,
+    opts: &Opts,
+    pending: Shared,
+    proxy: EventLoopProxy<UserEvent>,
+) {
+    use webkit2gtk::{
+        gio, glib, CacheModel, DownloadExt, HardwareAccelerationPolicy, LoadEvent, NetworkError,
+        PolicyError, ScriptDialogType, SettingsExt, TLSErrorsPolicy, URIRequestExt, WebContextExt,
+        WebViewExt, WebsiteDataManagerExt, WebsiteDataManagerExtManual, WebsiteDataTypes,
+    };
     use wry::WebViewExtUnix;
 
     // Every tab shares the default WebContext, so hook its downloads once.
@@ -1235,8 +1560,15 @@ fn trim_webkit(wv: &WebView, tab: TabId, opts: &Opts, pending: Shared, proxy: Ev
         if opts.fresh_session {
             DATA_CLEARED.call_once(|| {
                 if let Some(dm) = ctx.website_data_manager() {
-                    let site_data = WebsiteDataTypes::ALL - WebsiteDataTypes::DISK_CACHE - WebsiteDataTypes::MEMORY_CACHE;
-                    dm.clear(site_data, glib::TimeSpan::from_seconds(0), None::<&gio::Cancellable>, |_| {});
+                    let site_data = WebsiteDataTypes::ALL
+                        - WebsiteDataTypes::DISK_CACHE
+                        - WebsiteDataTypes::MEMORY_CACHE;
+                    dm.clear(
+                        site_data,
+                        glib::TimeSpan::from_seconds(0),
+                        None::<&gio::Cancellable>,
+                        |_| {},
+                    );
                 }
             });
         }
@@ -1282,11 +1614,15 @@ fn trim_webkit(wv: &WebView, tab: TabId, opts: &Opts, pending: Shared, proxy: Ev
         let mut p = pending.borrow_mut();
         // A load cancelled by a newer one is not a failure of the newer one,
         // unless it is the agent's own navigate that got cancelled.
-        if err.kind::<NetworkError>() == Some(NetworkError::Cancelled) && p.navigate_url.as_deref() != Some(url) {
+        if err.kind::<NetworkError>() == Some(NetworkError::Cancelled)
+            && p.navigate_url.as_deref() != Some(url)
+        {
             return false;
         }
         let why = match err.kind::<PolicyError>() {
-            Some(PolicyError::FrameLoadInterruptedByPolicyChange) => "download started, cancelled".to_owned(),
+            Some(PolicyError::FrameLoadInterruptedByPolicyChange) => {
+                "download started, cancelled".to_owned()
+            }
             _ => err.to_string(),
         };
         p.loading = false;
@@ -1308,11 +1644,18 @@ mod tests {
     fn parses_options() {
         assert_eq!(parse_viewport("640x480"), Some((640, 480)));
         assert_eq!(parse_viewport("640"), None);
-        assert!(matches!(parse_proxy("http://h:3128"), Ok(ProxyConfig::Http(e)) if e.host == "h" && e.port == "3128"));
-        assert!(matches!(parse_proxy("socks5://h:1080/"), Ok(ProxyConfig::Socks5(_))));
+        assert!(
+            matches!(parse_proxy("http://h:3128"), Ok(ProxyConfig::Http(e)) if e.host == "h" && e.port == "3128")
+        );
+        assert!(matches!(
+            parse_proxy("socks5://h:1080/"),
+            Ok(ProxyConfig::Socks5(_))
+        ));
         assert!(parse_proxy("ftp://h:1").is_err());
         assert!(parse_proxy("h:1").is_err());
-        let args: Vec<String> = ["bruster", "--viewport", "1x1", "--mcp"].map(String::from).to_vec();
+        let args: Vec<String> = ["bruster", "--viewport", "1x1", "--mcp"]
+            .map(String::from)
+            .to_vec();
         assert_eq!(opt(&args, "--viewport").as_deref(), Some("1x1"));
         assert_eq!(opt(&args, "--profile"), None);
     }

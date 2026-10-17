@@ -44,7 +44,8 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') document.get
 </script>
 </body></html>"##;
 
-pub const OTHER: &str = "<html><head><title>other</title></head><body><p>other page</p></body></html>";
+pub const OTHER: &str =
+    "<html><head><title>other</title></head><body><p>other page</p></body></html>";
 // Inserts an iframe after load; WebKit's own "finished" waits for it, the page's load event does not.
 pub const LATEFRAME: &str = r##"<html><head><title>lateframe</title></head><body><p>late</p>
 <script>addEventListener('load', () => { window.__loadedAt = performance.now(); const f = document.createElement('iframe'); f.src = '/slower'; document.body.appendChild(f); });</script>
@@ -169,13 +170,23 @@ impl Browser {
                 }
             }
         });
-        let mut b = Browser { child, stdin, lines, next_id: 0, stash: Vec::new(), closed: false };
+        let mut b = Browser {
+            child,
+            stdin,
+            lines,
+            next_id: 0,
+            stash: Vec::new(),
+            closed: false,
+        };
         b.wait_event("ready");
         b
     }
 
     pub fn next_line(&mut self) -> Value {
-        let line = self.lines.recv_timeout(REPLY_TIMEOUT).expect("no line from bruster within REPLY_TIMEOUT");
+        let line = self
+            .lines
+            .recv_timeout(REPLY_TIMEOUT)
+            .expect("no line from bruster within REPLY_TIMEOUT");
         serde_json::from_str(&line).unwrap()
     }
 
@@ -187,7 +198,10 @@ impl Browser {
             if let Some(i) = self.stash.iter().position(&pick) {
                 return self.stash.remove(i);
             }
-            assert!(start.elapsed() < REPLY_TIMEOUT, "timeout waiting for {what}");
+            assert!(
+                start.elapsed() < REPLY_TIMEOUT,
+                "timeout waiting for {what}"
+            );
             let v = self.next_line();
             self.stash.push(v);
         }
@@ -199,7 +213,9 @@ impl Browser {
 
     /// Loads of other tabs may already be stashed, so match the tab.
     pub fn wait_load(&mut self, tab: u64) -> Value {
-        self.take(&format!("load of tab {tab}"), |v| v["event"] == "load" && v["tab"] == tab)
+        self.take(&format!("load of tab {tab}"), |v| {
+            v["event"] == "load" && v["tab"] == tab
+        })
     }
 
     /// Sends a request without waiting. `tab` inside params is lifted to the top level.
@@ -228,16 +244,24 @@ impl Browser {
     }
 
     pub fn ok(&mut self, method: &str, params: Value) -> Value {
-        self.call(method, params).unwrap_or_else(|e| panic!("{method} failed: {e}"))
+        self.call(method, params)
+            .unwrap_or_else(|e| panic!("{method} failed: {e}"))
     }
 
     pub fn err(&mut self, method: &str, params: Value) -> String {
-        self.call(method, params).expect_err(&format!("{method} should fail"))
+        self.call(method, params)
+            .expect_err(&format!("{method} should fail"))
     }
 
     /// Drops our end of the pipe; bruster treats EOF as close.
     pub fn close_stdin(&mut self) {
-        let dummy = Command::new("true").stdin(Stdio::piped()).spawn().unwrap().stdin.take().unwrap();
+        let dummy = Command::new("true")
+            .stdin(Stdio::piped())
+            .spawn()
+            .unwrap()
+            .stdin
+            .take()
+            .unwrap();
         drop(std::mem::replace(&mut self.stdin, dummy));
     }
 
@@ -279,7 +303,11 @@ impl Drop for Browser {
 //   /cachedpage  CACHEDPAGE, /cached.js counts hits, max-age 1h
 /// Where bruster's stderr goes: /dev/null, or the test output with BRUSTER_TEST_STDERR=1.
 pub fn test_stderr() -> Stdio {
-    if std::env::var_os("BRUSTER_TEST_STDERR").is_some() { Stdio::inherit() } else { Stdio::null() }
+    if std::env::var_os("BRUSTER_TEST_STDERR").is_some() {
+        Stdio::inherit()
+    } else {
+        Stdio::null()
+    }
 }
 
 pub fn serve() -> String {
@@ -303,7 +331,9 @@ fn send(stream: &mut std::net::TcpStream, status: &str, ctype: &str, extra: &str
 pub fn big_page() -> String {
     let mut s = String::from("<html><head><title>big</title></head><body>");
     for i in 0..5000 {
-        s.push_str(&format!("<div><a href=\"/x{i}\">link {i}</a><input id=\"i{i}\"></div>"));
+        s.push_str(&format!(
+            "<div><a href=\"/x{i}\">link {i}</a><input id=\"i{i}\"></div>"
+        ));
     }
     s + "</body></html>"
 }
@@ -322,17 +352,31 @@ fn handle(mut stream: std::net::TcpStream) {
                 "/form" => ("200 OK", "", FORM),
                 "/other" => ("200 OK", "", OTHER),
                 "/cookie" => ("200 OK", "Set-Cookie: srv=1; Path=/\r\n", OTHER),
-                "/cookie_persistent" => ("200 OK", "Set-Cookie: keep=1; Path=/; Max-Age=3600\r\n", OTHER),
+                "/cookie_persistent" => (
+                    "200 OK",
+                    "Set-Cookie: keep=1; Path=/; Max-Age=3600\r\n",
+                    OTHER,
+                ),
                 "/extra" => ("200 OK", "", EXTRA),
                 "/texts" | "/slowbody" => ("200 OK", "", TEXTS),
                 "/frames" => ("200 OK", "", FRAMES),
                 "/more" => ("200 OK", "", MORE),
-                "/download" => ("200 OK", "Content-Disposition: attachment; filename=x.bin\r\n", "bytes"),
-                "/csp" => ("200 OK", "Content-Security-Policy: script-src 'self' 'unsafe-inline'\r\n", MORE),
+                "/download" => (
+                    "200 OK",
+                    "Content-Disposition: attachment; filename=x.bin\r\n",
+                    "bytes",
+                ),
+                "/csp" => (
+                    "200 OK",
+                    "Content-Security-Policy: script-src 'self' 'unsafe-inline'\r\n",
+                    MORE,
+                ),
                 "/tall" => ("200 OK", "", TALL),
                 "/beforeunload" => ("200 OK", "", BEFOREUNLOAD),
                 "/xml" => return send(&mut stream, "200 OK", "application/xml", "", XML),
-                "/json" => return send(&mut stream, "200 OK", "application/json", "", r#"{"a":1}"#),
+                "/json" => {
+                    return send(&mut stream, "200 OK", "application/json", "", r#"{"a":1}"#)
+                }
                 "/redirect" => ("301 Moved Permanently", "Location: /other\r\n", ""),
                 "/spa" | "/spa/about" => ("200 OK", "", SPA),
                 "/shadowdeep" => ("200 OK", "", SHADOWDEEP),
@@ -349,7 +393,11 @@ fn handle(mut stream: std::net::TcpStream) {
                 "/cachedpage" => ("200 OK", "", CACHEDPAGE),
                 "/cached.js" => {
                     CACHED_HITS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                    ("200 OK", "Cache-Control: max-age=3600\r\n", "window.cached = 1;")
+                    (
+                        "200 OK",
+                        "Cache-Control: max-age=3600\r\n",
+                        "window.cached = 1;",
+                    )
                 }
                 "/slower" => {
                     std::thread::sleep(SLOW_DELAY * 5);
@@ -367,7 +415,11 @@ fn handle(mut stream: std::net::TcpStream) {
                 body.len()
             );
             // The parser sees a head without a body for a while.
-            let (first, rest) = if path == "/slowbody" { body.split_at(body.find("<body>").unwrap()) } else { (body, "") };
+            let (first, rest) = if path == "/slowbody" {
+                body.split_at(body.find("<body>").unwrap())
+            } else {
+                (body, "")
+            };
             let _ = stream.write_all(first.as_bytes());
             let _ = stream.flush();
             if !rest.is_empty() {
@@ -377,4 +429,3 @@ fn handle(mut stream: std::net::TcpStream) {
         }
     }
 }
-

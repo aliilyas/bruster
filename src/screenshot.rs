@@ -38,13 +38,20 @@ pub fn capture(wv: &WebView, region: Region, cb: Done) {
         _ => None,
     };
 
-    wv.webview().snapshot(gtk_region, SnapshotOptions::NONE, None::<&gio::Cancellable>, move |res| {
-        let png = res.map_err(|e| e.to_string()).and_then(|surface| match clip {
-            Some(c) => crop(&surface, c).and_then(|s| to_png(&s)),
-            None => to_png(&surface),
-        });
-        cb(png);
-    });
+    wv.webview().snapshot(
+        gtk_region,
+        SnapshotOptions::NONE,
+        None::<&gio::Cancellable>,
+        move |res| {
+            let png = res
+                .map_err(|e| e.to_string())
+                .and_then(|surface| match clip {
+                    Some(c) => crop(&surface, c).and_then(|s| to_png(&s)),
+                    None => to_png(&surface),
+                });
+            cb(png);
+        },
+    );
 }
 
 #[cfg(target_os = "linux")]
@@ -58,9 +65,11 @@ fn to_png(surface: &cairo::Surface) -> Result<Vec<u8>, String> {
 fn crop(src: &cairo::Surface, c: Clip) -> Result<cairo::ImageSurface, String> {
     use cairo::{Context, Format, ImageSurface};
 
-    let out = ImageSurface::create(Format::ARgb32, c.width as i32, c.height as i32).map_err(|e| e.to_string())?;
+    let out = ImageSurface::create(Format::ARgb32, c.width as i32, c.height as i32)
+        .map_err(|e| e.to_string())?;
     let cr = Context::new(&out).map_err(|e| e.to_string())?;
-    cr.set_source_surface(src, -c.x, -c.y).map_err(|e| e.to_string())?;
+    cr.set_source_surface(src, -c.x, -c.y)
+        .map_err(|e| e.to_string())?;
     cr.paint().map_err(|e| e.to_string())?;
     drop(cr);
     Ok(out)
@@ -87,8 +96,10 @@ pub fn capture(wv: &WebView, region: Region, cb: Done) {
         let img = unsafe { &*img };
         let tiff = img.TIFFRepresentation().ok_or("no TIFF representation")?;
         let rep = NSBitmapImageRep::imageRepWithData(&tiff).ok_or("bitmap decode failed")?;
-        let png = unsafe { rep.representationUsingType_properties(NSBitmapImageFileType::PNG, &NSDictionary::new()) }
-            .ok_or("png encode failed")?;
+        let png = unsafe {
+            rep.representationUsingType_properties(NSBitmapImageFileType::PNG, &NSDictionary::new())
+        }
+        .ok_or("png encode failed")?;
         Ok(png.to_vec())
     }
 
@@ -108,7 +119,10 @@ pub fn capture(wv: &WebView, region: Region, cb: Done) {
         }
     });
 
-    unsafe { wv.webview().takeSnapshotWithConfiguration_completionHandler(Some(&config), &block) };
+    unsafe {
+        wv.webview()
+            .takeSnapshotWithConfiguration_completionHandler(Some(&config), &block)
+    };
 }
 
 /// WebView2 captures the visible viewport as PNG into a COM stream. Clips are
@@ -133,12 +147,22 @@ pub fn capture(wv: &WebView, region: Region, cb: Done) {
     };
 
     let done_stream = stream.clone();
-    let handler = CapturePreviewCompletedHandler::create(Box::new(move |result: windows::core::Result<()>| {
-        let png = result.map_err(|e| e.to_string()).and_then(|_| read_stream(&done_stream));
-        cb(png);
-        Ok(())
-    }));
-    if let Err(e) = unsafe { core.CapturePreview(COREWEBVIEW2_CAPTURE_PREVIEW_IMAGE_FORMAT_PNG, &stream, &handler) } {
+    let handler = CapturePreviewCompletedHandler::create(Box::new(
+        move |result: windows::core::Result<()>| {
+            let png = result
+                .map_err(|e| e.to_string())
+                .and_then(|_| read_stream(&done_stream));
+            cb(png);
+            Ok(())
+        },
+    ));
+    if let Err(e) = unsafe {
+        core.CapturePreview(
+            COREWEBVIEW2_CAPTURE_PREVIEW_IMAGE_FORMAT_PNG,
+            &stream,
+            &handler,
+        )
+    } {
         // The handler owns `cb` now; report through the webview error path instead.
         eprintln!("screenshot: {e}");
     }
@@ -153,7 +177,13 @@ fn read_stream(stream: &windows::Win32::System::Com::IStream) -> Result<Vec<u8>,
     let mut buf = [0u8; 64 * 1024];
     loop {
         let mut read = 0u32;
-        let hr = unsafe { stream.Read(buf.as_mut_ptr() as *mut _, buf.len() as u32, Some(&mut read)) };
+        let hr = unsafe {
+            stream.Read(
+                buf.as_mut_ptr() as *mut _,
+                buf.len() as u32,
+                Some(&mut read),
+            )
+        };
         if hr.is_err() {
             return Err(hr.to_string());
         }
