@@ -380,6 +380,18 @@ fn dark_and_light_persist_across_pages_and_runs() {
             assert_eq!(b.ok("eval", json!({"expression": scheme})), mode);
             b.open(&format!("{base}/form"));
             assert_eq!(b.ok("eval", json!({"expression": scheme})), mode);
+            // The document-start script still holds the preference the tab
+            // was created with. Every navigation milestone must apply the
+            // current preference before serving the next page request.
+            for until in ["dom", "load", "idle"] {
+                for page in ["other", "form"] {
+                    b.ok(
+                        "navigate",
+                        json!({"url": format!("{base}/{page}"), "until": until}),
+                    );
+                    assert_eq!(b.ok("eval", json!({"expression": scheme})), mode);
+                }
+            }
             let tab = b.ok("new_tab", json!({"url": format!("{base}/other")}))["tab"].clone();
             assert_eq!(
                 b.ok("eval", json!({"tab": tab, "expression": scheme})),

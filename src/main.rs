@@ -257,7 +257,9 @@ fn milestone(
         }
     }
     if stage == Until::Load || p.navigate_until == stage {
-        p.loading = false;
+        // Keep requests queued until Flush has submitted the current color
+        // preference. The document-start script captures the tab's original
+        // preference, which may have changed since the view was created.
         let _ = proxy.send_event(UserEvent::Flush(tab));
     }
 }
@@ -690,7 +692,11 @@ impl App {
         let _ = tab
             .webview
             .evaluate_script(&color_scheme_script(self.opts.dark));
-        let queued = std::mem::take(&mut tab.pending.borrow_mut().queue);
+        let queued = {
+            let mut pending = tab.pending.borrow_mut();
+            pending.loading = false;
+            std::mem::take(&mut pending.queue)
+        };
         for (id, q) in queued {
             tab_dispatch(tab, t, id, &q.method, q.params, q.retries, &self.proxy);
         }
