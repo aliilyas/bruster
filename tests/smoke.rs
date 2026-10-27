@@ -812,7 +812,7 @@ fn navigate_failures_reply() {
     );
 
     // A closed port (WebKit answers blocked ports like 1 with about:blank, so pick a free one).
-    // WebKitGTK reports the failure; WKWebView has no hook in wry, so there it is the timeout.
+    // Native load failures must answer the request and leave the tab usable.
     let closed = TcpListener::bind("127.0.0.1:0")
         .unwrap()
         .local_addr()
@@ -827,6 +827,13 @@ fn navigate_failures_reply() {
                 && (err.contains("timed out") || err.contains("load failed"))),
         "{err}"
     );
+    if cfg!(target_os = "macos") {
+        assert!(
+            err.contains("load failed"),
+            "native failure was missed: {err}"
+        );
+        assert_eq!(b.ok("title", json!({ "request_timeout": 5000 })), "other");
+    }
 
     if cfg!(target_os = "linux") {
         let err = b.err("navigate", json!({ "url": format!("{base}/download") }));
@@ -838,6 +845,37 @@ fn navigate_failures_reply() {
     // The tab still answers.
     b.open(&format!("{base}/other"));
     assert_eq!(b.ok("title", json!({})), "other");
+}
+
+#[test]
+fn visible_search_input_with_empty_label() {
+    let mut b = Browser::spawn();
+    b.open(&format!("{}/form", serve()));
+    b.ok(
+        "eval",
+        json!({ "expression": r#"document.body.innerHTML = `
+        <input name="search" hidden>
+        <input name="language" role="combobox">
+        <label for="generated-search-id"></label>
+        <input id="generated-search-id" name="search" role="combobox" title="Search Wikipedia">
+    `"# }),
+    );
+    let input = visible_input_named(&mut b, "search").expect("visible unnamed search input");
+    b.ok("type", json!({ "ref": input, "text": "WebKitGTK" }));
+    assert_eq!(
+        b.ok(
+            "eval",
+            json!({ "expression": "document.getElementById('generated-search-id').value" })
+        ),
+        "WebKitGTK"
+    );
+    assert_eq!(
+        b.ok(
+            "eval",
+            json!({ "expression": "document.querySelector('input[hidden]').value" })
+        ),
+        ""
+    );
 }
 
 #[test]

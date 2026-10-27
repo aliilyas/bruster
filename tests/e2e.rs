@@ -57,12 +57,15 @@ fn login_form_error_under_csp() {
     assert_eq!(b.ok("eval", json!({ "expression": "1 + 1" })), 2);
 }
 
-fn wiki_search_input(b: &mut Browser) -> Option<Value> {
-    // find excludes hidden controls and supplies refs even for generated IDs.
-    let found = b.ok("find", json!({ "text": "Search" }));
-    found["elements"].as_array().unwrap().iter()
-        .find(|e| matches!(e["role"].as_str(), Some("textbox" | "searchbox" | "combobox")))
-        .map(|e| e["ref"].clone())
+fn wiki_history_url(url: &Value) -> String {
+    let url = url.as_str().unwrap();
+    let (page, fragment) = url.split_once('#').unwrap_or((url, ""));
+    let (path, query) = page.split_once('?').unwrap_or((page, ""));
+    // MediaWiki replaces these analytics parameters after rendering results.
+    // Keep the actual search/title/profile parameters in the history check.
+    let mut params: Vec<_> = query.split('&').filter(|p| !p.is_empty() && !matches!(p.split('=').next(), Some("searchToken" | "wprov"))).collect();
+    params.sort_unstable();
+    format!("{path}{}{}{}{}", if params.is_empty() { "" } else { "?" }, params.join("&"), if fragment.is_empty() { "" } else { "#" }, fragment)
 }
 
 #[test]
@@ -73,13 +76,15 @@ fn wiki_search_then_back() {
     for (viewport, page) in [("1400x800", "Main_Page"), ("900x800", "Main_Page"), ("900x800", "Special:Search")] {
         let mut b = Browser::spawn_with(&["--viewport", viewport]);
         b.open(&format!("https://en.wikipedia.org/wiki/{page}"));
-        let mut input = wiki_search_input(&mut b);
+        // Special:Search can have an empty label, so find by role and form
+        // name rather than filtering snapshot elements by accessible name.
+        let mut input = visible_input_named(&mut b, "search");
         if input.is_none() {
             b.ok("click", json!({ "selector": "#p-search .search-toggle" }));
             // The toggle can expand inline or follow its Special:Search href.
             let start = Instant::now();
             while input.is_none() {
-                input = wiki_search_input(&mut b);
+                input = visible_input_named(&mut b, "search");
                 assert!(start.elapsed() < Duration::from_millis(SITE_TIMEOUT), "no visible Wikipedia search input: {:?}", b.call("snapshot", json!({})));
                 if input.is_none() {
                     std::thread::sleep(Duration::from_millis(100));
@@ -88,7 +93,7 @@ fn wiki_search_then_back() {
         }
         let entry_url = b.ok("url", json!({}));
         b.ok("type", json!({ "ref": input.unwrap(), "text": "WebKitGTK", "submit": true }));
-        let result_url = b.ok("url", json!({}));
+        let mut result_url = b.ok("url", json!({}));
         // Special:Search submits a full-text search rather than jumping
         // straight to the article as the header's search does.
         let results_page = !result_url.as_str().unwrap().contains("/wiki/WebKit");
@@ -97,6 +102,7 @@ fn wiki_search_then_back() {
             let link = found["elements"].as_array().unwrap().iter()
                 .find(|e| e["role"] == "link" && e["href"].as_str().is_some_and(|url| url.contains("/wiki/WebKit")))
                 .unwrap_or_else(|| panic!("no WebKit result at {result_url}: {found}"));
+            result_url = b.ok("url", json!({}));
             b.ok("click", json!({ "ref": link["ref"] }));
         }
         b.ok("wait_for", json!({ "url": "/wiki/WebKit", "timeout": SITE_TIMEOUT }));
@@ -105,9 +111,9 @@ fn wiki_search_then_back() {
         assert!(snap.as_str().unwrap().lines().count() > 100, "thin snapshot");
         eprintln!("Wikipedia {viewport} {page}: entry={entry_url}, search={result_url}");
         if results_page {
-            assert_eq!(b.ok("back", json!({}))["url"], result_url);
+            assert_eq!(wiki_history_url(&b.ok("back", json!({}))["url"]), wiki_history_url(&result_url));
         }
-        assert_eq!(b.ok("back", json!({}))["url"], entry_url);
+        assert_eq!(wiki_history_url(&b.ok("back", json!({}))["url"]), wiki_history_url(&entry_url));
     }
 }
 

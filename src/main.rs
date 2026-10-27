@@ -35,6 +35,8 @@ use wry::{
 };
 
 mod mcp;
+#[cfg(target_os = "macos")]
+mod navigation_macos;
 mod screenshot;
 mod window_state;
 
@@ -157,6 +159,9 @@ enum UserEvent {
     PageTimeout,
     /// A load finished: run the requests that waited for it.
     Flush(TabId),
+    /// A failed native load may have been replaced before this event is handled.
+    #[cfg(target_os = "macos")]
+    FlushIfIdle(TabId),
     /// A hinted navigation never started.
     HintTimeout {
         tab: TabId,
@@ -349,6 +354,9 @@ type Shared = Rc<RefCell<Pending>>;
 
 struct Tab {
     webview: WebView,
+    // WKWebView keeps a weak delegate; retain our forwarding observer per tab.
+    #[cfg(target_os = "macos")]
+    _navigation: objc2::rc::Retained<navigation_macos::NavigationObserver>,
     window: Window,
     pending: Shared,
 }
@@ -563,6 +571,15 @@ fn main() -> wry::Result<()> {
             Event::UserEvent(UserEvent::Flush(tab)) => {
                 app.last_load = std::time::Instant::now();
                 app.flush(tab);
+            }
+            #[cfg(target_os = "macos")]
+            Event::UserEvent(UserEvent::FlushIfIdle(tab)) => {
+                if app.tabs.get(&tab).is_some_and(|t| {
+                    let p = t.pending.borrow();
+                    !p.loading && p.navigate.is_none()
+                }) {
+                    app.flush(tab);
+                }
             }
             Event::UserEvent(UserEvent::HintTimeout { tab, id }) => {
                 if let Some(t) = app.tabs.get(&tab) {
@@ -804,12 +821,17 @@ impl App {
             &self.opts,
             &mut self.context,
         )?;
+        #[cfg(target_os = "macos")]
+        let navigation =
+            navigation_macos::observe(&webview, id, pending.clone(), self.proxy.clone());
 
         self.tabs.insert(
             id,
             Tab {
                 window,
                 webview,
+                #[cfg(target_os = "macos")]
+                _navigation: navigation,
                 pending,
             },
         );

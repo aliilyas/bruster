@@ -29,7 +29,7 @@ block2 = "0.6"
 objc2 = "0.6"
 objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSData", "NSDictionary", "NSError", "NSString"] }
 objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSImage", "NSImageRep", "NSBitmapImageRep"] }
-objc2-web-kit = { version = "0.3.2", default-features = false, features = ["std", "block2", "WKWebView", "WKSnapshotConfiguration"] }
+objc2-web-kit = { version = "0.3.2", default-features = false, features = ["std", "block2", "WKWebView", "WKSnapshotConfiguration", "WKNavigation", "WKNavigationDelegate"] }
 
 [profile.release]
 opt-level = 3
