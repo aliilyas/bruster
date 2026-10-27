@@ -60,8 +60,14 @@ fn login_form_error_under_csp() {
 #[test]
 #[ignore]
 fn wiki_search_then_back() {
-    let mut b = Browser::spawn();
+    let mut b = Browser::spawn_with(&["--viewport", "900x800"]);
     b.open("https://en.wikipedia.org/wiki/Main_Page");
+    // Vector collapses search at narrower CSS viewports (also common with
+    // Windows display scaling). Open it through the visible search toggle.
+    let visible = b.ok("eval", json!({ "expression": "(() => { const e = document.getElementById('searchInput'); return e && (e.checkVisibility ? e.checkVisibility() : e.getClientRects().length > 0); })()" }));
+    if visible != true {
+        b.ok("click", json!({ "selector": "#p-search .search-toggle" }));
+    }
     b.ok("type", json!({ "selector": "#searchInput", "text": "WebKitGTK", "submit": true }));
     b.ok("wait_for", json!({ "url": "/wiki/WebKit", "timeout": SITE_TIMEOUT }));
     assert!(b.ok("title", json!({})).as_str().unwrap().contains("WebKit"));

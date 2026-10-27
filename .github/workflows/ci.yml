@@ -2,7 +2,7 @@
 #
 #   macOS arm64 / x86_64   native WKWebView, tests run on the runner's desktop
 #   Ubuntu x86_64 / arm64  WebKitGTK 4.1, tests under xvfb-run
-#   Windows x86_64         WebView2, unit/smoke tests and informational edge tests
+#   Windows x86_64         WebView2, unit/smoke/edge tests
 name: ci
 on:
   push:
@@ -71,9 +71,8 @@ jobs:
         if: runner.os == 'Windows'
         run: cargo test --release --locked --target ${{ matrix.target }} --test smoke -- --test-threads=1
 
-      - name: Edge tests (Windows, informational)
+      - name: Edge tests (Windows)
         if: runner.os == 'Windows'
-        continue-on-error: true
         run: cargo test --release --locked --target ${{ matrix.target }} --test edge -- --test-threads=1
 
       - name: MCP launch check

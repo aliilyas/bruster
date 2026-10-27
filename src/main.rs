@@ -257,6 +257,11 @@ struct Pending {
     navigate_url: Option<String>,
     /// URL before a history operation, for same-document transitions with no load.
     history_url: Option<String>,
+    /// WebView2 can deliver popstate IPC before its native history flags change.
+    #[cfg(target_os = "windows")]
+    history_changed: bool,
+    #[cfg(target_os = "windows")]
+    history_reply: Option<String>,
     navigate_until: Until,
     /// The about:blank warm-up load is still in flight; its events are not the agent's.
     warming: bool,
@@ -268,10 +273,32 @@ struct Pending {
 /// A page finished loading, by its own load event or WebKit's. Answers the
 /// pending navigate, releases held requests, emits `load`, once per page.
 fn page_loaded(p: &mut Pending, tab: TabId, url: &str, proxy: &EventLoopProxy<UserEvent>) {
-    milestone(p, Until::Load, tab, url, proxy);
-    if !std::mem::replace(&mut p.loaded, true) {
-        emit(json!({ "event": "load", "tab": tab, "url": url }));
+    // The runtime load IPC can precede the native Finished callback. A click
+    // may already have started the next provisional load in between them;
+    // the duplicate must not release requests into the old document.
+    if std::mem::replace(&mut p.loaded, true) {
+        return;
     }
+    milestone(p, Until::Load, tab, url, proxy);
+    emit(json!({ "event": "load", "tab": tab, "url": url }));
+}
+
+fn history_traversed(p: &mut Pending, tab: TabId, url: &str, proxy: &EventLoopProxy<UserEvent>) {
+    if p.history_url.is_none() {
+        return;
+    }
+    let Some((id, false)) = p.navigate else {
+        return;
+    };
+    #[cfg(target_os = "windows")]
+    if !p.history_changed {
+        p.history_reply = Some(url.to_owned());
+        return;
+    }
+    p.navigate = None;
+    p.history_url = None;
+    reply(id, json!({ "tab": tab, "url": url }));
+    let _ = proxy.send_event(UserEvent::Flush(tab));
 }
 
 /// The page reached `stage`: answer a navigate that asked for it and release
@@ -568,6 +595,9 @@ fn main() -> wry::Result<()> {
                 if let Some(t) = app.tabs.get(&tab) {
                     let mut p = t.pending.borrow_mut();
                     if p.navigate == Some((id, false))
+                        // WebView2 must acknowledge HistoryChanged before the
+                        // next back/forward reads CanGoBack/CanGoForward.
+                        && !cfg!(target_os = "windows")
                         && !p.loading
                         && !navigation_in_progress(&t.webview)
                     {
@@ -1260,14 +1290,7 @@ fn build_webview(
             }
             if let Some(url) = body.get("history").and_then(Value::as_str) {
                 let mut p = ipc_pending.borrow_mut();
-                if p.history_url.is_some() {
-                    if let Some((id, false)) = p.navigate {
-                        p.navigate = None;
-                        p.history_url = None;
-                        reply(id, json!({ "tab": tab, "url": url }));
-                        let _ = ipc_proxy.send_event(UserEvent::Flush(tab));
-                    }
-                }
+                history_traversed(&mut p, tab, url, &ipc_proxy);
                 return;
             }
             for (key, stage) in [("dom", Until::Dom), ("idle", Until::Idle)] {
@@ -1384,10 +1407,9 @@ fn build_webview(
     }
 
     #[cfg(not(target_os = "linux"))]
-    let webview = {
-        drop((pending, proxy)); // load failures are only hooked on WebKitGTK
-        builder.build(window)?
-    };
+    let webview = builder.build(window)?;
+    #[cfg(target_os = "windows")]
+    track_history(&webview, tab, pending, proxy)?;
     #[cfg(target_os = "linux")]
     let webview = {
         use tao::platform::unix::WindowExtUnix;
@@ -1486,6 +1508,28 @@ fn stop_loading(wv: &WebView) {
 fn stop_loading(wv: &WebView) {
     use wry::WebViewExtWindows;
     let _ = unsafe { wv.webview().Stop() };
+}
+
+#[cfg(target_os = "windows")]
+fn track_history(
+    wv: &WebView,
+    tab: TabId,
+    pending: Shared,
+    proxy: EventLoopProxy<UserEvent>,
+) -> wry::Result<()> {
+    use webview2_com::HistoryChangedEventHandler;
+    use wry::WebViewExtWindows;
+    let handler = HistoryChangedEventHandler::create(Box::new(move |_, _| {
+        let mut p = pending.borrow_mut();
+        p.history_changed = true;
+        if let Some(url) = p.history_reply.take() {
+            history_traversed(&mut p, tab, &url, &proxy);
+        }
+        Ok(())
+    }));
+    let mut token = 0;
+    unsafe { wv.webview().add_HistoryChanged(&handler, &mut token) }?;
+    Ok(())
 }
 
 fn hint_timeout(proxy: EventLoopProxy<UserEvent>, tab: TabId, id: u64) {
@@ -1651,6 +1695,11 @@ fn tab_dispatch(tab: &Tab, t: TabId, id: u64, request: Queued, proxy: &EventLoop
         } else {
             None
         };
+        #[cfg(target_os = "windows")]
+        {
+            p.history_changed = false;
+            p.history_reply = None;
+        }
         drop(p);
         let proxy = proxy.clone();
         std::thread::spawn(move || {

@@ -75,9 +75,41 @@ fn beforeunload_does_not_block() {
         assert_eq!(
             b.ok("title", json!({})),
             "other",
-            "beforeunload prompt blocked the tab or title read the old page"
+            "beforeunload prompt blocked the tab or title read the old page: {path}; events: {:?}",
+            b.stash
         );
     }
+}
+
+#[test]
+fn duplicate_load_does_not_release_requests_for_the_next_page() {
+    let mut b = Browser::spawn();
+    let base = serve();
+    b.open(&format!("{base}/more"));
+    // The page's load IPC answers navigate before WebKit's native Finished.
+    // Reproduce that later duplicate while the next navigation is provisional.
+    // Send it immediately after the click reply on the same IPC channel;
+    // this avoids hidden-window timers and loads cancelled by navigation.
+    b.ok(
+        "eval",
+        json!({ "expression": r#"
+        document.getElementById('away').href = '/hang';
+        const run = __bruster.run;
+        __bruster.run = async (id, method, params) => {
+            await run(id, method, params);
+            if (method === 'click') {
+                window.ipc.postMessage(JSON.stringify({ loaded: location.href }));
+                window.ipc.postMessage(JSON.stringify({ event: 'duplicate_load_sent' }));
+            }
+        };
+    "# }),
+    );
+    b.ok("click", json!({ "selector": "#away" }));
+    let id = b.send("title", json!({ "request_timeout": 3000 }));
+    b.wait_event("duplicate_load_sent");
+    assert!(b.recv(id).unwrap_err().contains("timed out"));
+    b.open(&format!("{base}/other"));
+    assert_eq!(b.ok("title", json!({})), "other");
 }
 
 #[test]
