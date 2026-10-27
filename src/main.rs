@@ -99,6 +99,7 @@ const TALL_SHOT_TRIES: u8 = 30;
 /// WebKit writes disk cache entries about a second after a load; exiting
 /// earlier loses them for the next session.
 const CACHE_FLUSH_DELAY: Duration = Duration::from_millis(1200);
+
 type TabId = u32;
 
 #[derive(Deserialize)]
@@ -347,7 +348,7 @@ struct Tab {
     webview: WebView,
     // WKWebView keeps a weak delegate; retain our forwarding observer per tab.
     #[cfg(target_os = "macos")]
-    _navigation: objc2::rc::Retained<navigation_macos::NavigationObserver>,
+    navigation: objc2::rc::Retained<navigation_macos::NavigationObserver>,
     window: Window,
     pending: Shared,
 }
@@ -803,7 +804,7 @@ impl App {
                 window,
                 webview,
                 #[cfg(target_os = "macos")]
-                _navigation: navigation,
+                navigation,
                 pending,
             },
         );
@@ -1657,6 +1658,19 @@ fn attach_files(mut params: Value) -> Result<Value, String> {
     Ok(params)
 }
 
+fn start_navigation(tab: &Tab, _id: u64, method: &str, url: Option<&str>) -> wry::Result<()> {
+    #[cfg(target_os = "macos")]
+    return tab.navigation.navigate(&tab.webview, _id, method, url);
+    #[cfg(not(target_os = "macos"))]
+    match method {
+        "navigate" => tab.webview.load_url(url.unwrap()),
+        "reload" => tab.webview.reload(),
+        "back" => tab.webview.go_back(),
+        "forward" => tab.webview.go_forward(),
+        _ => unreachable!("not a native navigation"),
+    }
+}
+
 /// `retries` counts how many navigations this request has already outlived.
 fn tab_dispatch(tab: &Tab, t: TabId, id: u64, request: Queued, proxy: &EventLoopProxy<UserEvent>) {
     let wv = &tab.webview;
@@ -1733,9 +1747,9 @@ fn tab_dispatch(tab: &Tab, t: TabId, id: u64, request: Queued, proxy: &EventLoop
             if !valid_url(url) {
                 return fail(id, format!("navigate: invalid url '{url}'"));
             }
-            await_load(Some(url), &|| wv.load_url(url))
+            await_load(Some(url), &|| start_navigation(tab, id, method, Some(url)))
         }
-        "reload" => await_load(None, &|| wv.reload()),
+        "reload" => await_load(None, &|| start_navigation(tab, id, method, None)),
         "back" | "forward" => {
             let can_go = if method == "back" {
                 wv.can_go_back()
@@ -1752,10 +1766,7 @@ fn tab_dispatch(tab: &Tab, t: TabId, id: u64, request: Queued, proxy: &EventLoop
                 std::thread::sleep(HISTORY_START_TIMEOUT);
                 let _ = proxy.send_event(UserEvent::HistoryTimeout { tab: t, id });
             });
-            await_load(None, &|| match method {
-                "back" => wv.go_back(),
-                _ => wv.go_forward(),
-            })
+            await_load(None, &|| start_navigation(tab, id, method, None))
         }
         "cookies" => wv.cookies().map(|cs| Some(cookies_json(&cs))),
         "set_cookie" => set_cookie(wv, params).map(|_| Some(Value::Null)),

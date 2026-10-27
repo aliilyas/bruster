@@ -6,23 +6,19 @@ use std::cell::RefCell;
 use objc2::rc::Retained;
 use objc2::runtime::{AnyObject, NSObject, NSObjectProtocol, ProtocolObject, Sel};
 use objc2::{define_class, msg_send, DeclaredClass, MainThreadOnly, Message};
-use objc2_foundation::NSError;
+use objc2_foundation::{NSError, NSString, NSURLRequest, NSURL};
 use objc2_web_kit::{WKNavigation, WKNavigationDelegate, WKWebView};
 use wry::WebViewExtMacOS;
 
 use crate::{emit, fail, json, trace_navigation, EventLoopProxy, Shared, TabId, UserEvent};
-
-struct Active {
-    navigation: Retained<WKNavigation>,
-    request: Option<u64>,
-}
 
 pub struct ObserverState {
     original: Retained<ProtocolObject<dyn WKNavigationDelegate>>,
     pending: Shared,
     tab: TabId,
     proxy: EventLoopProxy<UserEvent>,
-    active: RefCell<Option<Active>>,
+    active: RefCell<Option<Retained<WKNavigation>>>,
+    explicit: RefCell<Option<(u64, Retained<WKNavigation>)>>,
 }
 
 define_class!(
@@ -53,10 +49,7 @@ define_class!(
             let state = self.ivars();
             let mut p = state.pending.borrow_mut();
             if !p.warming {
-                *state.active.borrow_mut() = navigation.map(|n| Active {
-                    navigation: n.retain(),
-                    request: p.navigate.map(|(id, _)| id),
-                });
+                *state.active.borrow_mut() = navigation.map(|n| n.retain());
                 // Also cover page-initiated navigation without an action reply.
                 p.loading = true;
                 p.hinted = None;
@@ -78,20 +71,47 @@ define_class!(
 );
 
 impl NavigationObserver {
+    fn is_current_failure(&self, navigation: Option<&WKNavigation>) -> bool {
+        let state = self.ivars();
+        let p = state.pending.borrow();
+        let Some(navigation) = navigation else {
+            return false;
+        };
+        if p.warming
+            || p.hinted.is_some()
+            || !state
+                .active
+                .borrow()
+                .as_ref()
+                .is_some_and(|n| std::ptr::eq(navigation, &**n))
+        {
+            return false;
+        }
+        if let Some((id, _)) = p.navigate {
+            // A delayed start from an older click may arrive while this ID is
+            // already pending. Match the token returned by the native API.
+            return state
+                .explicit
+                .borrow()
+                .as_ref()
+                .is_some_and(|(expected, n)| *expected == id && std::ptr::eq(navigation, &**n));
+        }
+        true
+    }
+
     fn failed(&self, navigation: Option<&WKNavigation>, error: &NSError) {
         let state = self.ivars();
-        let mut active = state.active.borrow_mut();
-        let Some(current) = active.as_ref() else {
+        if !self.is_current_failure(navigation) {
+            trace_navigation(
+                "stale native failure",
+                state.tab,
+                &state.pending.borrow(),
+                &error.localizedDescription().to_string(),
+            );
             return;
-        };
-        if !navigation.is_some_and(|n| std::ptr::eq(n, &*current.navigation)) {
-            return; // A newer native navigation has already started.
         }
         let mut p = state.pending.borrow_mut();
-        if current.request != p.navigate.map(|(id, _)| id) {
-            return; // An explicit navigate superseded this load before starting.
-        }
-        *active = None;
+        *state.active.borrow_mut() = None;
         p.loading = false;
         p.hinted = None;
         let why = error.localizedDescription().to_string();
@@ -103,6 +123,32 @@ impl NavigationObserver {
         // A cancelled download can leave the old document usable. If another
         // navigation starts before dispatch, its requests must stay queued.
         let _ = state.proxy.send_event(UserEvent::FlushIfIdle(state.tab));
+    }
+
+    pub fn navigate(
+        &self,
+        webview: &wry::WebView,
+        id: u64,
+        method: &str,
+        url: Option<&str>,
+    ) -> wry::Result<()> {
+        let webview = webview.webview();
+        let navigation = unsafe {
+            match method {
+                "navigate" => {
+                    let url = NSURL::URLWithString(&NSString::from_str(url.unwrap())).ok_or_else(
+                        || wry::Error::Io(std::io::Error::other("invalid navigation URL")),
+                    )?;
+                    webview.loadRequest(&NSURLRequest::requestWithURL(&url))
+                }
+                "reload" => webview.reload(),
+                "back" => webview.goBack(),
+                "forward" => webview.goForward(),
+                _ => unreachable!("not a native navigation"),
+            }
+        };
+        *self.ivars().explicit.borrow_mut() = navigation.map(|n| (id, n));
+        Ok(())
     }
 }
 
@@ -120,6 +166,7 @@ pub fn observe(
         tab,
         proxy,
         active: RefCell::new(None),
+        explicit: RefCell::new(None),
     });
     let observer: Retained<NavigationObserver> = unsafe { msg_send![super(observer), init] };
     unsafe { webview.setNavigationDelegate(Some(ProtocolObject::from_ref(&*observer))) };

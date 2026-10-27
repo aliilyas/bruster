@@ -67,6 +67,16 @@ fn wiki_history_page(b: &mut Browser, url: &Value) -> Value {
     }})()"#) }))
 }
 
+fn wiki_back_page(b: &mut Browser) -> Value {
+    let back = b.ok("back", json!({}));
+    assert!(back["url"].is_string(), "Wikipedia history ended before the entry page: {back}");
+    let current = b.ok("url", json!({}));
+    let page = wiki_history_page(b, &back["url"]);
+    assert_eq!(page, wiki_history_page(b, &current), "back reply disagrees with live URL: {back}; {current}");
+    eprintln!("Wikipedia back: {}", back["url"]);
+    page
+}
+
 #[test]
 #[ignore]
 fn wiki_search_then_back() {
@@ -109,12 +119,23 @@ fn wiki_search_then_back() {
         let snap = b.ok("snapshot", json!({ "format": "text" }));
         assert!(snap.as_str().unwrap().lines().count() > 100, "thin snapshot");
         eprintln!("Wikipedia {viewport} {page}: entry={entry_url}, search={result_url}");
+        let entry_page = wiki_history_page(&mut b, &entry_url);
+        let search_page = wiki_history_page(&mut b, &result_url);
         if results_page {
-            let back = b.ok("back", json!({}));
-            assert_eq!(wiki_history_page(&mut b, &back["url"]), wiki_history_page(&mut b, &result_url));
+            assert_eq!(wiki_back_page(&mut b), search_page);
         }
-        let back = b.ok("back", json!({}));
-        assert_eq!(wiki_history_page(&mut b, &back["url"]), wiki_history_page(&mut b, &entry_url));
+        // AdvancedSearch pushes a same-document history entry for default
+        // namespaces (MediaWiki T217445). Only equivalent result pages may
+        // intervene before back reaches the original search-entry page.
+        for step in 0..4 {
+            let back = wiki_back_page(&mut b);
+            if back == entry_page {
+                break;
+            }
+            assert!(results_page, "unexpected intermediate history page: {back}");
+            assert_eq!(back, search_page);
+            assert!(step < 3, "back never reached the search-entry page: {entry_url}");
+        }
     }
 }
 
