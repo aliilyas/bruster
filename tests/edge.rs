@@ -63,14 +63,75 @@ fn rss_mb(root: u32) -> u64 {
 fn beforeunload_does_not_block() {
     let mut b = Browser::spawn();
     let base = serve();
-    b.open(&format!("{base}/beforeunload"));
+    for path in ["/other", "/slower"] {
+        b.open(&format!("{base}/beforeunload"));
+        b.ok(
+            "eval",
+            json!({ "expression": format!("document.getElementById('l').href = '{path}'") }),
+        );
+        b.ok("click", json!({ "selector": "#l" }));
+        // /slower takes longer than the navigation-hint fallback. WKWebView
+        // has not committed yet; title must wait rather than read the old page.
+        assert_eq!(
+            b.ok("title", json!({})),
+            "other",
+            "beforeunload prompt blocked the tab or title read the old page: {path}; events: {:?}",
+            b.stash
+        );
+    }
+}
 
-    b.ok("click", json!({ "selector": "#l" }));
-    assert_eq!(
-        b.ok("title", json!({})),
-        "other",
-        "beforeunload prompt blocked the tab"
+#[test]
+fn duplicate_load_does_not_release_requests_for_the_next_page() {
+    let mut b = Browser::spawn_env(&[], &[("BRUSTER_TRACE_NAV", "1")]);
+    let base = serve();
+    b.open(&format!("{base}/more"));
+    // The page's load IPC answers navigate before WebKit's native Finished.
+    // Reproduce that later duplicate while the next navigation is provisional.
+    // Send it immediately after the click reply on the same IPC channel;
+    // this avoids hidden-window timers and loads cancelled by navigation.
+    b.ok(
+        "eval",
+        json!({ "expression": r#"
+        document.getElementById('away').href = '/hang';
+        const run = __bruster.run;
+        __bruster.run = async (id, method, params) => {
+            await run(id, method, params);
+            if (method === 'click') {
+                window.ipc.postMessage(JSON.stringify({ loaded: location.href }));
+                window.ipc.postMessage(JSON.stringify({ event: 'duplicate_load_sent' }));
+            }
+        };
+    "# }),
     );
+    b.ok("click", json!({ "selector": "#away" }));
+    let start = Instant::now();
+    let id = b.send("title", json!({ "request_timeout": 3000 }));
+    b.wait_event("duplicate_load_sent");
+    let result = b.recv(id);
+    assert!(
+        result.as_ref().is_err_and(|e| e.contains("timed out")),
+        "{result:?} after {:?}; events: {:?}",
+        start.elapsed(),
+        b.stash
+    );
+    b.open(&format!("{base}/other"));
+    assert_eq!(b.ok("title", json!({})), "other");
+}
+
+#[test]
+fn cancelled_navigation_hint_releases_page_requests() {
+    let mut b = Browser::spawn();
+    let base = serve();
+    b.open(&format!("{base}/more"));
+    // Registered after the runtime's bubble listener: it has already hinted
+    // when this listener cancels the link's default action.
+    b.ok(
+        "eval",
+        json!({ "expression": "window.addEventListener('click', e => e.preventDefault())" }),
+    );
+    b.ok("click", json!({ "selector": "#away" }));
+    assert_eq!(b.ok("title", json!({ "request_timeout": 5000 })), "more");
 }
 
 #[test]
@@ -240,16 +301,22 @@ fn last_tab_stays_open_and_new_tab_load_is_bounded() {
     b.open(&format!("{base}/other"));
     assert!(b.err("close_tab", json!({})).contains("last tab"));
     assert_eq!(b.ok("title", json!({})), "other");
-    let start = Instant::now();
-    assert!(b
-        .err(
-            "new_tab",
-            json!({ "url": format!("{base}/hang"), "timeout": 300 })
-        )
-        .contains("timed out"));
-    assert!(start.elapsed() < Duration::from_secs(3));
-    assert_eq!(b.ok("title", json!({})), "other");
+    let id = b.send(
+        "new_tab",
+        json!({ "url": format!("{base}/hang"), "timeout": 300 }),
+    );
+    // Native window/web-process construction is synchronous and can take
+    // seconds on CI. The URL-load timeout starts after that construction.
     let tabs = b.ok("tabs", json!({}));
+    assert_eq!(tabs.as_array().unwrap().len(), 2);
+    let start = Instant::now();
+    assert!(b.recv(id).unwrap_err().contains("timed out"));
+    assert!(
+        start.elapsed() < Duration::from_secs(3),
+        "{:?}",
+        start.elapsed()
+    );
+    assert_eq!(b.ok("title", json!({})), "other");
     let tab = tabs
         .as_array()
         .unwrap()
@@ -539,7 +606,7 @@ fn window_commands_persist_in_hidden_runs() {
         b.closed = true;
         assert!(b.child.wait().unwrap().success());
     }
-    std::fs::remove_dir_all(root).unwrap();
+    remove_profile_dir(&root);
 }
 
 #[test]
@@ -596,7 +663,7 @@ fn dark_and_light_persist_across_pages_and_runs() {
         b.closed = true;
         assert!(b.child.wait().unwrap().success());
     }
-    std::fs::remove_dir_all(root).unwrap();
+    remove_profile_dir(&root);
 }
 
 #[test]

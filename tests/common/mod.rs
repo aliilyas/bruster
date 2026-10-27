@@ -281,6 +281,26 @@ impl Drop for Browser {
     }
 }
 
+/// WebView2's child processes can briefly retain profile handles after the
+/// bruster process exits. Retry Windows sharing/access errors during cleanup.
+pub fn remove_profile_dir(path: &std::path::Path) {
+    let start = Instant::now();
+    loop {
+        match std::fs::remove_dir_all(path) {
+            Ok(()) => return,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return,
+            Err(e)
+                if cfg!(target_os = "windows")
+                    && matches!(e.raw_os_error(), Some(5 | 32 | 33 | 145))
+                    && start.elapsed() < Duration::from_secs(10) =>
+            {
+                std::thread::sleep(Duration::from_millis(100));
+            }
+            Err(e) => panic!("remove profile {}: {e}", path.display()),
+        }
+    }
+}
+
 // Tiny HTTP server on a random port. data: URLs are not usable: wry drops
 // IPC messages whose page URL is not a valid http::Uri.
 //

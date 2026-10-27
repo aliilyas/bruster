@@ -124,7 +124,10 @@ enum UserEvent {
         height: f64,
     },
     /// Puts the window back to the viewport size after a full capture.
-    RestoreSize(TabId),
+    RestoreSize {
+        tab: TabId,
+        size: tao::dpi::LogicalSize<f64>,
+    },
     /// Linux: the window was resized for a tall capture; poll until the page sees the new height.
     TallShot {
         tab: TabId,
@@ -132,11 +135,13 @@ enum UserEvent {
         path: Option<String>,
         height: f64,
         tries: u8,
+        restore: tao::dpi::LogicalSize<f64>,
     },
     TallShotReady {
         tab: TabId,
         id: u64,
         path: Option<String>,
+        restore: tao::dpi::LogicalSize<f64>,
     },
     /// back/forward/reload gave the webview HISTORY_START_TIMEOUT to start loading.
     HistoryTimeout {
@@ -153,7 +158,10 @@ enum UserEvent {
     /// A load finished: run the requests that waited for it.
     Flush(TabId),
     /// A hinted navigation never started.
-    HintTimeout(TabId),
+    HintTimeout {
+        tab: TabId,
+        id: u64,
+    },
     /// The eval wrapper did not compile as an expression; try the statement form.
     EvalRetry {
         tab: TabId,
@@ -238,8 +246,9 @@ struct Pending {
     queue: Vec<(u64, Queued)>,
     loading: bool,
     /// `loading` came from a page hint (link clicked, form submitted) and no
-    /// load has started yet; cleared by the load or by NAV_HINT_TIMEOUT.
-    hinted: bool,
+    /// load has started yet. The request id keeps old hint timers from
+    /// releasing a newer navigation; the fallback checks native loading too.
+    hinted: Option<u64>,
     /// (request id, has the new load started yet). A Finished event for the
     /// previous page can arrive after load_url(); ignore it until Started.
     navigate: Option<(u64, bool)>,
@@ -248,6 +257,11 @@ struct Pending {
     navigate_url: Option<String>,
     /// URL before a history operation, for same-document transitions with no load.
     history_url: Option<String>,
+    /// WebView2 can deliver popstate IPC before its native history flags change.
+    #[cfg(target_os = "windows")]
+    history_changed: bool,
+    #[cfg(target_os = "windows")]
+    history_reply: Option<String>,
     navigate_until: Until,
     /// The about:blank warm-up load is still in flight; its events are not the agent's.
     warming: bool,
@@ -256,13 +270,42 @@ struct Pending {
     loaded: bool,
 }
 
+fn trace_navigation(stage: &str, tab: TabId, p: &Pending, url: &str) {
+    if std::env::var_os("BRUSTER_TRACE_NAV").is_some() {
+        eprintln!("navigation {stage}: tab={tab} url={url:?} loading={} loaded={} hint={:?} navigate={:?}", p.loading, p.loaded, p.hinted, p.navigate);
+    }
+}
+
 /// A page finished loading, by its own load event or WebKit's. Answers the
 /// pending navigate, releases held requests, emits `load`, once per page.
 fn page_loaded(p: &mut Pending, tab: TabId, url: &str, proxy: &EventLoopProxy<UserEvent>) {
-    milestone(p, Until::Load, tab, url, proxy);
-    if !std::mem::replace(&mut p.loaded, true) {
-        emit(json!({ "event": "load", "tab": tab, "url": url }));
+    trace_navigation("loaded", tab, p, url);
+    // The runtime load IPC can precede the native Finished callback. A click
+    // may already have started the next provisional load in between them;
+    // the duplicate must not release requests into the old document.
+    if std::mem::replace(&mut p.loaded, true) {
+        return;
     }
+    milestone(p, Until::Load, tab, url, proxy);
+    emit(json!({ "event": "load", "tab": tab, "url": url }));
+}
+
+fn history_traversed(p: &mut Pending, tab: TabId, url: &str, proxy: &EventLoopProxy<UserEvent>) {
+    if p.history_url.is_none() {
+        return;
+    }
+    let Some((id, false)) = p.navigate else {
+        return;
+    };
+    #[cfg(target_os = "windows")]
+    if !p.history_changed {
+        p.history_reply = Some(url.to_owned());
+        return;
+    }
+    p.navigate = None;
+    p.history_url = None;
+    reply(id, json!({ "tab": tab, "url": url }));
+    let _ = proxy.send_event(UserEvent::Flush(tab));
 }
 
 /// The page reached `stage`: answer a navigate that asked for it and release
@@ -500,30 +543,43 @@ fn main() -> wry::Result<()> {
                 path,
                 height,
                 tries,
+                restore,
             }) => {
-                app.tall_shot_poll(tab, id, path, height, tries);
+                app.tall_shot_poll(tab, id, path, height, tries, restore);
             }
-            Event::UserEvent(UserEvent::TallShotReady { tab, id, path }) => {
-                app.viewport_shot_then_restore(tab, id, path);
+            Event::UserEvent(UserEvent::TallShotReady {
+                tab,
+                id,
+                path,
+                restore,
+            }) => {
+                app.viewport_shot_then_restore(tab, id, path, restore);
             }
-            Event::UserEvent(UserEvent::RestoreSize(tab)) => {
+            Event::UserEvent(UserEvent::RestoreSize { tab, size }) => {
                 if let Some(t) = app.tabs.get(&tab) {
-                    t.window
-                        .set_inner_size(tao::dpi::LogicalSize::new(app.viewport.0, app.viewport.1));
+                    t.window.set_inner_size(size);
                 }
             }
             Event::UserEvent(UserEvent::Flush(tab)) => {
                 app.last_load = std::time::Instant::now();
                 app.flush(tab);
             }
-            Event::UserEvent(UserEvent::HintTimeout(tab)) => {
+            Event::UserEvent(UserEvent::HintTimeout { tab, id }) => {
                 if let Some(t) = app.tabs.get(&tab) {
                     let mut p = t.pending.borrow_mut();
-                    if p.hinted {
-                        p.hinted = false;
-                        p.loading = false;
-                        drop(p);
-                        app.flush(tab);
+                    if p.hinted == Some(id) {
+                        // Wry reports WKWebView's Started at commit, not at
+                        // provisional start. A slow response is still loading.
+                        if navigation_in_progress(&t.webview) {
+                            trace_navigation("hint still loading", tab, &p, "");
+                            hint_timeout(app.proxy.clone(), tab, id);
+                        } else {
+                            trace_navigation("hint expired", tab, &p, "");
+                            p.hinted = None;
+                            p.loading = false;
+                            drop(p);
+                            app.flush(tab);
+                        }
                     }
                 }
             }
@@ -547,7 +603,13 @@ fn main() -> wry::Result<()> {
                 // Fallback for engines restoring a page without load events.
                 if let Some(t) = app.tabs.get(&tab) {
                     let mut p = t.pending.borrow_mut();
-                    if p.navigate == Some((id, false)) {
+                    if p.navigate == Some((id, false))
+                        // WebView2 must acknowledge HistoryChanged before the
+                        // next back/forward reads CanGoBack/CanGoForward.
+                        && !cfg!(target_os = "windows")
+                        && !p.loading
+                        && !navigation_in_progress(&t.webview)
+                    {
                         let current = t.webview.url().ok();
                         if current.is_some() && current != p.history_url {
                             p.navigate = None;
@@ -829,7 +891,9 @@ impl App {
             .evaluate_script(&color_scheme_script(self.opts.dark));
         let queued = {
             let mut pending = tab.pending.borrow_mut();
+            trace_navigation("flush", t, &pending, "");
             pending.loading = false;
+            pending.hinted = None;
             std::mem::take(&mut pending.queue)
         };
         for (id, q) in queued {
@@ -1059,7 +1123,11 @@ impl App {
         // renders the visible area, and cairo cannot hold a very tall surface.
         if matches!(region, Region::Full) {
             let proxy = self.proxy.clone();
-            let fallback = self.viewport.1 as f64;
+            let fallback = tab
+                .window
+                .inner_size()
+                .to_logical::<f64>(tab.window.scale_factor())
+                .height;
             let res = tab.webview.evaluate_script_with_callback(
                 "Math.max(document.documentElement.scrollHeight, document.body.scrollHeight)",
                 move |h| {
@@ -1092,8 +1160,12 @@ impl App {
         }
 
         let height = height.min(MAX_FULL_HEIGHT);
+        let restore = tab
+            .window
+            .inner_size()
+            .to_logical::<f64>(tab.window.scale_factor());
         tab.window
-            .set_inner_size(tao::dpi::LogicalSize::new(self.viewport.0 as f64, height));
+            .set_inner_size(tao::dpi::LogicalSize::new(restore.width, height));
 
         // GTK applies the resize asynchronously; WKWebView is ready right away.
         if cfg!(target_os = "linux") {
@@ -1103,14 +1175,23 @@ impl App {
                 path,
                 height,
                 tries: 0,
+                restore,
             });
             return;
         }
-        self.viewport_shot_then_restore(t, id, path);
+        self.viewport_shot_then_restore(t, id, path, restore);
     }
 
     /// Captures once the page reports the enlarged viewport, or after TALL_SHOT_TRIES polls.
-    fn tall_shot_poll(&self, t: TabId, id: u64, path: Option<String>, height: f64, tries: u8) {
+    fn tall_shot_poll(
+        &self,
+        t: TabId,
+        id: u64,
+        path: Option<String>,
+        height: f64,
+        tries: u8,
+        restore: tao::dpi::LogicalSize<f64>,
+    ) {
         let Some(tab) = self.tabs.get(&t) else {
             return fail(id, format!("no such tab {t}"));
         };
@@ -1124,6 +1205,7 @@ impl App {
                         tab: t,
                         id,
                         path: path.clone(),
+                        restore,
                     }
                 } else {
                     std::thread::sleep(TALL_SHOT_POLL);
@@ -1133,16 +1215,24 @@ impl App {
                         path: path.clone(),
                         height,
                         tries: tries + 1,
+                        restore,
                     }
                 };
                 let _ = proxy.send_event(ev);
             });
         if let Err(e) = res {
+            tab.window.set_inner_size(restore);
             fail(id, e);
         }
     }
 
-    fn viewport_shot_then_restore(&self, t: TabId, id: u64, path: Option<String>) {
+    fn viewport_shot_then_restore(
+        &self,
+        t: TabId,
+        id: u64,
+        path: Option<String>,
+        restore: tao::dpi::LogicalSize<f64>,
+    ) {
         let Some(tab) = self.tabs.get(&t) else {
             return fail(id, format!("no such tab {t}"));
         };
@@ -1152,8 +1242,11 @@ impl App {
             &tab.webview,
             Region::Viewport,
             Box::new(move |png| {
+                let _ = proxy.send_event(UserEvent::RestoreSize {
+                    tab: t,
+                    size: restore,
+                });
                 done(png);
-                let _ = proxy.send_event(UserEvent::RestoreSize(t));
             }),
         );
     }
@@ -1207,14 +1300,7 @@ fn build_webview(
             }
             if let Some(url) = body.get("history").and_then(Value::as_str) {
                 let mut p = ipc_pending.borrow_mut();
-                if p.history_url.is_some() {
-                    if let Some((id, false)) = p.navigate {
-                        p.navigate = None;
-                        p.history_url = None;
-                        reply(id, json!({ "tab": tab, "url": url }));
-                        let _ = ipc_proxy.send_event(UserEvent::Flush(tab));
-                    }
-                }
+                history_traversed(&mut p, tab, url, &ipc_proxy);
                 return;
             }
             for (key, stage) in [("dom", Until::Dom), ("idle", Until::Idle)] {
@@ -1241,14 +1327,12 @@ fn build_webview(
                     .as_object_mut()
                     .and_then(|o| o.remove("navigating"))
                     .is_some()
+                    && !p.loading
                 {
                     p.loading = true;
-                    p.hinted = true;
-                    let proxy = ipc_proxy.clone();
-                    std::thread::spawn(move || {
-                        std::thread::sleep(NAV_HINT_TIMEOUT);
-                        let _ = proxy.send_event(UserEvent::HintTimeout(tab));
-                    });
+                    p.hinted = Some(id);
+                    trace_navigation("hint", tab, &p, "");
+                    hint_timeout(ipc_proxy.clone(), tab, id);
                 }
             }
             if body.get("event").is_some() {
@@ -1268,10 +1352,11 @@ fn build_webview(
             }
             match ev {
                 PageLoadEvent::Started => {
+                    trace_navigation("committed", tab, &p, &url);
                     // The old document is gone, so are its in-flight promises:
                     // re-run them once the new page is in, a few times at most.
                     p.loading = true;
-                    p.hinted = false;
+                    p.hinted = None;
                     p.loaded = false;
                     for (id, mut q) in p.js.drain().collect::<Vec<_>>() {
                         q.retries += 1;
@@ -1289,6 +1374,21 @@ fn build_webview(
                 PageLoadEvent::Finished => page_loaded(&mut p, tab, &url, &load_proxy),
             }
         });
+
+    // Like Wry's WebKit Started, WebView2's ContentLoading arrives only after
+    // the server responds. Hold page calls from the provisional start instead.
+    #[cfg(target_os = "windows")]
+    {
+        let start_pending = pending.clone();
+        builder = builder.with_navigation_handler(move |_| {
+            let mut p = start_pending.borrow_mut();
+            if !p.warming {
+                p.loading = true;
+                p.hinted = None;
+            }
+            true
+        });
+    }
 
     // Load about:blank right away so the web and network processes exist
     // before the agent's first navigate.
@@ -1319,10 +1419,9 @@ fn build_webview(
     }
 
     #[cfg(not(target_os = "linux"))]
-    let webview = {
-        drop((pending, proxy)); // load failures are only hooked on WebKitGTK
-        builder.build(window)?
-    };
+    let webview = builder.build(window)?;
+    #[cfg(target_os = "windows")]
+    track_history(&webview, tab, pending, proxy)?;
     #[cfg(target_os = "linux")]
     let webview = {
         use tao::platform::unix::WindowExtUnix;
@@ -1411,8 +1510,65 @@ fn stop_loading(wv: &WebView) {
     wv.webview().stop_loading();
 }
 
-#[cfg(not(target_os = "linux"))]
-fn stop_loading(_wv: &WebView) {}
+#[cfg(target_os = "macos")]
+fn stop_loading(wv: &WebView) {
+    use wry::WebViewExtMacOS;
+    unsafe { wv.webview().stopLoading() };
+}
+
+#[cfg(target_os = "windows")]
+fn stop_loading(wv: &WebView) {
+    use wry::WebViewExtWindows;
+    let _ = unsafe { wv.webview().Stop() };
+}
+
+#[cfg(target_os = "windows")]
+fn track_history(
+    wv: &WebView,
+    tab: TabId,
+    pending: Shared,
+    proxy: EventLoopProxy<UserEvent>,
+) -> wry::Result<()> {
+    use webview2_com::HistoryChangedEventHandler;
+    use wry::WebViewExtWindows;
+    let handler = HistoryChangedEventHandler::create(Box::new(move |_, _| {
+        let mut p = pending.borrow_mut();
+        p.history_changed = true;
+        if let Some(url) = p.history_reply.take() {
+            history_traversed(&mut p, tab, &url, &proxy);
+        }
+        Ok(())
+    }));
+    let mut token = 0;
+    unsafe { wv.webview().add_HistoryChanged(&handler, &mut token) }?;
+    Ok(())
+}
+
+fn hint_timeout(proxy: EventLoopProxy<UserEvent>, tab: TabId, id: u64) {
+    std::thread::spawn(move || {
+        std::thread::sleep(NAV_HINT_TIMEOUT);
+        let _ = proxy.send_event(UserEvent::HintTimeout { tab, id });
+    });
+}
+
+#[cfg(target_os = "macos")]
+fn navigation_in_progress(wv: &WebView) -> bool {
+    use wry::WebViewExtMacOS;
+    unsafe { wv.webview().isLoading() }
+}
+
+#[cfg(target_os = "linux")]
+fn navigation_in_progress(wv: &WebView) -> bool {
+    use webkit2gtk::WebViewExt;
+    use wry::WebViewExtUnix;
+    wv.webview().is_loading()
+}
+
+// WebView2's NavigationStarting handler above already clears the hint.
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
+fn navigation_in_progress(_wv: &WebView) -> bool {
+    false
+}
 
 /// "http://host:port" or "socks5://host:port".
 fn parse_proxy(s: &str) -> wry::Result<ProxyConfig> {
@@ -1551,6 +1707,11 @@ fn tab_dispatch(tab: &Tab, t: TabId, id: u64, request: Queued, proxy: &EventLoop
         } else {
             None
         };
+        #[cfg(target_os = "windows")]
+        {
+            p.history_changed = false;
+            p.history_reply = None;
+        }
         drop(p);
         let proxy = proxy.clone();
         std::thread::spawn(move || {
@@ -1610,7 +1771,6 @@ fn tab_dispatch(tab: &Tab, t: TabId, id: u64, request: Queued, proxy: &EventLoop
                 _ => wv.go_forward(),
             })
         }
-        "url" => wv.url().map(|u| Some(json!(u))),
         "cookies" => wv.cookies().map(|cs| Some(cookies_json(&cs))),
         "set_cookie" => set_cookie(wv, params).map(|_| Some(Value::Null)),
         // The expression is compiled as script source, not passed to eval(),
@@ -1785,7 +1945,7 @@ fn trim_webkit(
         if ev == LoadEvent::Started {
             let mut p = start_pending.borrow_mut();
             p.loading = true;
-            p.hinted = false;
+            p.hinted = None;
         }
     });
     // DNS errors, refused connections and cancelled downloads: fail the

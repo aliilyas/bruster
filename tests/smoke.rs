@@ -1233,23 +1233,41 @@ fn png_size(bytes: &[u8]) -> (u32, u32) {
     ignore = "WKWebView renders the visible area only; the window cannot grow past the screen"
 )]
 fn tall_full_screenshot() {
-    let mut b = Browser::spawn();
+    let mut b = Browser::spawn_with(&["--viewport", "960x640"]);
     let base = serve();
     b.open(&format!("{base}/tall"));
 
-    // Taller than cairo allows: capped, not failed.
+    // Resizing a second tab must not change the first tab's capture or restore.
+    let other = b.ok("new_tab", json!({ "url": format!("{base}/other") }))["tab"].clone();
+    b.ok(
+        "resize",
+        json!({ "tab": other, "width": 640, "height": 480 }),
+    );
     let path = std::env::temp_dir().join(format!("bruster-tall-{}.png", std::process::id()));
-    b.ok("screenshot", json!({ "full": true, "path": path }));
-    let bytes = std::fs::read(&path).unwrap();
-    let _ = std::fs::remove_file(&path);
-    let (w, h) = png_size(&bytes);
-    assert_eq!(w, 1280);
-    assert!(h > 800 && h <= 16000, "height {h}");
-    // The window goes back to the viewport size (GTK applies it a moment later).
-    let t = Instant::now();
-    while b.ok("eval", json!({ "expression": "innerHeight" })) != 800 {
-        assert!(t.elapsed() < Duration::from_secs(5), "window not restored");
-        b.ok("wait_for", json!({ "time": 100 }));
+    for overflow in ["auto", "hidden"] {
+        b.ok("eval", json!({ "expression": format!("document.documentElement.style.overflow = '{overflow}'") }));
+        let size = b.ok("eval", json!({ "expression": "[innerWidth, innerHeight]" }));
+        // WebKit snapshots exclude non-overlay scrollbars. Measure the content
+        // viewport instead of assuming every GTK theme uses overlay scrollbars.
+        let width = b.ok(
+            "eval",
+            json!({ "expression": "document.scrollingElement.clientWidth * devicePixelRatio" }),
+        );
+        b.ok("screenshot", json!({ "full": true, "path": path }));
+        let bytes = std::fs::read(&path).unwrap();
+        let _ = std::fs::remove_file(&path);
+        let (w, h) = png_size(&bytes);
+        assert_eq!(w as u64, width.as_u64().unwrap(), "overflow={overflow}");
+        assert!(h > 640 && h <= 16000, "height {h}");
+        // Taller than cairo allows: capped, then both dimensions restored.
+        let t = Instant::now();
+        while b.ok("eval", json!({ "expression": "[innerWidth, innerHeight]" })) != size {
+            assert!(
+                t.elapsed() < Duration::from_secs(5),
+                "window not restored to {size}"
+            );
+            std::thread::sleep(Duration::from_millis(50));
+        }
     }
 }
 
@@ -1492,6 +1510,7 @@ fn speaks_mcp() {
     assert_eq!(prop("drag", "from")["type"], "object");
     assert_eq!(prop("click", "force")["type"], "boolean");
     assert_eq!(prop("eval", "request_timeout")["type"], "integer");
+    assert_eq!(prop("url", "request_timeout")["type"], "integer");
     assert_eq!(prop("navigate", "timeout")["type"], "integer");
     assert_eq!(prop("new_tab", "timeout")["type"], "integer");
     assert!(prop("screenshot", "request_timeout").is_null());

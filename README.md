@@ -182,7 +182,7 @@ e4 checkbox "Remember me" checked=false
 > [!NOTE]
 > Same-origin hrefs lose the origin in the text format. Alert and prompt dialogs never block. bruster answers them as the current `dialog` setting specifies, and reports them as `dialog` events. `beforeunload` handlers are disarmed.
 
-Calls routed through the page runtime (`eval`, `snapshot`, interactions and other DOM tools) have an outer `request_timeout` in milliseconds, defaulting to at least 30000 ms (or the requested `timeout`/`time` plus 5000 ms, whichever is longer). This deadline includes time spent waiting for navigation. Set it explicitly for unusually long operations. A timeout stops waiting for the reply; it does not interrupt JavaScript already running in the page. In particular, an infinite loop can make a web process unresponsive and may require restarting bruster. Late replies are discarded. Navigation uses its own `timeout`; native operations such as screenshots do not use `request_timeout`. MCP represents null results as the text `null`.
+Calls routed through the page runtime (`eval`, `url`, `title`, `snapshot`, interactions and other DOM tools) have an outer `request_timeout` in milliseconds, defaulting to at least 30000 ms (or the requested `timeout`/`time` plus 5000 ms, whichever is longer). This deadline includes time spent waiting for navigation. Set it explicitly for unusually long operations. A timeout stops waiting for the reply; it does not interrupt JavaScript already running in the page. In particular, an infinite loop can make a web process unresponsive and may require restarting bruster. Late replies are discarded. Navigation uses its own `timeout`; native operations such as screenshots do not use `request_timeout`. MCP represents null results as the text `null`.
 
 ## API
 
@@ -237,6 +237,7 @@ Calls routed through the page runtime (`eval`, `snapshot`, interactions and othe
 - bruster does not intercept native file choosers. Use `upload` instead of a click on a file input.
 - Without `--profile`, cookies and storage last for one session.
 - Full-page screenshots are capped at 16000 px. On macOS, very tall pages can be cut when they are higher than the screen.
+- WebKitGTK screenshots capture page content without non-overlay scrollbars, so their width can be narrower than the window viewport.
 - On Windows (WebView2), `screenshot` has no `clip`. `--quiet` does nothing. The Linux-only flags have no effect.
 - With `--hidden`, WebKit timer throttling can make `setTimeout`-driven pages slow.
 

@@ -60,9 +60,26 @@ fn login_form_error_under_csp() {
 #[test]
 #[ignore]
 fn wiki_search_then_back() {
-    let mut b = Browser::spawn();
+    let mut b = Browser::spawn_with(&["--viewport", "900x800"]);
     b.open("https://en.wikipedia.org/wiki/Main_Page");
-    b.ok("type", json!({ "selector": "#searchInput", "text": "WebKitGTK", "submit": true }));
+    // Vector collapses search at narrower CSS viewports (also common with
+    // Windows display scaling). Open it through the visible search toggle.
+    let visible = b.ok("eval", json!({ "expression": "(() => { const e = document.getElementById('searchInput'); return e && (e.checkVisibility ? e.checkVisibility() : e.getClientRects().length > 0); })()" }));
+    if visible != true {
+        b.ok("click", json!({ "selector": "#p-search .search-toggle" }));
+    }
+    if let Err(err) = b.call("type", json!({ "selector": "#searchInput", "text": "WebKitGTK", "submit": true })) {
+        let state = b.call("eval", json!({ "expression": r#"({
+            url: location.href, viewport: [innerWidth, innerHeight], ready: document.readyState,
+            classes: document.documentElement.className,
+            search: document.getElementById('p-search')?.outerHTML,
+            inputs: [...document.querySelectorAll('input[name=search]')].map(e => ({
+                html: e.outerHTML, visible: e.checkVisibility?.(), box: e.getBoundingClientRect().toJSON(),
+                display: getComputedStyle(e).display, visibility: getComputedStyle(e).visibility
+            }))
+        })"# }));
+        panic!("type failed: {err}; initial visible={visible}; state={state:?}");
+    }
     b.ok("wait_for", json!({ "url": "/wiki/WebKit", "timeout": SITE_TIMEOUT }));
     assert!(b.ok("title", json!({})).as_str().unwrap().contains("WebKit"));
     let snap = b.ok("snapshot", json!({ "format": "text" }));
@@ -170,6 +187,7 @@ fn interaction_playground() {
 
 #[test]
 #[ignore]
+#[cfg(target_os = "linux")] // Native download cancellation/reporting is WebKitGTK-only.
 fn download_is_cancelled_and_reported() {
     let mut b = Browser::spawn();
     b.open("https://example.com/");

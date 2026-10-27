@@ -291,7 +291,7 @@ fn tools() -> Vec<Value> {
                 "tab".into(),
                 json!({ "type": "integer", "description": "tab id, defaults to current" }),
             );
-            if !matches!(*name, "navigate" | "reload" | "back" | "forward" | "url" | "cookies" | "set_cookie" | "screenshot" | "resize" | "maximize" | "minimize" | "dark" | "light" | "close" | "new_tab" | "tabs" | "switch_tab" | "close_tab") {
+            if !matches!(*name, "navigate" | "reload" | "back" | "forward" | "cookies" | "set_cookie" | "screenshot" | "resize" | "maximize" | "minimize" | "dark" | "light" | "close" | "new_tab" | "tabs" | "switch_tab" | "close_tab") {
                 properties.insert(
                     "request_timeout".into(),
                     json!({ "type": "integer", "minimum": 0, "description": "Outer page request deadline in milliseconds; defaults to at least 30000" }),
