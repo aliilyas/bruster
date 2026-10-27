@@ -57,15 +57,14 @@ fn login_form_error_under_csp() {
     assert_eq!(b.ok("eval", json!({ "expression": "1 + 1" })), 2);
 }
 
-fn wiki_history_url(url: &Value) -> String {
-    let url = url.as_str().unwrap();
-    let (page, fragment) = url.split_once('#').unwrap_or((url, ""));
-    let (path, query) = page.split_once('?').unwrap_or((page, ""));
-    // MediaWiki replaces these analytics parameters after rendering results.
-    // Keep the actual search/title/profile parameters in the history check.
-    let mut params: Vec<_> = query.split('&').filter(|p| !p.is_empty() && !matches!(p.split('=').next(), Some("searchToken" | "wprov"))).collect();
-    params.sort_unstable();
-    format!("{path}{}{}{}{}", if params.is_empty() { "" } else { "?" }, params.join("&"), if fragment.is_empty() { "" } else { "#" }, fragment)
+fn wiki_history_page(b: &mut Browser, url: &Value) -> Value {
+    // MediaWiki replaces analytics and default namespace/profile parameters
+    // after rendering. Compare the actual page and decoded search query.
+    b.ok("eval", json!({ "expression": format!(r#"(() => {{
+        const u = new URL({url});
+        return {{ origin: u.origin, path: u.pathname, fragment: u.hash,
+            title: u.searchParams.get('title'), search: u.searchParams.get('search') }};
+    }})()"#) }))
 }
 
 #[test]
@@ -111,9 +110,11 @@ fn wiki_search_then_back() {
         assert!(snap.as_str().unwrap().lines().count() > 100, "thin snapshot");
         eprintln!("Wikipedia {viewport} {page}: entry={entry_url}, search={result_url}");
         if results_page {
-            assert_eq!(wiki_history_url(&b.ok("back", json!({}))["url"]), wiki_history_url(&result_url));
+            let back = b.ok("back", json!({}));
+            assert_eq!(wiki_history_page(&mut b, &back["url"]), wiki_history_page(&mut b, &result_url));
         }
-        assert_eq!(wiki_history_url(&b.ok("back", json!({}))["url"]), wiki_history_url(&entry_url));
+        let back = b.ok("back", json!({}));
+        assert_eq!(wiki_history_page(&mut b, &back["url"]), wiki_history_page(&mut b, &entry_url));
     }
 }
 

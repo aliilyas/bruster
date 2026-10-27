@@ -57,8 +57,7 @@ define_class!(
                     navigation: n.retain(),
                     request: p.navigate.map(|(id, _)| id),
                 });
-                // isLoading can transiently be false before commit. Once the
-                // native main-frame start is confirmed, never expire its hint.
+                // Also cover page-initiated navigation without an action reply.
                 p.loading = true;
                 p.hinted = None;
                 let url = unsafe { webview.URL() }.and_then(|u| u.absoluteString()).map(|u| u.to_string()).unwrap_or_default();

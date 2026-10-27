@@ -99,10 +99,6 @@ const TALL_SHOT_TRIES: u8 = 30;
 /// WebKit writes disk cache entries about a second after a load; exiting
 /// earlier loses them for the next session.
 const CACHE_FLUSH_DELAY: Duration = Duration::from_millis(1200);
-/// After an action that should navigate, hold page requests this long for
-/// the load to start; if it never does, run them in the current page.
-const NAV_HINT_TIMEOUT: Duration = Duration::from_millis(1000);
-
 type TabId = u32;
 
 #[derive(Deserialize)]
@@ -162,11 +158,6 @@ enum UserEvent {
     /// A failed native load may have been replaced before this event is handled.
     #[cfg(target_os = "macos")]
     FlushIfIdle(TabId),
-    /// A hinted navigation never started.
-    HintTimeout {
-        tab: TabId,
-        id: u64,
-    },
     /// The eval wrapper did not compile as an expression; try the statement form.
     EvalRetry {
         tab: TabId,
@@ -250,9 +241,9 @@ struct Pending {
     /// Held back while a load is in flight; dispatched on Flush.
     queue: Vec<(u64, Queued)>,
     loading: bool,
-    /// `loading` came from a page hint (link clicked, form submitted) and no
-    /// load has started yet. The request id keeps old hint timers from
-    /// releasing a newer navigation; the fallback checks native loading too.
+    /// The action's default navigation was not cancelled, but its native start
+    /// may still be pending. Keep requests queued until native completion or
+    /// failure; their own deadlines bound the wait without reading the old page.
     hinted: Option<u64>,
     /// (request id, has the new load started yet). A Finished event for the
     /// previous page can arrive after load_url(); ignore it until Started.
@@ -579,25 +570,6 @@ fn main() -> wry::Result<()> {
                     !p.loading && p.navigate.is_none()
                 }) {
                     app.flush(tab);
-                }
-            }
-            Event::UserEvent(UserEvent::HintTimeout { tab, id }) => {
-                if let Some(t) = app.tabs.get(&tab) {
-                    let mut p = t.pending.borrow_mut();
-                    if p.hinted == Some(id) {
-                        // Wry reports WKWebView's Started at commit, not at
-                        // provisional start. A slow response is still loading.
-                        if navigation_in_progress(&t.webview) {
-                            trace_navigation("hint still loading", tab, &p, "");
-                            hint_timeout(app.proxy.clone(), tab, id);
-                        } else {
-                            trace_navigation("hint expired", tab, &p, "");
-                            p.hinted = None;
-                            p.loading = false;
-                            drop(p);
-                            app.flush(tab);
-                        }
-                    }
                 }
             }
             Event::UserEvent(UserEvent::EvalRetry { tab, id }) => app.eval_retry(tab, id),
@@ -1354,7 +1326,6 @@ fn build_webview(
                     p.loading = true;
                     p.hinted = Some(id);
                     trace_navigation("hint", tab, &p, "");
-                    hint_timeout(ipc_proxy.clone(), tab, id);
                 }
             }
             if body.get("event").is_some() {
@@ -1564,13 +1535,6 @@ fn track_history(
     let mut token = 0;
     unsafe { wv.webview().add_HistoryChanged(&handler, &mut token) }?;
     Ok(())
-}
-
-fn hint_timeout(proxy: EventLoopProxy<UserEvent>, tab: TabId, id: u64) {
-    std::thread::spawn(move || {
-        std::thread::sleep(NAV_HINT_TIMEOUT);
-        let _ = proxy.send_event(UserEvent::HintTimeout { tab, id });
-    });
 }
 
 #[cfg(target_os = "macos")]
