@@ -84,24 +84,29 @@ fn wiki_search_then_back() {
     // when the toggle's JavaScript happens to expand the header inline.
     for (viewport, page) in [("1400x800", "Main_Page"), ("900x800", "Main_Page"), ("900x800", "Special:Search")] {
         let mut b = Browser::spawn_with(&["--viewport", viewport]);
+        eprintln!("Wikipedia {viewport} {page}: opening search");
         b.open(&format!("https://en.wikipedia.org/wiki/{page}"));
         // Special:Search can have an empty label, so find by role and form
         // name rather than filtering snapshot elements by accessible name.
-        let mut input = visible_input_named(&mut b, "search");
-        if input.is_none() {
-            b.ok("click", json!({ "selector": "#p-search .search-toggle" }));
-            // The toggle can expand inline or follow its Special:Search href.
-            let start = Instant::now();
-            while input.is_none() {
-                input = visible_input_named(&mut b, "search");
-                assert!(start.elapsed() < Duration::from_millis(SITE_TIMEOUT), "no visible Wikipedia search input: {:?}", b.call("snapshot", json!({})));
-                if input.is_none() {
-                    std::thread::sleep(Duration::from_millis(100));
-                }
+        // Its scripts can replace the form after load. An absent input does
+        // not necessarily mean the responsive header toggle is available.
+        let start = Instant::now();
+        let mut toggled = false;
+        let input = loop {
+            if let Some(input) = visible_input_named(&mut b, "search") {
+                break input;
             }
-        }
+            assert!(start.elapsed() < Duration::from_millis(SITE_TIMEOUT), "no visible Wikipedia search input at {viewport} {page}: {:?}", b.call("snapshot", json!({})));
+            if !toggled && b.ok("eval", json!({ "expression": "!!document.querySelector('#p-search .search-toggle')?.checkVisibility()" })) == true {
+                // The toggle can expand inline or follow its Special:Search href.
+                b.ok("click", json!({ "selector": "#p-search .search-toggle" }));
+                toggled = true;
+            } else {
+                std::thread::sleep(Duration::from_millis(100));
+            }
+        };
         let entry_url = b.ok("url", json!({}));
-        b.ok("type", json!({ "ref": input.unwrap(), "text": "WebKitGTK", "submit": true }));
+        b.ok("type", json!({ "ref": input, "text": "WebKitGTK", "submit": true }));
         let mut result_url = b.ok("url", json!({}));
         // Special:Search submits a full-text search rather than jumping
         // straight to the article as the header's search does.
