@@ -1,0 +1,90 @@
+name: benchmarks
+
+on:
+  # A merge (including squash/rebase) updates main. Direct pushes are measured too.
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+# Deliberately no concurrency group: GitHub replaces pending runs in a group,
+# even with cancel-in-progress: false. Every merge must retain its measurement.
+jobs:
+  measure:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set benchmark paths
+        run: |
+          printf 'PLAYWRIGHT_BROWSERS_PATH=%s\nBENCH_DEPS=%s\nRESULTS=%s\n' \
+            "$RUNNER_TEMP/benchmark-browsers" "$RUNNER_TEMP/benchmark-deps" "$RUNNER_TEMP/benchmark-results" >> "$GITHUB_ENV"
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: benchmarks-linux-x86_64
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 'node'
+          check-latest: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check publication logic
+        run: python3 -m unittest discover -s scripts -p 'test_bench_*.py'
+      - name: Install runtimes
+        run: |
+          mkdir -p "$RESULTS" "$BENCH_DEPS"
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libwebkit2gtk-4.1-dev libgtk-3-dev xvfb xauth fonts-dejavu-core
+          cp benchmarks/package.json "$BENCH_DEPS/package.json"
+          npm install --prefix "$BENCH_DEPS" --save-exact --prefer-online --ignore-scripts --no-audit --no-fund \
+            playwright-core@latest puppeteer-core@latest agent-browser@latest
+          cp "$BENCH_DEPS/package.json" "$BENCH_DEPS/package-lock.json" "$RESULTS/"
+          chmod +x "$BENCH_DEPS/node_modules/agent-browser/bin/agent-browser-linux-x64"
+          node "$BENCH_DEPS/node_modules/playwright-core/cli.js" install --with-deps chromium --no-shell
+          node "$BENCH_DEPS/node_modules/playwright-core/cli.js" install chromium-headless-shell
+          node benchmarks/browser-paths.mjs "$BENCH_DEPS" >> "$GITHUB_ENV"
+          dpkg-query -W > "$RESULTS/os-packages.txt"
+      - name: Build
+        run: cargo build --release --locked
+      - name: Measure five configurations
+        run: |
+          mkdir -p "$RESULTS"
+          xvfb-run -a python3 scripts/bench_compare.py \
+            --bruster target/release/bruster --node "$(command -v node)" \
+            --chrome "$BENCH_CHROME" --shell "$BENCH_SHELL" \
+            --deps "$BENCH_DEPS" --output "$RESULTS" --rounds 10 --iterations 10 \
+            2>&1 | tee "$RESULTS/measurement.log"
+      - name: Inventory runtime files
+        run: |
+          python3 scripts/bench_footprint.py \
+            --bruster target/release/bruster --node "$(command -v node)" \
+            --chrome "$BENCH_CHROME" --shell "$BENCH_SHELL" \
+            --deps "$BENCH_DEPS" --samples "$RESULTS/samples.json" \
+            --output "$RESULTS/footprint.json"
+      - name: Validate and render measurements
+        run: |
+          python3 scripts/bench_report.py prepare --results "$RESULTS"
+          cat "$RESULTS/report.md" >> "$GITHUB_STEP_SUMMARY"
+      - name: Retain raw evidence (including failed runs)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmarks-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/benchmark-results/
+          retention-days: 90
+          if-no-files-found: warn
+      - name: Publish versioned results to gh-pages
+        run: python3 scripts/bench_publish.py --results "$RESULTS" --checkout "$RUNNER_TEMP/benchmark-site"
