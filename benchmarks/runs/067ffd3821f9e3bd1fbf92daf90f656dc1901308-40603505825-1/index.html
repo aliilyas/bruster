@@ -1,0 +1,117 @@
+<!doctype html><html lang="en"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bruster browser benchmarks</title><style>
+body{font:16px/1.6 system-ui,sans-serif;margin:2rem auto;padding:0 1rem;max-width:1200px;color:#202938;overflow-wrap:anywhere}
+a{color:#075ab4}.scroll{overflow:auto}table{border-collapse:collapse;width:100%;min-width:1000px}
+th,td{padding:.6rem;border:1px solid #ccd3dc;text-align:right}th:first-child,td:first-child{text-align:left}
+th{background:#edf2f7}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f5f7fa;padding:1rem}
+</style><body><h1>Browser benchmarks</h1>
+<p>Commit <code>067ffd3821f9e3bd1fbf92daf90f656dc1901308</code> · <a href="https://github.com/aliilyas/bruster/actions/runs/40603505825">Workflow and raw artifacts</a></p>
+<p>Measured 2026-10-27T23:44:06.273948+00:00 · 10 sessions per configuration. Values are medians [min–max].</p>
+<p>WebKitGTK 2.52.6 · Playwright 1.64.1 · Puppeteer 25.16.0 · agent-browser 0.40.0 · Google Chrome for Testing 156.0.8078.4 · Headless Shell Google Chrome for Testing 156.0.8078.4 · Node v26.12.1</p>
+<p>Ubuntu 24.04.5 LTS · AMD EPYC 9V74 80-Core Processor · 4 visible CPUs · 15.6 GiB RAM · runner image 20261023.334.3</p>
+<div class="scroll"><table><thead><tr><th>Metric</th><th>Bruster / WebKitGTK</th><th>Playwright / Headless Shell</th><th>Playwright / full Chrome</th><th>Puppeteer / full Chrome</th><th>agent-browser / full Chrome</th></tr></thead><tbody>
+<tr><td>Launch → first loaded page (ms)</td><td>681.5 [676.2–1994.5]</td><td>422.6 [417.9–426.5]</td><td>583.5 [561.3–644.1]</td><td>446.3 [436.1–849.9]</td><td>660.5 [636.8–732.8]</td></tr>
+<tr><td>Startup → ready / blank-page setup (ms)</td><td>120.9 [114.0–1367.4]</td><td>406.1 [402.5–410.1]</td><td>546.7 [525.6–607.3]</td><td>418.7 [409.7–691.8]</td><td>598.6 [582.1–653.0]</td></tr>
+<tr><td>First navigation after setup (ms)</td><td>561.7 [558.8–626.9]</td><td>16.0 [13.8–17.0]</td><td>34.5 [29.5–46.7]</td><td>25.0 [24.4–157.9]</td><td>65.6 [47.3–87.0]</td></tr>
+<tr><td>Warm tiny-page navigation (ms)</td><td>6.6 [2.8–7.8]</td><td>7.7 [6.6–16.6]</td><td>13.7 [10.5–29.9]</td><td>15.7 [12.7–26.7]</td><td>28.3 [17.7–75.2]</td></tr>
+<tr><td>Tiny DOM extraction (ms)</td><td>0.7 [0.6–4.8]</td><td>2.5 [1.8–5.5]</td><td>5.7 [2.4–19.6]</td><td>2.6 [1.1–9.1]</td><td>4.9 [2.8–22.1]</td></tr>
+<tr><td>Large-page navigation (ms)</td><td>22.7 [21.1–23.4]</td><td>27.1 [18.0–28.3]</td><td>32.2 [21.9–38.1]</td><td>30.6 [27.9–34.2]</td><td>62.9 [59.0–77.3]</td></tr>
+<tr><td>Large DOM extraction, object return (ms)</td><td>13.9 [10.2–21.6]</td><td>79.4 [59.0–116.0]</td><td>81.8 [59.1–120.5]</td><td>22.8 [13.8–40.8]</td><td>24.9 [20.7–39.2]</td></tr>
+<tr><td>Large DOM extraction, JSON-string return (ms)</td><td>15.5 [7.4–21.2]</td><td>16.1 [6.9–26.6]</td><td>17.1 [6.9–29.9]</td><td>18.1 [6.7–33.9]</td><td>10.1 [9.0–18.1]</td></tr>
+<tr><td>Image-page navigation (ms)</td><td>113.5 [109.7–118.9]</td><td>114.3 [112.9–126.5]</td><td>118.6 [115.6–131.8]</td><td>119.6 [117.9–127.4]</td><td>123.2 [120.3–129.7]</td></tr>
+<tr><td>PNG screenshot (ms)</td><td>28.6 [27.9–35.5]</td><td>31.2 [29.9–45.1]</td><td>36.3 [29.8–51.4]</td><td>48.1 [42.8–74.8]</td><td>51.4 [47.3–74.1]</td></tr>
+<tr><td>Idle total PSS, including display (MiB)</td><td>284.1 [277.6–285.9]</td><td>328.0 [324.4–330.6]</td><td>515.2 [510.3–520.0]</td><td>424.7 [421.8–429.6]</td><td>521.5 [516.6–524.5]</td></tr>
+<tr><td>Idle process RSS, excluding display (MiB)</td><td>402.0 [398.9–405.2]</td><td>596.9 [592.4–599.7]</td><td>1180.5 [1159.6–1190.0]</td><td>1068.4 [1053.8–1081.2]</td><td>1595.8 [1584.7–1615.8]</td></tr>
+<tr><td>Installed runtime files, lower bound (MB)</td><td>427.9</td><td>475.5</td><td>630.8</td><td>644.7</td><td>483.2</td></tr>
+<tr><td>Sessions with failures (including cleanup)</td><td>0/10</td><td>10/10</td><td>10/10</td><td>0/10</td><td>0/10</td></tr>
+</tbody></table></div><h2>Method</h2>
+<p>Ten sessions per configuration by default, with rotating order and fresh browser profiles. Values are medians [observed minimum–maximum], not confidence intervals. Startup and first navigation have one sample per session; repeated-operation timings pool all iterations; memory uses the median of three idle readings per session. Startup ends at the adapter ready event, or after blank-page/viewport setup for agent-browser. The combined launch-to-first-page measurement includes both setup and the first navigation. Xvfb is already running: its startup time is excluded, but its memory is included. 1280×800 viewport; localhost fixtures; no-store HTTP responses; navigation waits for load. OS filesystem caches are not flushed. Identical extraction JavaScript and cross-tool result hashes. Timings include controller round trips; agent-browser includes its per-command native CLI. Memory covers the complete owned process forest (including detached daemons and helpers), plus Xvfb for Bruster. PSS apportions shared pages; summed RSS double-counts them. Memory is small-page idle usage, not peak usage. Native snapshots have different semantics and are retained in the raw artifacts rather than ranked as equal work. MB = 1,000,000 bytes; MiB = 1,048,576 bytes. Installed-file inventories are lower bounds including browser/engine, linked libraries, observed mapped files and Node where required; unobserved OS resources may add more. GitHub-hosted runner hardware and OS packages can change: compare the configurations within a run and inspect provenance before interpreting trends.</p>
+<p><a href="measurement.json">measurement.json</a> · <a href="summary.json">summary.json</a> · <a href="samples.json">samples.json</a> · <a href="footprint.json">footprint.json</a> · <a href="report.md">report.md</a> · <a href="package.json">package.json</a> · <a href="package-lock.json">package-lock.json</a></p>
+<h2>Fault probes and cleanup</h2><p>Failures remain visible even when a later retry succeeds. These probes run after the timed workloads.</p><ul>
+<li>Bruster / WebKitGTK — fault probes: none; shutdown/cleanup: none; successful 100 ms recovery retries: 0</li>
+<li>Playwright / Headless Shell — fault probes: recovery_after_navigation_error: 10; shutdown/cleanup: none; successful 100 ms recovery retries: 10</li>
+<li>Playwright / full Chrome — fault probes: recovery_after_navigation_error: 10; shutdown/cleanup: none; successful 100 ms recovery retries: 10</li>
+<li>Puppeteer / full Chrome — fault probes: none; shutdown/cleanup: none; successful 100 ms recovery retries: 0</li>
+<li>agent-browser / full Chrome — fault probes: none; shutdown/cleanup: none; successful 100 ms recovery retries: 0</li>
+</ul><details><summary>Environment, versions and hashes</summary>
+<pre>{
+  &quot;started_utc&quot;: &quot;2026-10-27T23:40:04.170054+00:00&quot;,
+  &quot;platform&quot;: &quot;Linux-6.17.0-1022-azure-x86_64-with-glibc2.39&quot;,
+  &quot;os&quot;: {
+    &quot;NAME&quot;: &quot;Ubuntu&quot;,
+    &quot;ID&quot;: &quot;ubuntu&quot;,
+    &quot;PRETTY_NAME&quot;: &quot;Ubuntu 24.04.5 LTS&quot;,
+    &quot;VERSION_ID&quot;: &quot;24.04&quot;,
+    &quot;VERSION&quot;: &quot;24.04.5 LTS (Noble Numbat)&quot;,
+    &quot;VERSION_CODENAME&quot;: &quot;noble&quot;,
+    &quot;ID_LIKE&quot;: &quot;debian&quot;,
+    &quot;HOME_URL&quot;: &quot;https://www.ubuntu.com/&quot;,
+    &quot;SUPPORT_URL&quot;: &quot;https://help.ubuntu.com/&quot;,
+    &quot;BUG_REPORT_URL&quot;: &quot;https://bugs.launchpad.net/ubuntu/&quot;,
+    &quot;PRIVACY_POLICY_URL&quot;: &quot;https://www.ubuntu.com/legal/terms-and-policies/privacy-policy&quot;,
+    &quot;UBUNTU_CODENAME&quot;: &quot;noble&quot;,
+    &quot;LOGO&quot;: &quot;ubuntu-logo&quot;
+  },
+  &quot;node&quot;: &quot;v26.12.1&quot;,
+  &quot;chrome&quot;: &quot;Google Chrome for Testing 156.0.8078.4&quot;,
+  &quot;headless_shell&quot;: &quot;Google Chrome for Testing 156.0.8078.4&quot;,
+  &quot;cpu_count&quot;: 4,
+  &quot;cpu_model&quot;: &quot;AMD EPYC 9V74 80-Core Processor&quot;,
+  &quot;mem_total_kib&quot;: 16373448,
+  &quot;runner_image&quot;: {
+    &quot;ImageOS&quot;: &quot;ubuntu24&quot;,
+    &quot;ImageVersion&quot;: &quot;20261023.334.3&quot;,
+    &quot;RUNNER_ARCH&quot;: &quot;X64&quot;
+  },
+  &quot;session_environment&quot;: {
+    &quot;display_set&quot;: true,
+    &quot;session_bus_address_set&quot;: false,
+    &quot;XDG_CURRENT_DESKTOP&quot;: null,
+    &quot;GTK_USE_PORTAL&quot;: null,
+    &quot;GTK_MODULES&quot;: null,
+    &quot;NO_AT_BRIDGE&quot;: null,
+    &quot;BRUSTER_USE_SESSION_BUS&quot;: null
+  },
+  &quot;rustc&quot;: &quot;rustc 1.99.1 (58cf8f9c3 2026-10-13)&quot;,
+  &quot;gtk&quot;: &quot;3.24.41&quot;,
+  &quot;webkitgtk&quot;: &quot;2.52.6&quot;,
+  &quot;packages&quot;: {
+    &quot;playwright-core&quot;: &quot;1.64.1&quot;,
+    &quot;puppeteer-core&quot;: &quot;25.16.0&quot;,
+    &quot;agent-browser&quot;: &quot;0.40.0&quot;
+  },
+  &quot;bruster_bytes&quot;: 1452824,
+  &quot;bruster_sha256&quot;: &quot;7fe32d1b8566891f93807f1bccdd80eadfb458accd0c470704ba508dbbc15447&quot;,
+  &quot;chrome_sha256&quot;: &quot;377a9fc07b495c3b8d0ab8ec1fdfd153641759f9756fea34d8dfce4de82f5025&quot;,
+  &quot;headless_shell_sha256&quot;: &quot;4fa61f0ba0b4f89b7bec242c32ca16d3bccf69dbfef0651924a9ba8fede5f9d6&quot;,
+  &quot;rounds&quot;: 10,
+  &quot;iterations&quot;: 10,
+  &quot;common_extraction_js&quot;: &quot;(() =&gt; ({\n  title: document.title,\n  elements: Array.from(document.querySelectorAll(&#x27;h1,h2,h3,p,li,a,input,button,select,textarea&#x27;))\n    .filter(e =&gt; { const r = e.getBoundingClientRect(); return r.width &gt; 0 &amp;&amp; r.height &gt; 0; })\n    .map(e =&gt; ({tag: e.tagName.toLowerCase(),\n      name: (e.getAttribute(&#x27;aria-label&#x27;) || e.getAttribute(&#x27;placeholder&#x27;) || e.textContent || &#x27;&#x27;).trim(),\n      href: e.getAttribute(&#x27;href&#x27;), value: &#x27;value&#x27; in e ? e.value : null}))\n}))()&quot;,
+  &quot;harness_sha256&quot;: {
+    &quot;bench_compare.py&quot;: &quot;b0ae6d143db99830cb3dc0dac2c20f953c5b4cb545005cb42f8b3830ea834155&quot;,
+    &quot;bench_competitor_driver.mjs&quot;: &quot;c9bb792d8d3a1a60f1b0f5fe6a1775e865ca715858f3b2da13ba2162f75077fe&quot;,
+    &quot;bench_audit.py&quot;: &quot;df91d7a203077227c82fc6730033498ea20badaf519c6dd8f6bf10b1c6ae006c&quot;
+  },
+  &quot;package_lock_sha256&quot;: &quot;210628238686d22733351fad6e50abaee12565f3664605aa8ac740ad9931716e&quot;,
+  &quot;args&quot;: {
+    &quot;bruster&quot;: &quot;/home/runner/work/bruster/bruster/target/release/bruster&quot;,
+    &quot;node&quot;: &quot;/opt/hostedtoolcache/node/26.12.1/x64/bin/node&quot;,
+    &quot;chrome&quot;: &quot;/home/runner/work/_temp/benchmark-browsers/chromium-1248/chrome-linux64/chrome&quot;,
+    &quot;shell&quot;: &quot;/home/runner/work/_temp/benchmark-browsers/chromium_headless_shell-1248/chrome-headless-shell-linux64/chrome-headless-shell&quot;,
+    &quot;deps&quot;: &quot;/home/runner/work/_temp/benchmark-deps&quot;,
+    &quot;output&quot;: &quot;/home/runner/work/_temp/benchmark-results&quot;,
+    &quot;rounds&quot;: 10,
+    &quot;iterations&quot;: 10,
+    &quot;tools&quot;: [
+      &quot;bruster&quot;,
+      &quot;playwright&quot;,
+      &quot;puppeteer&quot;,
+      &quot;agent-browser&quot;,
+      &quot;playwright-shell&quot;
+    ]
+  },
+  &quot;finished_utc&quot;: &quot;2026-10-27T23:44:06.273948+00:00&quot;
+}</pre></details>
+<p><a href="../../">All measurements</a></p>
+</body></html>
