@@ -57,12 +57,24 @@ fn login_form_error_under_csp() {
     assert_eq!(b.ok("eval", json!({ "expression": "1 + 1" })), 2);
 }
 
-fn wiki_search_input(b: &mut Browser) -> Option<Value> {
-    // find excludes hidden controls and supplies refs even for generated IDs.
-    let found = b.ok("find", json!({ "text": "Search" }));
-    found["elements"].as_array().unwrap().iter()
-        .find(|e| matches!(e["role"].as_str(), Some("textbox" | "searchbox" | "combobox")))
-        .map(|e| e["ref"].clone())
+fn wiki_history_page(b: &mut Browser, url: &Value) -> Value {
+    // MediaWiki replaces analytics and default namespace/profile parameters
+    // after rendering. Compare the actual page and decoded search query.
+    b.ok("eval", json!({ "expression": format!(r#"(() => {{
+        const u = new URL({url});
+        return {{ origin: u.origin, path: u.pathname, fragment: u.hash,
+            title: u.searchParams.get('title'), search: u.searchParams.get('search') }};
+    }})()"#) }))
+}
+
+fn wiki_back_page(b: &mut Browser) -> Value {
+    let back = b.ok("back", json!({}));
+    assert!(back["url"].is_string(), "Wikipedia history ended before the entry page: {back}");
+    let current = b.ok("url", json!({}));
+    let page = wiki_history_page(b, &back["url"]);
+    assert_eq!(page, wiki_history_page(b, &current), "back reply disagrees with live URL: {back}; {current}");
+    eprintln!("Wikipedia back: {}", back["url"]);
+    page
 }
 
 #[test]
@@ -72,23 +84,30 @@ fn wiki_search_then_back() {
     // when the toggle's JavaScript happens to expand the header inline.
     for (viewport, page) in [("1400x800", "Main_Page"), ("900x800", "Main_Page"), ("900x800", "Special:Search")] {
         let mut b = Browser::spawn_with(&["--viewport", viewport]);
+        eprintln!("Wikipedia {viewport} {page}: opening search");
         b.open(&format!("https://en.wikipedia.org/wiki/{page}"));
-        let mut input = wiki_search_input(&mut b);
-        if input.is_none() {
-            b.ok("click", json!({ "selector": "#p-search .search-toggle" }));
-            // The toggle can expand inline or follow its Special:Search href.
-            let start = Instant::now();
-            while input.is_none() {
-                input = wiki_search_input(&mut b);
-                assert!(start.elapsed() < Duration::from_millis(SITE_TIMEOUT), "no visible Wikipedia search input: {:?}", b.call("snapshot", json!({})));
-                if input.is_none() {
-                    std::thread::sleep(Duration::from_millis(100));
-                }
+        // Special:Search can have an empty label, so find by role and form
+        // name rather than filtering snapshot elements by accessible name.
+        // Its scripts can replace the form after load. An absent input does
+        // not necessarily mean the responsive header toggle is available.
+        let start = Instant::now();
+        let mut toggled = false;
+        let input = loop {
+            if let Some(input) = visible_input_named(&mut b, "search") {
+                break input;
             }
-        }
+            assert!(start.elapsed() < Duration::from_millis(SITE_TIMEOUT), "no visible Wikipedia search input at {viewport} {page}: {:?}", b.call("snapshot", json!({})));
+            if !toggled && b.ok("eval", json!({ "expression": "!!document.querySelector('#p-search .search-toggle')?.checkVisibility()" })) == true {
+                // The toggle can expand inline or follow its Special:Search href.
+                b.ok("click", json!({ "selector": "#p-search .search-toggle" }));
+                toggled = true;
+            } else {
+                std::thread::sleep(Duration::from_millis(100));
+            }
+        };
         let entry_url = b.ok("url", json!({}));
-        b.ok("type", json!({ "ref": input.unwrap(), "text": "WebKitGTK", "submit": true }));
-        let result_url = b.ok("url", json!({}));
+        b.ok("type", json!({ "ref": input, "text": "WebKitGTK", "submit": true }));
+        let mut result_url = b.ok("url", json!({}));
         // Special:Search submits a full-text search rather than jumping
         // straight to the article as the header's search does.
         let results_page = !result_url.as_str().unwrap().contains("/wiki/WebKit");
@@ -97,6 +116,7 @@ fn wiki_search_then_back() {
             let link = found["elements"].as_array().unwrap().iter()
                 .find(|e| e["role"] == "link" && e["href"].as_str().is_some_and(|url| url.contains("/wiki/WebKit")))
                 .unwrap_or_else(|| panic!("no WebKit result at {result_url}: {found}"));
+            result_url = b.ok("url", json!({}));
             b.ok("click", json!({ "ref": link["ref"] }));
         }
         b.ok("wait_for", json!({ "url": "/wiki/WebKit", "timeout": SITE_TIMEOUT }));
@@ -104,10 +124,23 @@ fn wiki_search_then_back() {
         let snap = b.ok("snapshot", json!({ "format": "text" }));
         assert!(snap.as_str().unwrap().lines().count() > 100, "thin snapshot");
         eprintln!("Wikipedia {viewport} {page}: entry={entry_url}, search={result_url}");
+        let entry_page = wiki_history_page(&mut b, &entry_url);
+        let search_page = wiki_history_page(&mut b, &result_url);
         if results_page {
-            assert_eq!(b.ok("back", json!({}))["url"], result_url);
+            assert_eq!(wiki_back_page(&mut b), search_page);
         }
-        assert_eq!(b.ok("back", json!({}))["url"], entry_url);
+        // AdvancedSearch pushes a same-document history entry for default
+        // namespaces (MediaWiki T217445). Only equivalent result pages may
+        // intervene before back reaches the original search-entry page.
+        for step in 0..4 {
+            let back = wiki_back_page(&mut b);
+            if back == entry_page {
+                break;
+            }
+            assert!(results_page, "unexpected intermediate history page: {back}");
+            assert_eq!(back, search_page);
+            assert!(step < 3, "back never reached the search-entry page: {entry_url}");
+        }
     }
 }
 

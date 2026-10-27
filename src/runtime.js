@@ -153,6 +153,10 @@
   // start. The reply of the current call carries that hint so Rust holds the
   // agent's next calls for the new page instead of running them in this one.
   let navExpected = false;
+  // Listeners registered after ours can still cancel the default action.
+  // Settle after synchronous event dispatch, before the action's async reply.
+  // A confirmed hint must survive arbitrarily delayed native start callbacks.
+  const hintNavigation = (e) => queueMicrotask(() => { if (!e.defaultPrevented) navExpected = true; });
   const leavesPage = (a) => /^https?:$/.test(a.protocol) && !a.hasAttribute('download')
     && !(a.hash && a.href.split('#')[0] === location.href.split('#')[0]);
   window.addEventListener('click', (e) => {
@@ -163,10 +167,10 @@
       post({ open: a.href });
       return;
     }
-    if (!a.target && leavesPage(a)) navExpected = true;
+    if ((!a.target || a.target === '_self') && leavesPage(a)) hintNavigation(e);
   });
   window.addEventListener('submit', (e) => {
-    if (!e.defaultPrevented && !e.target.target) navExpected = true;
+    if (!e.defaultPrevented && e.target.method !== 'dialog' && (!e.target.target || e.target.target === '_self')) hintNavigation(e);
   });
   // A beforeunload prompt is a native dialog that would block the tab, and
   // the agent, for good. This runs before any page listener (registered

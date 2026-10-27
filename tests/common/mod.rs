@@ -281,6 +281,23 @@ impl Drop for Browser {
     }
 }
 
+/// Locate visible form inputs even when the site supplies an empty label.
+pub fn visible_input_named(b: &mut Browser, name: &str) -> Option<Value> {
+    let found = b.ok("snapshot", json!({}));
+    found["elements"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|e| {
+            matches!(
+                e["role"].as_str(),
+                Some("textbox" | "searchbox" | "combobox")
+            )
+        })
+        .find(|e| b.ok("attr", json!({ "ref": e["ref"], "name": "name" })) == name)
+        .map(|e| e["ref"].clone())
+}
+
 /// Browser child processes can briefly retain profile handles or finish writes
 /// after bruster exits. Retry these transient cleanup errors on every platform.
 pub fn remove_profile_dir(path: &std::path::Path) {

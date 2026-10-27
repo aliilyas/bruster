@@ -35,6 +35,8 @@ use wry::{
 };
 
 mod mcp;
+#[cfg(target_os = "macos")]
+mod navigation_macos;
 mod screenshot;
 mod window_state;
 
@@ -97,9 +99,6 @@ const TALL_SHOT_TRIES: u8 = 30;
 /// WebKit writes disk cache entries about a second after a load; exiting
 /// earlier loses them for the next session.
 const CACHE_FLUSH_DELAY: Duration = Duration::from_millis(1200);
-/// After an action that should navigate, hold page requests this long for
-/// the load to start; if it never does, run them in the current page.
-const NAV_HINT_TIMEOUT: Duration = Duration::from_millis(1000);
 
 type TabId = u32;
 
@@ -157,11 +156,9 @@ enum UserEvent {
     PageTimeout,
     /// A load finished: run the requests that waited for it.
     Flush(TabId),
-    /// A hinted navigation never started.
-    HintTimeout {
-        tab: TabId,
-        id: u64,
-    },
+    /// A failed native load may have been replaced before this event is handled.
+    #[cfg(target_os = "macos")]
+    FlushIfIdle(TabId),
     /// The eval wrapper did not compile as an expression; try the statement form.
     EvalRetry {
         tab: TabId,
@@ -245,9 +242,9 @@ struct Pending {
     /// Held back while a load is in flight; dispatched on Flush.
     queue: Vec<(u64, Queued)>,
     loading: bool,
-    /// `loading` came from a page hint (link clicked, form submitted) and no
-    /// load has started yet. The request id keeps old hint timers from
-    /// releasing a newer navigation; the fallback checks native loading too.
+    /// The action's default navigation was not cancelled, but its native start
+    /// may still be pending. Keep requests queued until native completion or
+    /// failure; their own deadlines bound the wait without reading the old page.
     hinted: Option<u64>,
     /// (request id, has the new load started yet). A Finished event for the
     /// previous page can arrive after load_url(); ignore it until Started.
@@ -349,6 +346,9 @@ type Shared = Rc<RefCell<Pending>>;
 
 struct Tab {
     webview: WebView,
+    // WKWebView keeps a weak delegate; retain our forwarding observer per tab.
+    #[cfg(target_os = "macos")]
+    navigation: objc2::rc::Retained<navigation_macos::NavigationObserver>,
     window: Window,
     pending: Shared,
 }
@@ -574,23 +574,13 @@ fn main() -> wry::Result<()> {
                 app.last_load = std::time::Instant::now();
                 app.flush(tab);
             }
-            Event::UserEvent(UserEvent::HintTimeout { tab, id }) => {
-                if let Some(t) = app.tabs.get(&tab) {
-                    let mut p = t.pending.borrow_mut();
-                    if p.hinted == Some(id) {
-                        // Wry reports WKWebView's Started at commit, not at
-                        // provisional start. A slow response is still loading.
-                        if navigation_in_progress(&t.webview) {
-                            trace_navigation("hint still loading", tab, &p, "");
-                            hint_timeout(app.proxy.clone(), tab, id);
-                        } else {
-                            trace_navigation("hint expired", tab, &p, "");
-                            p.hinted = None;
-                            p.loading = false;
-                            drop(p);
-                            app.flush(tab);
-                        }
-                    }
+            #[cfg(target_os = "macos")]
+            Event::UserEvent(UserEvent::FlushIfIdle(tab)) => {
+                if app.tabs.get(&tab).is_some_and(|t| {
+                    let p = t.pending.borrow();
+                    !p.loading && p.navigate.is_none()
+                }) {
+                    app.flush(tab);
                 }
             }
             Event::UserEvent(UserEvent::EvalRetry { tab, id }) => app.eval_retry(tab, id),
@@ -814,12 +804,17 @@ impl App {
             &self.opts,
             &mut self.context,
         )?;
+        #[cfg(target_os = "macos")]
+        let navigation =
+            navigation_macos::observe(&webview, id, pending.clone(), self.proxy.clone());
 
         self.tabs.insert(
             id,
             Tab {
                 window,
                 webview,
+                #[cfg(target_os = "macos")]
+                navigation,
                 pending,
             },
         );
@@ -1342,7 +1337,6 @@ fn build_webview(
                     p.loading = true;
                     p.hinted = Some(id);
                     trace_navigation("hint", tab, &p, "");
-                    hint_timeout(ipc_proxy.clone(), tab, id);
                 }
             }
             if body.get("event").is_some() {
@@ -1554,13 +1548,6 @@ fn track_history(
     Ok(())
 }
 
-fn hint_timeout(proxy: EventLoopProxy<UserEvent>, tab: TabId, id: u64) {
-    std::thread::spawn(move || {
-        std::thread::sleep(NAV_HINT_TIMEOUT);
-        let _ = proxy.send_event(UserEvent::HintTimeout { tab, id });
-    });
-}
-
 #[cfg(target_os = "macos")]
 fn navigation_in_progress(wv: &WebView) -> bool {
     use wry::WebViewExtMacOS;
@@ -1681,6 +1668,19 @@ fn attach_files(mut params: Value) -> Result<Value, String> {
     Ok(params)
 }
 
+fn start_navigation(tab: &Tab, _id: u64, method: &str, url: Option<&str>) -> wry::Result<()> {
+    #[cfg(target_os = "macos")]
+    return tab.navigation.navigate(&tab.webview, _id, method, url);
+    #[cfg(not(target_os = "macos"))]
+    match method {
+        "navigate" => tab.webview.load_url(url.unwrap()),
+        "reload" => tab.webview.reload(),
+        "back" => tab.webview.go_back(),
+        "forward" => tab.webview.go_forward(),
+        _ => unreachable!("not a native navigation"),
+    }
+}
+
 /// `retries` counts how many navigations this request has already outlived.
 fn tab_dispatch(tab: &Tab, t: TabId, id: u64, request: Queued, proxy: &EventLoopProxy<UserEvent>) {
     let wv = &tab.webview;
@@ -1757,9 +1757,9 @@ fn tab_dispatch(tab: &Tab, t: TabId, id: u64, request: Queued, proxy: &EventLoop
             if !valid_url(url) {
                 return fail(id, format!("navigate: invalid url '{url}'"));
             }
-            await_load(Some(url), &|| wv.load_url(url))
+            await_load(Some(url), &|| start_navigation(tab, id, method, Some(url)))
         }
-        "reload" => await_load(None, &|| wv.reload()),
+        "reload" => await_load(None, &|| start_navigation(tab, id, method, None)),
         "back" | "forward" => {
             let can_go = if method == "back" {
                 wv.can_go_back()
@@ -1776,10 +1776,7 @@ fn tab_dispatch(tab: &Tab, t: TabId, id: u64, request: Queued, proxy: &EventLoop
                 std::thread::sleep(HISTORY_START_TIMEOUT);
                 let _ = proxy.send_event(UserEvent::HistoryTimeout { tab: t, id });
             });
-            await_load(None, &|| match method {
-                "back" => wv.go_back(),
-                _ => wv.go_forward(),
-            })
+            await_load(None, &|| start_navigation(tab, id, method, None))
         }
         "cookies" => wv.cookies().map(|cs| Some(cookies_json(&cs))),
         "set_cookie" => set_cookie(wv, params).map(|_| Some(Value::Null)),

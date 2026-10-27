@@ -67,11 +67,11 @@ fn beforeunload_does_not_block() {
         b.open(&format!("{base}/beforeunload"));
         b.ok(
             "eval",
-            json!({ "expression": format!("document.getElementById('l').href = '{path}'") }),
+            json!({ "expression": format!("document.getElementById('l').href = '{path}'; document.getElementById('l').target = '{}'", if path == "/slower" { "_self" } else { "" }) }),
         );
         b.ok("click", json!({ "selector": "#l" }));
-        // /slower takes longer than the navigation-hint fallback. WKWebView
-        // has not committed yet; title must wait rather than read the old page.
+        // WKWebView has not committed while /slower is waiting. Title must
+        // wait for that document rather than read the old page.
         assert_eq!(
             b.ok("title", json!({})),
             "other",
@@ -124,13 +124,18 @@ fn cancelled_navigation_hint_releases_page_requests() {
     let mut b = Browser::spawn();
     let base = serve();
     b.open(&format!("{base}/more"));
-    // Registered after the runtime's bubble listener: it has already hinted
-    // when this listener cancels the link's default action.
+    // Registered after the runtime's bubble listener: the reply must still
+    // see the final cancellation of both links and form submissions.
     b.ok(
         "eval",
-        json!({ "expression": "window.addEventListener('click', e => e.preventDefault())" }),
+        json!({ "expression": "window.addEventListener('click', e => e.preventDefault()); window.addEventListener('submit', e => e.preventDefault())" }),
     );
     b.ok("click", json!({ "selector": "#away" }));
+    assert_eq!(b.ok("title", json!({ "request_timeout": 5000 })), "more");
+    b.ok(
+        "type",
+        json!({ "selector": "#go", "text": "cancelled", "submit": true }),
+    );
     assert_eq!(b.ok("title", json!({ "request_timeout": 5000 })), "more");
 }
 
@@ -155,6 +160,25 @@ fn navigate_times_out_and_is_superseded() {
     b.ok("navigate", json!({ "url": format!("{base}/form") }));
     assert!(b.recv(first).unwrap_err().contains("superseded"));
     assert_eq!(b.ok("title", json!({})), "form");
+
+    #[cfg(target_os = "macos")]
+    {
+        // Identical URLs still represent different WKNavigation objects.
+        // Cancelling the older load must not fail its replacement.
+        let first = b.send("navigate", json!({ "url": format!("{base}/hang") }));
+        let next = b.send(
+            "navigate",
+            json!({ "url": format!("{base}/hang"), "timeout": 1000 }),
+        );
+        assert!(b.recv(first).unwrap_err().contains("superseded"));
+        let err = b.recv(next).unwrap_err();
+        assert!(
+            err.contains("timed out"),
+            "replacement failed on an old callback: {err}"
+        );
+        b.open(&format!("{base}/other"));
+        assert_eq!(b.ok("title", json!({})), "other");
+    }
 }
 
 #[test]
@@ -212,7 +236,7 @@ fn page_requests_time_out_without_duplicate_replies() {
 
 #[test]
 fn queued_page_requests_expire_without_running_after_navigation() {
-    let mut b = Browser::spawn();
+    let mut b = Browser::spawn_env(&[], &[("BRUSTER_TRACE_NAV", "1")]);
     let base = serve();
     b.open(&format!("{base}/more"));
     b.ok(
