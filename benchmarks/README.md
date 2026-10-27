@@ -28,6 +28,8 @@ Results: <https://aliilyas.github.io/bruster/benchmarks/>. Existing site files a
 custom domains are preserved. The known legacy `scripts/bench.py` performance
 section, if present, is replaced with a link to the corrected comparison page.
 
+[Review of published runs 1–4 and the startup investigation](REVIEW.md).
+
 ## Measurements and publication
 
 - Ubuntu 24.04 x86_64; ten fresh sessions for each of five configurations:
@@ -37,6 +39,12 @@ section, if present, is replaced with a link to the corrected comparison page.
   for `load`; identical JavaScript for DOM extraction. Both object and JSON-string
   returns are measured. The delayed-load check, image counts, screenshot PNG
   dimensions and extraction hashes check that each tool actually did the work.
+- Reports show startup/setup separately from first navigation, alongside the
+  combined launch-to-first-page time. Timings and memory display medians and
+  observed min–max ranges. Repeated-operation timings pool iterations; memory
+  uses each session's median of three idle samples. Ranges are not confidence
+  intervals. OS, CPU, RAM, runner image and engine versions appear above the table.
+  Xvfb is started before measurement; its launch time is excluded from startup.
 - Idle PSS covers the entire process forest, detached daemons and crashpad
   helpers. Bruster includes Xvfb. RSS is also recorded with its scope labeled.
 - Installed-file sizes include tool packages, browsers/engines, Node where
@@ -49,7 +57,8 @@ section, if present, is replaced with a link to the corrected comparison page.
 - Every run archives the generated exact dependency manifest/lockfile, actual
   versions, browser/executable hashes, hardware, runner image and harness hashes.
   Native OS packages follow Ubuntu updates; the WebKit version and installed
-  Debian package versions are recorded.
+  Debian package versions are recorded, along with GTK and desktop-session
+  environment settings that can affect startup.
 - `report.md` appears in the Actions job summary. Raw samples, process listings,
   screenshots, snapshots, inventories and logs are retained as an Actions
   artifact for 90 days, including evidence from failed runs.

@@ -455,10 +455,20 @@ fn main() -> wry::Result<()> {
         .map(|v| parse_viewport(&v).expect("--viewport WxH"))
         .unwrap_or(DEFAULT_VIEWPORT);
 
-    // Must be set before GTK/WebKit initialise. Software rendering saves ~200 MB
-    // under Xvfb and speeds up loads; agents do not need GPU compositing.
+    // Must be set before GTK/WebKit initialise or any threads are started.
     #[cfg(target_os = "linux")]
-    std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
+    {
+        // Software rendering saves ~200 MB under Xvfb.
+        std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
+        if opts.hidden && std::env::var("BRUSTER_USE_SESSION_BUS").as_deref() != Ok("1") {
+            // Hidden automation does not need desktop session integration. GTK's
+            // Inhibit proxy and Tao's theme lookup can synchronously wait 25 + 5 s
+            // for an unresponsive portal; the theme wait repeats for new tabs.
+            // An explicit unsupported transport fails immediately; unsetting it can
+            // instead autolaunch another bus. Visible mode keeps the desktop bus.
+            std::env::set_var("DBUS_SESSION_BUS_ADDRESS", "disabled:");
+        }
+    }
 
     let event_loop = EventLoopBuilder::<UserEvent>::with_user_event().build();
     spawn_stdin_reader(event_loop.create_proxy());

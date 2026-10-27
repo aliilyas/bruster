@@ -417,7 +417,14 @@ def main():
         'mem_total_kib': int(next(line.split()[1] for line in Path('/proc/meminfo').read_text().splitlines()
                                   if line.startswith('MemTotal:'))),
         'runner_image': {key: os.environ.get(key) for key in ('ImageOS', 'ImageVersion', 'RUNNER_ARCH')},
+        'session_environment': {
+            'display_set': bool(os.environ.get('DISPLAY') or os.environ.get('WAYLAND_DISPLAY')),
+            'session_bus_address_set': bool(os.environ.get('DBUS_SESSION_BUS_ADDRESS')),
+            **{key: os.environ.get(key) for key in ('XDG_CURRENT_DESKTOP', 'GTK_USE_PORTAL', 'GTK_MODULES',
+                                                   'NO_AT_BRIDGE', 'BRUSTER_USE_SESSION_BUS')},
+        },
         'rustc': subprocess.check_output(['rustc', '--version'], text=True).strip(),
+        'gtk': subprocess.check_output(['pkg-config', '--modversion', 'gtk+-3.0'], text=True).strip(),
         'webkitgtk': subprocess.check_output(['pkg-config', '--modversion', 'webkit2gtk-4.1'], text=True).strip(),
         'packages': {name: json.loads((args.deps / 'node_modules' / name / 'package.json').read_text())['version']
                      for name in ('playwright-core', 'puppeteer-core', 'agent-browser')},
@@ -453,6 +460,7 @@ def main():
                 rows.append(row)
                 (args.output / 'samples.json').write_text(json.dumps(rows, indent=2) + '\n')
                 print(f"{round_}: {tool} first-page={row['launch_to_first_page_ms']:.1f}ms "
+                      f"setup={row['startup_ms']:.1f}ms first-nav={row['first_navigation_ms']:.1f}ms "
                       f"warm={statistics.median(row['tiny_navigation_ms']):.2f}ms "
                       f"PSS={statistics.median(m['total_pss_mib'] for m in row['idle_memory']):.1f}MiB", flush=True)
     finally:

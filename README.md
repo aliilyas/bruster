@@ -124,6 +124,10 @@ codex mcp add bruster -- bruster --mcp --quiet           # Codex CLI
 X11/Wayland display or Xvfb. When no display is set, Bruster automatically tries
 `xvfb-run`; install Xvfb if it is unavailable.
 
+On Linux, hidden/MCP mode skips the desktop session bus to avoid waiting for
+unavailable desktop portals. Set `BRUSTER_USE_SESSION_BUS=1` if you need desktop
+session integration in hidden mode. `--visible` uses the normal session bus.
+
 ## Run
 
 ```sh
@@ -246,7 +250,7 @@ Calls routed through the page runtime (`eval`, `url`, `title`, `snapshot`, inter
 - `bin/bruster` runs the development build from this checkout.
 - `tests/run_all.sh` runs the build, unit tests, smoke tests, edge tests, the MCP launch check, and end-to-end tests.
 - CI (`.github/workflows/ci.yml`) builds all platforms, runs the tests, and publishes release archives on `v*` tags.
-- Benchmarks: `scripts/bench.py` measures binary size, cold start, page load, snapshot, and idle RSS under Xvfb.
+- Benchmarks: `scripts/bench_compare.py` compares five configurations; `scripts/bench_footprint.py` inventories runtime files and `scripts/bench_report.py` validates and publishes results. See [setup and methodology](benchmarks/README.md).
 
 ## License
 
