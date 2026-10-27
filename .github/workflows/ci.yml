@@ -41,13 +41,17 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq libwebkit2gtk-4.1-dev libgtk-3-dev xvfb fonts-dejavu-core
+          sudo apt-get install -y -qq libwebkit2gtk-4.1-dev libgtk-3-dev xvfb fonts-dejavu-core dbus python3-dbus python3-gi
 
       - name: Build
         run: cargo build --release --locked --target ${{ matrix.target }}
 
       - name: Unit tests
         run: cargo test --release --locked --target ${{ matrix.target }} --bin bruster
+
+      - name: Startup with an unresponsive desktop portal (Linux)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a /usr/bin/python3 tests/startup_portal.py target/${{ matrix.target }}/release/bruster
 
       - name: Smoke and edge tests (Linux)
         if: runner.os == 'Linux' && matrix.test == 'full'

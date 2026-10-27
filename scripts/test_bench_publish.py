@@ -94,7 +94,23 @@ class Reports(unittest.TestCase):
         self.assertEqual(stat['recovery_retry_passes'], 1)
         table = dict((r[0], r[1:]) for r in report.table_rows(record))
         self.assertEqual(table['Installed runtime files, lower bound (MB)'], ['2.0'] * 5)
-        self.assertEqual(table['Idle total PSS, including display (MiB)'], ['3.0', '2.0', '2.0', '2.0', '2.0'])
+        self.assertEqual(table['Idle total PSS, including display (MiB)'],
+                         ['3.0 [3.0–3.0]'] + ['2.0 [2.0–2.0]'] * 4)
+
+    def test_startup_phases_ranges_and_lifecycle_failures(self):
+        row = self.rows[0]
+        row.update(startup_ms=30_000, first_navigation_ms=500, launch_to_first_page_ms=30_500)
+        row['failures'].append({'name': 'graceful_close', 'pass': False, 'error': 'close refused'})
+        report.write_json(self.results / 'samples.json', self.rows)
+        record = report.prepare(self.results, self.context)
+        stats = record['summary']['bruster']
+        self.assertEqual(stats['sessions_with_failures'], 1)
+        self.assertEqual(stats['fault_probe_failures'], {})
+        self.assertEqual(stats['lifecycle_failures'], {'graceful_close': 1})
+        table = {r[0]: r[1:] for r in report.table_rows(record)}
+        self.assertEqual(table['Startup → ready / blank-page setup (ms)'][0], '30000.0 [30000.0–30000.0]')
+        self.assertEqual(table['First navigation after setup (ms)'][0], '500.0 [500.0–500.0]')
+        self.assertEqual(table['Warm tiny-page navigation (ms)'][0], '15.0 [10.0–20.0]')
 
     def test_lockfile_identity(self):
         (self.results / 'package-lock.json').write_text('{}\n')

@@ -27,6 +27,8 @@ VECTORS = ('tiny_navigation_ms', 'tiny_extract_ms', 'large_navigation_ms', 'larg
 MEMORY = ('rss_mib', 'pss_mib', 'display_pss_mib', 'total_pss_mib', 'process_count')
 METRICS = (
     ('launch_to_first_page_ms', 'Launch → first loaded page (ms)'),
+    ('startup_ms', 'Startup → ready / blank-page setup (ms)'),
+    ('first_navigation_ms', 'First navigation after setup (ms)'),
     ('tiny_navigation_ms', 'Warm tiny-page navigation (ms)'),
     ('tiny_extract_ms', 'Tiny DOM extraction (ms)'),
     ('large_navigation_ms', 'Large-page navigation (ms)'),
@@ -39,6 +41,12 @@ METRICS = (
 )
 METHOD = (
     'Ten sessions per configuration by default, with rotating order and fresh browser profiles. '
+    'Values are medians [observed minimum–maximum], not confidence intervals. '
+    'Startup and first navigation have one sample per session; repeated-operation timings pool all '
+    'iterations; memory uses the median of three idle readings per session. '
+    'Startup ends at the adapter ready event, or after blank-page/viewport setup for agent-browser. '
+    'The combined launch-to-first-page measurement includes both setup and the first navigation. '
+    'Xvfb is already running: its startup time is excluded, but its memory is included. '
     '1280×800 viewport; localhost fixtures; no-store HTTP responses; navigation waits for load. '
     'OS filesystem caches are not flushed. Identical extraction JavaScript and cross-tool result hashes. '
     'Timings include controller round trips; agent-browser includes its per-command native CLI. '
@@ -126,7 +134,9 @@ def aggregate(rows):
         result.update({key: summary([statistics.median(m[key] for m in r['idle_memory']) for r in subset])
                        for key in MEMORY})
         result['sessions_with_failures'] = sum(bool(r['failures']) for r in subset)
-        result['fault_probe_failures'] = dict(collections.Counter(f['name'] for r in subset for f in r['failures']))
+        result['fault_probe_failures'] = dict(collections.Counter(c['name'] for r in subset for c in r['failure_checks'] if not c['pass']))
+        result['lifecycle_failures'] = dict(collections.Counter(f['name'] for r in subset for f in r['failures']
+                                                               if f['name'] in ('graceful_close', 'process_cleanup')))
         result['recovery_retry_passes'] = sum(c['pass'] for r in subset for c in r['failure_checks']
                                               if c['name'] == 'navigation_recovery_retry_100ms')
         result['failures'] = [{'round': r['round'], **f} for r in subset for f in r['failures']]
@@ -153,24 +163,26 @@ def record_id(record):
 def table_rows(record):
     stats = record['summary']
     for key, label in METRICS:
-        yield [label, *(f"{stats[t][key]['median']:.1f}" for t in LABELS)]
+        yield [label, *(f"{stats[t][key]['median']:.1f} [{stats[t][key]['min']:.1f}–{stats[t][key]['max']:.1f}]" for t in LABELS)]
     yield ['Installed runtime files, lower bound (MB)',
            *(f"{record['footprint']['tool_totals'][t]['bytes'] / 1e6:.1f}" for t in LABELS)]
-    yield ['Sessions with fault-probe failures',
+    yield ['Sessions with failures (including cleanup)',
            *(f"{stats[t]['sessions_with_failures']}/{record['metadata']['rounds']}" for t in LABELS)]
 
 
 def markdown(record):
     c, m = record['context'], record['metadata']
     lines = ['# Browser comparison', '', f"Commit `{c['sha']}` · [workflow run]({c['run_url']})",
-             f"Measured {m['finished_utc']}; {m['rounds']} sessions per configuration. Values are medians.",
-             versions(m), '',
+             f"Measured {m['finished_utc']}; {m['rounds']} sessions per configuration. Values are medians [min–max].",
+             versions(m), '', environment(m), '',
              '| Metric | ' + ' | '.join(LABELS.values()) + ' |', '|---|' + '---:|' * len(LABELS)]
     lines.extend('| ' + ' | '.join(row) + ' |' for row in table_rows(record))
-    lines.extend(['', METHOD, '', '## Fault probes', ''])
+    lines.extend(['', METHOD, '', '## Fault probes and cleanup', ''])
     for tool, label in LABELS.items():
         s = record['summary'][tool]
-        lines.append(f"- {label}: {json.dumps(s['fault_probe_failures'])}; successful 100 ms recovery retries: {s['recovery_retry_passes']}.")
+        lines.append(f"- {label}: fault probes {json.dumps(s['fault_probe_failures'])}; "
+                     f"shutdown/cleanup {json.dumps(s.get('lifecycle_failures', {}))}; "
+                     f"successful 100 ms recovery retries: {s['recovery_retry_passes']}.")
     lines.extend(['', '## Provenance', '', '```json', json.dumps(m, indent=2), '```', ''])
     return '\n'.join(lines)
 
@@ -191,8 +203,17 @@ def prepare(results, context):
 
 def versions(metadata):
     packages = metadata['packages']
-    return (f"Playwright {packages['playwright-core']} · Puppeteer {packages['puppeteer-core']} · "
-            f"agent-browser {packages['agent-browser']} · {metadata['chrome']} · Node {metadata['node']}")
+    return (f"WebKitGTK {metadata.get('webkitgtk', 'unrecorded')} · Playwright {packages['playwright-core']} · "
+            f"Puppeteer {packages['puppeteer-core']} · agent-browser {packages['agent-browser']} · "
+            f"{metadata['chrome']} · Headless Shell {metadata.get('headless_shell', 'unrecorded')} · Node {metadata['node']}")
+
+
+def environment(metadata):
+    memory = metadata.get('mem_total_kib')
+    return (f"{metadata.get('os', {}).get('PRETTY_NAME', 'OS unrecorded')} · "
+            f"{metadata.get('cpu_model', 'CPU unrecorded')} · {metadata.get('cpu_count', '?')} visible CPUs · "
+            f"{f'{memory / 1024**2:.1f}' if memory else '?'} GiB RAM · "
+            f"runner image {metadata.get('runner_image', {}).get('ImageVersion') or 'unrecorded'}")
 
 
 def page(record, history=None):
@@ -202,24 +223,27 @@ def page(record, history=None):
     parts = ['<!doctype html><html lang="en"><meta charset="utf-8">',
              '<meta name="viewport" content="width=device-width, initial-scale=1">',
              '<title>Bruster browser benchmarks</title><style>',
-             'body{font:16px/1.6 system-ui,sans-serif;margin:2rem auto;padding:0 1rem;max-width:1200px;color:#202938}',
-             'a{color:#075ab4}.scroll{overflow:auto}table{border-collapse:collapse;width:100%}',
+             'body{font:16px/1.6 system-ui,sans-serif;margin:2rem auto;padding:0 1rem;max-width:1200px;color:#202938;overflow-wrap:anywhere}',
+             'a{color:#075ab4}.scroll{overflow:auto}table{border-collapse:collapse;width:100%;min-width:1000px}',
              'th,td{padding:.6rem;border:1px solid #ccd3dc;text-align:right}th:first-child,td:first-child{text-align:left}',
              'th{background:#edf2f7}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f5f7fa;padding:1rem}',
              '</style><body><h1>Browser benchmarks</h1>',
              f'<p>Commit <code>{e(c["sha"])}</code> · <a href="{e(c["run_url"])}">Workflow and raw artifacts</a></p>',
-             f'<p>Measured {e(m["finished_utc"])} · {e(m["rounds"])} sessions per configuration. Values are medians.</p>',
+             f'<p>Measured {e(m["finished_utc"])} · {e(m["rounds"])} sessions per configuration. Values are medians [min–max].</p>',
              f'<p>{e(versions(m))}</p>',
+             f'<p>{e(environment(m))}</p>',
              '<div class="scroll"><table><thead><tr><th>Metric</th>' + ''.join(f'<th>{e(v)}</th>' for v in LABELS.values()) + '</tr></thead><tbody>']
     parts.extend('<tr>' + ''.join(f'<td>{e(cell)}</td>' for cell in row) + '</tr>' for row in table_rows(record))
     parts.extend(['</tbody></table></div><h2>Method</h2>', f'<p>{e(METHOD)}</p>',
                   '<p>' + ' · '.join(f'<a href="{e(prefix + name)}">{e(name)}</a>' for name in PUBLIC_FILES) + '</p>',
-                  '<h2>Fault probes</h2><p>Failures remain visible even when a later retry succeeds. '
+                  '<h2>Fault probes and cleanup</h2><p>Failures remain visible even when a later retry succeeds. '
                   'These probes run after the timed workloads.</p><ul>'])
     for tool, label in LABELS.items():
         s = record['summary'][tool]
         counts = ', '.join(f'{name}: {count}' for name, count in s['fault_probe_failures'].items()) or 'none'
-        parts.append(f'<li>{e(label)} — failures: {e(counts)}; successful 100 ms recovery retries: {s["recovery_retry_passes"]}</li>')
+        lifecycle = ', '.join(f'{name}: {count}' for name, count in s.get('lifecycle_failures', {}).items()) or 'none'
+        parts.append(f'<li>{e(label)} — fault probes: {e(counts)}; shutdown/cleanup: {e(lifecycle)}; '
+                     f'successful 100 ms recovery retries: {s["recovery_retry_passes"]}</li>')
     parts.extend(['</ul><details><summary>Environment, versions and hashes</summary>',
                   '<pre>' + e(json.dumps(m, indent=2)) + '</pre></details>'])
     if history is not None:
@@ -227,7 +251,8 @@ def page(record, history=None):
         for item in history:
             ctx = item['context']
             parts.append(f'<li><a href="runs/{e(record_id(item))}/">{e(ctx["sha"][:12])} · run {ctx["run_number"]}, '
-                         f'attempt {ctx["run_attempt"]}</a> · {e(item["metadata"]["finished_utc"])}</li>')
+                          f'attempt {ctx["run_attempt"]}</a> · {e(item["metadata"]["finished_utc"])} '
+                          f'· {e(environment(item["metadata"]))}</li>')
         parts.append('</ul>')
     else:
         parts.append('<p><a href="../../">All measurements</a></p>')
