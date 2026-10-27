@@ -67,6 +67,15 @@ jobs:
         env: { BRUSTER_TEST_STDERR: 1 }
         run: cargo test --release --locked --target ${{ matrix.target }} --test smoke --test edge -- --nocapture
 
+      - name: Repeat navigation race regression (macOS)
+        if: runner.os == 'macOS'
+        env: { BRUSTER_TEST_STDERR: 1 }
+        run: |
+          for round in {1..10}; do
+            echo "Navigation regression round $round"
+            cargo test --release --locked --target ${{ matrix.target }} --test edge duplicate_load_does_not_release_requests_for_the_next_page -- --exact --nocapture || exit 1
+          done
+
       - name: Smoke tests (Windows)
         if: runner.os == 'Windows'
         run: cargo test --release --locked --target ${{ matrix.target }} --test smoke -- --test-threads=1
