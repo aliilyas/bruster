@@ -48,13 +48,15 @@
 
   let refs = new Map();
 
-  const post = (msg) => window.ipc.postMessage(JSON.stringify(msg));
+  // Pages can replace JSON.stringify after injection; IPC must still work.
+  const stringify = JSON.stringify.bind(JSON);
+  const post = (msg) => window.ipc.postMessage(stringify(msg));
   const trunc = (s, n) => (s = (s || '').replace(/\s+/g, ' ').trim()).length > n ? s.slice(0, n) + '…' : s;
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const fmt = (v) => {
     if (typeof v === 'string') return v;
     if (v instanceof Error) return v.stack || v.message;
-    try { return JSON.stringify(v); } catch { return String(v); }
+    try { return stringify(v); } catch { return String(v); }
   };
 
   // Request log. Patched fetch/XHR give status, headers and a body prefix;
@@ -178,6 +180,9 @@
   let lastResource = 0;
   const resourceDone = () => { lastResource = Date.now(); };
   if (window.top === window) {
+    // pushState history can change only state, not the URL. Native load
+    // callbacks do not fire for these traversals, so acknowledge popstate.
+    window.addEventListener('popstate', () => post({ history: location.href }));
     new PerformanceObserver(() => { lastResource = Date.now(); }).observe({ type: 'resource' });
     document.addEventListener('DOMContentLoaded', () => post({ dom: location.href }));
     window.addEventListener('load', () => {
@@ -481,10 +486,10 @@
     const lines = [snap.url, snap.title];
     for (const e of snap.elements) {
       let s = `${e.ref} ${e.role}`;
-      if (e.name) s += ' ' + JSON.stringify(e.name);
-      if (e.text) s += ' ' + JSON.stringify(e.text);
+      if (e.name) s += ' ' + stringify(e.name);
+      if (e.text) s += ' ' + stringify(e.text);
       if (e.href) s += ' href=' + (e.href.startsWith(location.origin) ? e.href.slice(location.origin.length) : e.href);
-      if (e.value && !('checked' in e && e.value === 'on')) s += ' value=' + JSON.stringify(e.value);
+      if (e.value && !('checked' in e && e.value === 'on')) s += ' value=' + stringify(e.value);
       if ('checked' in e) s += ' checked=' + e.checked;
       if (e.disabled) s += ' disabled';
       if (e.box) s += ` box=${e.box.x},${e.box.y},${e.box.width},${e.box.height}`;
@@ -721,7 +726,7 @@
       };
 
       while (!check()) {
-        if (Date.now() > deadline) throw new Error(`wait_for timed out after ${timeout}ms: ${JSON.stringify(p)}`);
+        if (Date.now() > deadline) throw new Error(`wait_for timed out after ${timeout}ms: ${stringify(p)}`);
         await sleep(POLL_MS);
       }
       return null;

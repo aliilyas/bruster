@@ -182,6 +182,8 @@ e4 checkbox "Remember me" checked=false
 > [!NOTE]
 > Same-origin hrefs lose the origin in the text format. Alert and prompt dialogs never block. bruster answers them as the current `dialog` setting specifies, and reports them as `dialog` events. `beforeunload` handlers are disarmed.
 
+Calls routed through the page runtime (`eval`, `snapshot`, interactions and other DOM tools) have an outer `request_timeout` in milliseconds, defaulting to at least 30000 ms (or the requested `timeout`/`time` plus 5000 ms, whichever is longer). This deadline includes time spent waiting for navigation. Set it explicitly for unusually long operations. A timeout stops waiting for the reply; it does not interrupt JavaScript already running in the page. In particular, an infinite loop can make a web process unresponsive and may require restarting bruster. Late replies are discarded. Navigation uses its own `timeout`; native operations such as screenshots do not use `request_timeout`. MCP represents null results as the text `null`.
+
 ## API
 
 | method | params | result |
@@ -190,7 +192,7 @@ e4 checkbox "Remember me" checked=false
 | `reload` `back` `forward` | none | `{url}`, or `null` if there is nowhere to go |
 | `url` `title` | none | string |
 | `eval` | `expression` | JSON value. Promises are awaited. Compiled as a script |
-| `snapshot` | `selector?`, `max?` (1000), `boxes?`, `format?` (`json` default, `text`) | `{url,title,elements[],truncated?}` or text lines |
+| `snapshot` | `selector?`, `max?` (1000), `boxes?`, `format?` (native default `json`, MCP default `text`) | `{url,title,elements[],truncated?}` or text lines |
 | `find` | `text?` or `regex?` + snapshot params | filtered snapshot |
 | `screenshot` | `path?`, `full?`, `clip?` `{x,y,width,height}` | `{path,bytes}` or `{png_base64}`. Full pages are capped at 16000 px |
 | `rect` | target | `{x,y,width,height}` viewport-relative |
@@ -204,22 +206,22 @@ e4 checkbox "Remember me" checked=false
 | `check` | target, `checked?` | bool |
 | `drag` | `from` target, `to` target | `null` |
 | `upload` | target, `paths[]` | file names set on the input |
-| `scroll` | target or `x,y` | `{x,y}` |
+| `scroll` | target or `x,y` deltas | `{x,y}` current position |
 | `resize` | `width`, `height` (1 to 16000) | `{width,height}` |
 | `text` `html` | target | string |
 | `attr` | target, `name` | string or null |
 | `count` | `selector` | number |
 | `wait_for` | `selector`/`ref` + `state?` (visible, attached, hidden), `text`, `textGone`, `url`, `idle`, `time` ms; `timeout?` ms | `null` |
-| `network` | `clear?` | `[{index,type,method,url,status,ms}]` |
+| `network` | `clear?` | fetch/XHR entries with index, method and status where available, plus resource timing entries |
 | `network_request` | `index` | one entry with `req_headers`, `res_headers`, and `body` (first 16 KB) |
 | `console` | `clear?` | `[{level,text,ms}]` console output and uncaught errors |
 | `dialog` | `accept?`, `text?`, `clear?` | dialogs seen. Sets the answer for the next dialogs |
 | `cookies` | none | list |
 | `set_cookie` | `name`, `value`, `domain?`, `path?` (`/`) | `null` |
-| `new_tab` | `url?` | `{tab}`, or `{tab,url}` after the load when you give a URL |
+| `new_tab` | `url?`, `timeout?` ms (default 30000) | `{tab}`, or `{tab,url}` after load; does not switch the current tab |
 | `tabs` | none | `[{tab,url,current}]` |
 | `switch_tab` | `tab` | `null` |
-| `close_tab` | (uses `tab`) | `null` |
+| `close_tab` | (uses `tab`) | `null`; closing the last tab is rejected (use `close`) |
 | `close` | none | exits |
 
 ## Events
@@ -229,9 +231,9 @@ e4 checkbox "Remember me" checked=false
 ## Limits
 
 - Input uses synthetic DOM events (`isTrusted` is false). You do not get `:hover` styles, native `<select>` popups, or OS-level shortcuts.
-- Network and console logs are patched in the page. They contain no request bodies and they reset on navigation. Use `--proxy` for real interception.
+- Network and console logs are patched in the page and reset on navigation. Network entries for fetch/XHR include status and an index; other resources use performance timings and may lack status or method. The document request is not included. Logs contain no request bodies. Use `--proxy` for real interception.
 - Cross-origin iframes are out of reach. Same-origin iframes and open shadow roots work.
-- `data:` and `file:` pages load, but in-page calls get no reply. Serve the pages over localhost instead.
+- Use HTTP(S) URLs for navigation. `data:` and `file:` URLs are unsupported; serve local pages over localhost instead.
 - bruster does not intercept native file choosers. Use `upload` instead of a click on a file input.
 - Without `--profile`, cookies and storage last for one session.
 - Full-page screenshots are capped at 16000 px. On macOS, very tall pages can be cut when they are higher than the screen.

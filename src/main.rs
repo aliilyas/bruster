@@ -77,8 +77,11 @@ const MAX_FULL_HEIGHT: f64 = 16_000.0;
 const MAX_VIEWPORT_SIDE: u32 = MAX_FULL_HEIGHT as u32;
 /// `navigate` gives up after this unless `timeout` says otherwise.
 const NAVIGATE_TIMEOUT: Duration = Duration::from_secs(30);
-/// back/forward at the end of history are silent no-ops in the webview. If no
-/// load has started by then, answer null instead of hanging.
+/// Bound page IPC even if a promise never resolves or the runtime stops responding.
+const PAGE_TIMEOUT: Duration = Duration::from_secs(30);
+const PAGE_TIMEOUT_MARGIN_MS: u64 = 5_000;
+/// Some engines restore history without a load event. Check the URL then;
+/// same-document history is also acknowledged by the runtime's popstate hook.
 const HISTORY_START_TIMEOUT: Duration = Duration::from_millis(500);
 /// A request re-run after this many navigations is given up on.
 const MAX_REDISPATCH: u8 = 3;
@@ -145,6 +148,8 @@ enum UserEvent {
         tab: TabId,
         id: u64,
     },
+    /// Wake the event loop to expire page IPC, even when GTK has no events.
+    PageTimeout,
     /// A load finished: run the requests that waited for it.
     Flush(TabId),
     /// A hinted navigation never started.
@@ -191,6 +196,37 @@ struct Queued {
     method: String,
     params: Value,
     retries: u8,
+    deadline: std::time::Instant,
+}
+
+impl Queued {
+    fn new(method: String, params: Value) -> Result<Self, String> {
+        // Let action/wait timeouts complete first. request_timeout is a
+        // separate outer deadline for page code that never replies.
+        let timeout_ms = match params.get("request_timeout") {
+            Some(value) => value
+                .as_u64()
+                .ok_or("request_timeout must be a non-negative integer")?,
+            None => {
+                let expected = ["timeout", "time"]
+                    .iter()
+                    .filter_map(|key| params.get(key).and_then(Value::as_u64))
+                    .max()
+                    .unwrap_or(0);
+                (PAGE_TIMEOUT.as_millis() as u64)
+                    .max(expected.saturating_add(PAGE_TIMEOUT_MARGIN_MS))
+            }
+        };
+        let deadline = std::time::Instant::now()
+            .checked_add(Duration::from_millis(timeout_ms))
+            .ok_or("request_timeout is too large")?;
+        Ok(Self {
+            method,
+            params,
+            retries: 0,
+            deadline,
+        })
+    }
 }
 
 /// Requests still waiting for an answer from the page.
@@ -210,6 +246,8 @@ struct Pending {
     /// Url of the pending `navigate`, to tell its own cancellation apart
     /// from the cancellation of the load it replaced.
     navigate_url: Option<String>,
+    /// URL before a history operation, for same-document transitions with no load.
+    history_url: Option<String>,
     navigate_until: Until,
     /// The about:blank warm-up load is still in flight; its events are not the agent's.
     warming: bool,
@@ -307,6 +345,8 @@ struct App {
     /// Last page load, to let the disk cache settle before exit.
     last_load: std::time::Instant,
     proxy: EventLoopProxy<UserEvent>,
+    deadline_timer: std::sync::mpsc::Sender<Option<std::time::Instant>>,
+    next_deadline: Option<std::time::Instant>,
 }
 
 fn emit(v: Value) {
@@ -413,6 +453,8 @@ fn main() -> wry::Result<()> {
         opts,
         viewport,
         proxy: event_loop.create_proxy(),
+        deadline_timer: spawn_deadline_timer(event_loop.create_proxy()),
+        next_deadline: None,
     };
     app.open_tab(&event_loop, None)?;
     // Only once WebKit is up: calling into WKWebsiteDataStore before the
@@ -475,37 +517,45 @@ fn main() -> wry::Result<()> {
                 app.flush(tab);
             }
             Event::UserEvent(UserEvent::HintTimeout(tab)) => {
-                let Some(t) = app.tabs.get(&tab) else { return };
-                let mut p = t.pending.borrow_mut();
-                if p.hinted {
-                    p.hinted = false;
-                    p.loading = false;
-                    drop(p);
-                    app.flush(tab);
+                if let Some(t) = app.tabs.get(&tab) {
+                    let mut p = t.pending.borrow_mut();
+                    if p.hinted {
+                        p.hinted = false;
+                        p.loading = false;
+                        drop(p);
+                        app.flush(tab);
+                    }
                 }
             }
             Event::UserEvent(UserEvent::EvalRetry { tab, id }) => app.eval_retry(tab, id),
             Event::UserEvent(UserEvent::EvalFailed { tab, id }) => app.eval_failed(tab, id),
             Event::UserEvent(UserEvent::NavigateTimeout { tab, id }) => {
-                let Some(t) = app.tabs.get(&tab) else { return };
-                let mut p = t.pending.borrow_mut();
-                if p.navigate.is_some_and(|(nid, _)| nid == id) {
-                    let url = p.navigate_url.take().unwrap_or_default();
-                    p.navigate = None;
-                    p.loading = false;
-                    drop(p);
-                    stop_loading(&t.webview);
-                    fail(id, format!("navigate {url}: timed out"));
-                    app.flush(tab);
+                if let Some(t) = app.tabs.get(&tab) {
+                    let mut p = t.pending.borrow_mut();
+                    if p.navigate.is_some_and(|(nid, _)| nid == id) {
+                        let url = p.navigate_url.take().unwrap_or_default();
+                        p.navigate = None;
+                        p.loading = false;
+                        drop(p);
+                        stop_loading(&t.webview);
+                        fail(id, format!("navigate {url}: timed out"));
+                        app.flush(tab);
+                    }
                 }
             }
             Event::UserEvent(UserEvent::HistoryTimeout { tab, id }) => {
-                // Still waiting with no Started event: there was nowhere to go.
-                let Some(t) = app.tabs.get(&tab) else { return };
-                let mut p = t.pending.borrow_mut();
-                if p.navigate == Some((id, false)) {
-                    p.navigate = None;
-                    reply(id, Value::Null);
+                // Fallback for engines restoring a page without load events.
+                if let Some(t) = app.tabs.get(&tab) {
+                    let mut p = t.pending.borrow_mut();
+                    if p.navigate == Some((id, false)) {
+                        let current = t.webview.url().ok();
+                        if current.is_some() && current != p.history_url {
+                            p.navigate = None;
+                            p.history_url = None;
+                            reply(id, json!({ "tab": tab, "url": current }));
+                            let _ = app.proxy.send_event(UserEvent::Flush(tab));
+                        }
+                    }
                 }
             }
             Event::UserEvent(UserEvent::Command(req)) => {
@@ -518,6 +568,9 @@ fn main() -> wry::Result<()> {
                 app.dispatch(target, req);
             }
             _ => {}
+        }
+        if *control_flow != ControlFlow::Exit {
+            app.page_deadlines();
         }
     });
 }
@@ -587,7 +640,74 @@ fn spawn_stdin_reader(proxy: EventLoopProxy<UserEvent>) {
     });
 }
 
+/// One reschedulable timer for all page calls. Tao's GTK WaitUntil path can
+/// block in gtk::main_iteration_do(true) until unrelated activity arrives;
+/// sending a user event wakes it reliably. Completed calls cancel the timer,
+/// rather than leaving a sleeping thread behind for every request.
+fn spawn_deadline_timer(
+    proxy: EventLoopProxy<UserEvent>,
+) -> std::sync::mpsc::Sender<Option<std::time::Instant>> {
+    use std::sync::mpsc::{channel, RecvTimeoutError};
+    let (tx, rx) = channel::<Option<std::time::Instant>>();
+    std::thread::spawn(move || {
+        let mut next: Option<std::time::Instant> = None;
+        loop {
+            let update = match next {
+                Some(deadline) => {
+                    rx.recv_timeout(deadline.saturating_duration_since(std::time::Instant::now()))
+                }
+                None => rx.recv().map_err(|_| RecvTimeoutError::Disconnected),
+            };
+            match update {
+                Ok(deadline) => next = deadline,
+                Err(RecvTimeoutError::Timeout) => {
+                    if proxy.send_event(UserEvent::PageTimeout).is_err() {
+                        break;
+                    }
+                    next = None;
+                }
+                Err(RecvTimeoutError::Disconnected) => break,
+            }
+        }
+    });
+    tx
+}
+
 impl App {
+    /// Expire unanswered page IPC and arrange a wakeup for the next deadline.
+    fn page_deadlines(&mut self) {
+        let now = std::time::Instant::now();
+        let mut next = None;
+        for tab in self.tabs.values() {
+            let mut pending = tab.pending.borrow_mut();
+            pending.js.retain(|id, request| {
+                if request.deadline <= now {
+                    fail(*id, format!("{}: page request timed out", request.method));
+                    false
+                } else {
+                    next = Some(next.map_or(request.deadline, |n: std::time::Instant| {
+                        n.min(request.deadline)
+                    }));
+                    true
+                }
+            });
+            pending.queue.retain(|(id, request)| {
+                if request.deadline <= now {
+                    fail(*id, format!("{}: page request timed out", request.method));
+                    false
+                } else {
+                    next = Some(next.map_or(request.deadline, |n: std::time::Instant| {
+                        n.min(request.deadline)
+                    }));
+                    true
+                }
+            });
+        }
+        if next != self.next_deadline {
+            self.next_deadline = next;
+            let _ = self.deadline_timer.send(next);
+        }
+    }
     fn open_tab(
         &mut self,
         target: &EventLoopWindowTarget<UserEvent>,
@@ -713,7 +833,7 @@ impl App {
             std::mem::take(&mut pending.queue)
         };
         for (id, q) in queued {
-            tab_dispatch(tab, t, id, &q.method, q.params, q.retries, &self.proxy);
+            tab_dispatch(tab, t, id, q, &self.proxy);
         }
     }
 
@@ -754,6 +874,9 @@ impl App {
             .find(|(_, t)| t.window.id() == wid)
             .map(|(id, _)| *id);
         if let Some(id) = id {
+            if self.tabs.len() == 1 {
+                return;
+            }
             self.close_tab(id);
             emit(json!({ "event": "tab_closed", "tab": id }));
         }
@@ -780,7 +903,19 @@ impl App {
                 return match self.open_tab(target, url) {
                     // With a url the load handler answers {tab, url} once the page is in.
                     Ok(t) if url.is_some() => {
-                        self.tabs[&t].pending.borrow_mut().navigate = Some((id, false))
+                        let mut pending = self.tabs[&t].pending.borrow_mut();
+                        pending.navigate = Some((id, false));
+                        pending.navigate_url = url.map(str::to_owned);
+                        let timeout = params
+                            .get("timeout")
+                            .and_then(Value::as_u64)
+                            .map(Duration::from_millis)
+                            .unwrap_or(NAVIGATE_TIMEOUT);
+                        let proxy = self.proxy.clone();
+                        std::thread::spawn(move || {
+                            std::thread::sleep(timeout);
+                            let _ = proxy.send_event(UserEvent::NavigateTimeout { tab: t, id });
+                        });
                     }
                     Ok(t) => reply(id, json!({ "tab": t })),
                     Err(e) => fail(id, e),
@@ -788,6 +923,12 @@ impl App {
             }
             "close_tab" => {
                 let t = tab.unwrap_or(self.current);
+                if self.tabs.len() == 1 && self.tabs.contains_key(&t) {
+                    return fail(
+                        id,
+                        "close_tab: cannot close the last tab; use close to shut down",
+                    );
+                }
                 return match self.close_tab(t) {
                     true => reply(id, Value::Null),
                     false => fail(id, format!("no such tab {t}")),
@@ -879,7 +1020,10 @@ impl App {
             _ => params,
         };
 
-        tab_dispatch(tab, t, id, &method, params, 0, &self.proxy);
+        match Queued::new(method, params) {
+            Ok(request) => tab_dispatch(tab, t, id, request, &self.proxy),
+            Err(e) => fail(id, e),
+        }
     }
 
     fn screenshot(&self, t: TabId, id: u64, params: &Value) {
@@ -1061,6 +1205,18 @@ fn build_webview(
                 }
                 return;
             }
+            if let Some(url) = body.get("history").and_then(Value::as_str) {
+                let mut p = ipc_pending.borrow_mut();
+                if p.history_url.is_some() {
+                    if let Some((id, false)) = p.navigate {
+                        p.navigate = None;
+                        p.history_url = None;
+                        reply(id, json!({ "tab": tab, "url": url }));
+                        let _ = ipc_proxy.send_event(UserEvent::Flush(tab));
+                    }
+                }
+                return;
+            }
             for (key, stage) in [("dom", Until::Dom), ("idle", Until::Idle)] {
                 if let Some(url) = body.get(key).and_then(Value::as_str) {
                     let mut p = ipc_pending.borrow_mut();
@@ -1076,7 +1232,11 @@ fn build_webview(
             }
             if let Some(id) = body.get("id").and_then(Value::as_u64) {
                 let mut p = ipc_pending.borrow_mut();
-                p.js.remove(&id);
+                // A timed-out request can still finish later. Never emit a
+                // second reply or apply a stale navigation hint.
+                if p.js.remove(&id).is_none() {
+                    return;
+                }
                 if body
                     .as_object_mut()
                     .and_then(|o| o.remove("navigating"))
@@ -1356,17 +1516,11 @@ fn attach_files(mut params: Value) -> Result<Value, String> {
 }
 
 /// `retries` counts how many navigations this request has already outlived.
-fn tab_dispatch(
-    tab: &Tab,
-    t: TabId,
-    id: u64,
-    method: &str,
-    params: Value,
-    retries: u8,
-    proxy: &EventLoopProxy<UserEvent>,
-) {
+fn tab_dispatch(tab: &Tab, t: TabId, id: u64, request: Queued, proxy: &EventLoopProxy<UserEvent>) {
     let wv = &tab.webview;
     let pending = &tab.pending;
+    let method = request.method.as_str();
+    let params = &request.params;
 
     // Answered by the load handler once the new page finishes. Registered
     // before the call in case the webview reports Started synchronously.
@@ -1392,6 +1546,11 @@ fn tab_dispatch(
         p.navigate = Some((id, false));
         p.navigate_until = until;
         p.navigate_url = url.map(str::to_owned);
+        p.history_url = if matches!(method, "back" | "forward") {
+            wv.url().ok()
+        } else {
+            None
+        };
         drop(p);
         let proxy = proxy.clone();
         std::thread::spawn(move || {
@@ -1404,25 +1563,17 @@ fn tab_dispatch(
     // Page requests sent while a load is in flight run in the new page,
     // like an agent expects after clicking a link.
     let in_page = |p: &mut Pending| -> bool {
+        // Flush may run after the deadline but before the event-loop sweep.
+        // Expired queued actions must never be dispatched to the new page.
+        if request.deadline <= std::time::Instant::now() {
+            fail(id, format!("{method}: page request timed out"));
+            return false;
+        }
         if !p.loading {
-            p.js.insert(
-                id,
-                Queued {
-                    method: method.to_owned(),
-                    params: params.clone(),
-                    retries,
-                },
-            );
+            p.js.insert(id, request.clone());
             return true;
         }
-        p.queue.push((
-            id,
-            Queued {
-                method: method.to_owned(),
-                params: params.clone(),
-                retries,
-            },
-        ));
+        p.queue.push((id, request.clone()));
         false
     };
 
@@ -1437,21 +1588,31 @@ fn tab_dispatch(
             }
             await_load(Some(url), &|| wv.load_url(url))
         }
-        "reload" | "back" | "forward" => {
+        "reload" => await_load(None, &|| wv.reload()),
+        "back" | "forward" => {
+            let can_go = if method == "back" {
+                wv.can_go_back()
+            } else {
+                wv.can_go_forward()
+            };
+            match can_go {
+                Ok(false) => return reply(id, Value::Null),
+                Err(e) => return fail(id, e),
+                Ok(true) => {}
+            }
             let proxy = proxy.clone();
             std::thread::spawn(move || {
                 std::thread::sleep(HISTORY_START_TIMEOUT);
                 let _ = proxy.send_event(UserEvent::HistoryTimeout { tab: t, id });
             });
             await_load(None, &|| match method {
-                "reload" => wv.reload(),
                 "back" => wv.go_back(),
                 _ => wv.go_forward(),
             })
         }
         "url" => wv.url().map(|u| Some(json!(u))),
         "cookies" => wv.cookies().map(|cs| Some(cookies_json(&cs))),
-        "set_cookie" => set_cookie(wv, &params).map(|_| Some(Value::Null)),
+        "set_cookie" => set_cookie(wv, params).map(|_| Some(Value::Null)),
         // The expression is compiled as script source, not passed to eval(),
         // so a page CSP without 'unsafe-eval' cannot refuse it. The wrapper
         // answers EVAL_COMPILED when it parsed; the statement form is the

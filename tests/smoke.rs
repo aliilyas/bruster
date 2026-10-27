@@ -1491,6 +1491,10 @@ fn speaks_mcp() {
     assert_eq!(prop("upload", "paths")["type"], "array");
     assert_eq!(prop("drag", "from")["type"], "object");
     assert_eq!(prop("click", "force")["type"], "boolean");
+    assert_eq!(prop("eval", "request_timeout")["type"], "integer");
+    assert_eq!(prop("navigate", "timeout")["type"], "integer");
+    assert_eq!(prop("new_tab", "timeout")["type"], "integer");
+    assert!(prop("screenshot", "request_timeout").is_null());
     assert!(tools.iter().any(|t| t["name"] == "dialog"));
 
     assert_eq!(
@@ -1549,12 +1553,36 @@ fn speaks_mcp() {
         .unwrap()
         .starts_with("{\"elements\""));
 
-    // Screenshots are image content, null results read "ok".
+    // Screenshots are image content, null results remain distinguishable.
     let shot = rpc(call(json!(5), "screenshot", json!({})));
     assert_eq!(shot["result"]["content"][0]["type"], "image");
     assert_eq!(shot["result"]["content"][0]["mimeType"], "image/png");
     let clicked = rpc(call(json!(6), "click", json!({ "selector": "#go" })));
-    assert_eq!(clicked["result"]["content"][0]["text"], "ok");
+    assert_eq!(clicked["result"]["content"][0]["text"], "null");
+    let missing = rpc(call(
+        json!("missing"),
+        "attr",
+        json!({ "selector": "#go", "name": "data-missing" }),
+    ));
+    assert_eq!(missing["result"]["content"][0]["text"], "null");
+    let undefined = rpc(call(
+        json!("undefined"),
+        "eval",
+        json!({ "expression": "undefined" }),
+    ));
+    assert_eq!(undefined["result"]["content"][0]["text"], "null");
+    let timeout = rpc(call(
+        json!("timeout"),
+        "eval",
+        json!({ "expression": "new Promise(() => {})", "request_timeout": 200 }),
+    ));
+    assert_eq!(timeout["result"]["isError"], true);
+    assert!(timeout["result"]["content"][0]["text"]
+        .as_str()
+        .unwrap()
+        .contains("timed out"));
+    let alive = rpc(call(json!("alive"), "eval", json!({ "expression": "42" })));
+    assert_eq!(alive["result"]["content"][0]["text"], "42");
 
     // tab argument is routed, not passed to the page.
     let t2 = rpc(call(json!(7), "new_tab", json!({})));
