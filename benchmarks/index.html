@@ -6,25 +6,25 @@ a{color:#075ab4}.scroll{overflow:auto}table{border-collapse:collapse;width:100%}
 th,td{padding:.6rem;border:1px solid #ccd3dc;text-align:right}th:first-child,td:first-child{text-align:left}
 th{background:#edf2f7}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f5f7fa;padding:1rem}
 </style><body><h1>Browser benchmarks</h1>
-<p>Commit <code>1d60e7188f0ab0e21219a8e75c76fccfefdc9052</code> · <a href="https://github.com/aliilyas/bruster/actions/runs/40594943590">Workflow and raw artifacts</a></p>
-<p>Measured 2026-10-27T22:38:46.090302+00:00 · 10 sessions per configuration. Values are medians.</p>
+<p>Commit <code>1d60e7188f0ab0e21219a8e75c76fccfefdc9052</code> · <a href="https://github.com/aliilyas/bruster/actions/runs/40595366190">Workflow and raw artifacts</a></p>
+<p>Measured 2026-10-27T22:41:51.009959+00:00 · 10 sessions per configuration. Values are medians.</p>
 <p>Playwright 1.64.1 · Puppeteer 25.16.0 · agent-browser 0.40.0 · Google Chrome for Testing 156.0.8078.4 · Node v26.12.1</p>
 <div class="scroll"><table><thead><tr><th>Metric</th><th>Bruster / WebKitGTK</th><th>Playwright / Headless Shell</th><th>Playwright / full Chrome</th><th>Puppeteer / full Chrome</th><th>agent-browser / full Chrome</th></tr></thead><tbody>
-<tr><td>Launch → first loaded page (ms)</td><td>30709.0</td><td>442.6</td><td>609.6</td><td>473.3</td><td>713.7</td></tr>
-<tr><td>Warm tiny-page navigation (ms)</td><td>7.3</td><td>9.8</td><td>15.9</td><td>17.7</td><td>32.2</td></tr>
-<tr><td>Tiny DOM extraction (ms)</td><td>0.9</td><td>2.8</td><td>6.1</td><td>5.2</td><td>3.9</td></tr>
-<tr><td>Large-page navigation (ms)</td><td>24.8</td><td>29.1</td><td>34.0</td><td>34.9</td><td>72.0</td></tr>
-<tr><td>Large DOM extraction, object return (ms)</td><td>16.4</td><td>87.0</td><td>88.6</td><td>28.5</td><td>29.0</td></tr>
-<tr><td>Large DOM extraction, JSON-string return (ms)</td><td>16.2</td><td>13.7</td><td>17.5</td><td>20.5</td><td>11.8</td></tr>
-<tr><td>Image-page navigation (ms)</td><td>115.3</td><td>117.1</td><td>120.4</td><td>125.7</td><td>127.7</td></tr>
-<tr><td>PNG screenshot (ms)</td><td>29.5</td><td>34.9</td><td>33.2</td><td>55.2</td><td>62.0</td></tr>
-<tr><td>Idle total PSS, including display (MiB)</td><td>286.4</td><td>325.9</td><td>513.7</td><td>424.0</td><td>520.6</td></tr>
-<tr><td>Idle process RSS, excluding display (MiB)</td><td>406.8</td><td>593.3</td><td>1179.7</td><td>1064.2</td><td>1597.9</td></tr>
+<tr><td>Launch → first loaded page (ms)</td><td>30707.8</td><td>451.3</td><td>628.7</td><td>473.3</td><td>714.2</td></tr>
+<tr><td>Warm tiny-page navigation (ms)</td><td>7.3</td><td>8.6</td><td>14.4</td><td>16.0</td><td>31.4</td></tr>
+<tr><td>Tiny DOM extraction (ms)</td><td>0.8</td><td>2.7</td><td>6.2</td><td>2.3</td><td>4.8</td></tr>
+<tr><td>Large-page navigation (ms)</td><td>24.5</td><td>27.7</td><td>33.4</td><td>32.6</td><td>66.0</td></tr>
+<tr><td>Large DOM extraction, object return (ms)</td><td>15.1</td><td>80.1</td><td>84.0</td><td>23.7</td><td>26.2</td></tr>
+<tr><td>Large DOM extraction, JSON-string return (ms)</td><td>15.2</td><td>8.4</td><td>12.7</td><td>17.5</td><td>10.6</td></tr>
+<tr><td>Image-page navigation (ms)</td><td>114.2</td><td>114.6</td><td>118.2</td><td>119.8</td><td>125.2</td></tr>
+<tr><td>PNG screenshot (ms)</td><td>29.0</td><td>31.5</td><td>40.3</td><td>64.3</td><td>58.1</td></tr>
+<tr><td>Idle total PSS, including display (MiB)</td><td>250.8</td><td>324.7</td><td>507.6</td><td>418.8</td><td>516.8</td></tr>
+<tr><td>Idle process RSS, excluding display (MiB)</td><td>371.9</td><td>597.3</td><td>1174.0</td><td>1064.3</td><td>1589.7</td></tr>
 <tr><td>Installed runtime files, lower bound (MB)</td><td>427.9</td><td>475.5</td><td>630.8</td><td>644.7</td><td>483.2</td></tr>
 <tr><td>Sessions with fault-probe failures</td><td>0/10</td><td>10/10</td><td>10/10</td><td>0/10</td><td>0/10</td></tr>
 </tbody></table></div><h2>Method</h2>
 <p>Ten sessions per configuration by default, with rotating order and fresh browser profiles. 1280×800 viewport; localhost fixtures; no-store HTTP responses; navigation waits for load. OS filesystem caches are not flushed. Identical extraction JavaScript and cross-tool result hashes. Timings include controller round trips; agent-browser includes its per-command native CLI. Memory covers the complete owned process forest (including detached daemons and helpers), plus Xvfb for Bruster. PSS apportions shared pages; summed RSS double-counts them. Memory is small-page idle usage, not peak usage. Native snapshots have different semantics and are retained in the raw artifacts rather than ranked as equal work. MB = 1,000,000 bytes; MiB = 1,048,576 bytes. Installed-file inventories are lower bounds including browser/engine, linked libraries, observed mapped files and Node where required; unobserved OS resources may add more. GitHub-hosted runner hardware and OS packages can change: compare the configurations within a run and inspect provenance before interpreting trends.</p>
-<p><a href="runs/1d60e7188f0ab0e21219a8e75c76fccfefdc9052-40594943590-1/measurement.json">measurement.json</a> · <a href="runs/1d60e7188f0ab0e21219a8e75c76fccfefdc9052-40594943590-1/summary.json">summary.json</a> · <a href="runs/1d60e7188f0ab0e21219a8e75c76fccfefdc9052-40594943590-1/samples.json">samples.json</a> · <a href="runs/1d60e7188f0ab0e21219a8e75c76fccfefdc9052-40594943590-1/footprint.json">footprint.json</a> · <a href="runs/1d60e7188f0ab0e21219a8e75c76fccfefdc9052-40594943590-1/report.md">report.md</a> · <a href="runs/1d60e7188f0ab0e21219a8e75c76fccfefdc9052-40594943590-1/package.json">package.json</a> · <a href="runs/1d60e7188f0ab0e21219a8e75c76fccfefdc9052-40594943590-1/package-lock.json">package-lock.json</a></p>
+<p><a href="runs/1d60e7188f0ab0e21219a8e75c76fccfefdc9052-40595366190-1/measurement.json">measurement.json</a> · <a href="runs/1d60e7188f0ab0e21219a8e75c76fccfefdc9052-40595366190-1/summary.json">summary.json</a> · <a href="runs/1d60e7188f0ab0e21219a8e75c76fccfefdc9052-40595366190-1/samples.json">samples.json</a> · <a href="runs/1d60e7188f0ab0e21219a8e75c76fccfefdc9052-40595366190-1/footprint.json">footprint.json</a> · <a href="runs/1d60e7188f0ab0e21219a8e75c76fccfefdc9052-40595366190-1/report.md">report.md</a> · <a href="runs/1d60e7188f0ab0e21219a8e75c76fccfefdc9052-40595366190-1/package.json">package.json</a> · <a href="runs/1d60e7188f0ab0e21219a8e75c76fccfefdc9052-40595366190-1/package-lock.json">package-lock.json</a></p>
 <h2>Fault probes</h2><p>Failures remain visible even when a later retry succeeds. These probes run after the timed workloads.</p><ul>
 <li>Bruster / WebKitGTK — failures: none; successful 100 ms recovery retries: 0</li>
 <li>Playwright / Headless Shell — failures: recovery_after_navigation_error: 10; successful 100 ms recovery retries: 10</li>
@@ -33,8 +33,8 @@ th{background:#edf2f7}pre{white-space:pre-wrap;overflow-wrap:anywhere;background
 <li>agent-browser / full Chrome — failures: none; successful 100 ms recovery retries: 0</li>
 </ul><details><summary>Environment, versions and hashes</summary>
 <pre>{
-  &quot;started_utc&quot;: &quot;2026-10-27T22:29:44.892726+00:00&quot;,
-  &quot;platform&quot;: &quot;Linux-6.17.0-1022-azure-x86_64-with-glibc2.39&quot;,
+  &quot;started_utc&quot;: &quot;2026-10-27T22:32:51.970062+00:00&quot;,
+  &quot;platform&quot;: &quot;Linux-7.0.0-1017-azure-x86_64-with-glibc2.39&quot;,
   &quot;os&quot;: {
     &quot;NAME&quot;: &quot;Ubuntu&quot;,
     &quot;ID&quot;: &quot;ubuntu&quot;,
@@ -55,10 +55,10 @@ th{background:#edf2f7}pre{white-space:pre-wrap;overflow-wrap:anywhere;background
   &quot;headless_shell&quot;: &quot;Google Chrome for Testing 156.0.8078.4&quot;,
   &quot;cpu_count&quot;: 4,
   &quot;cpu_model&quot;: &quot;AMD EPYC 9V74 80-Core Processor&quot;,
-  &quot;mem_total_kib&quot;: 16373452,
+  &quot;mem_total_kib&quot;: 16367524,
   &quot;runner_image&quot;: {
     &quot;ImageOS&quot;: &quot;ubuntu24&quot;,
-    &quot;ImageVersion&quot;: &quot;20261023.334.3&quot;,
+    &quot;ImageVersion&quot;: &quot;20261026.354.1&quot;,
     &quot;RUNNER_ARCH&quot;: &quot;X64&quot;
   },
   &quot;rustc&quot;: &quot;rustc 1.99.1 (58cf8f9c3 2026-10-13)&quot;,
@@ -98,9 +98,10 @@ th{background:#edf2f7}pre{white-space:pre-wrap;overflow-wrap:anywhere;background
       &quot;playwright-shell&quot;
     ]
   },
-  &quot;finished_utc&quot;: &quot;2026-10-27T22:38:46.090302+00:00&quot;
+  &quot;finished_utc&quot;: &quot;2026-10-27T22:41:51.009959+00:00&quot;
 }</pre></details>
 <h2>History</h2><p>Newest workflow invocation first; late-finishing older runs never replace latest.</p><ul>
+<li><a href="runs/1d60e7188f0ab0e21219a8e75c76fccfefdc9052-40595366190-1/">1d60e7188f0a · run 4, attempt 1</a> · 2026-10-27T22:41:51.009959+00:00</li>
 <li><a href="runs/1d60e7188f0ab0e21219a8e75c76fccfefdc9052-40594943590-1/">1d60e7188f0a · run 3, attempt 1</a> · 2026-10-27T22:38:46.090302+00:00</li>
 <li><a href="runs/69aa9cdef033eac29f72bcfcc5722af94ba7b467-40594138104-1/">69aa9cdef033 · run 2, attempt 1</a> · 2026-10-27T22:32:34.913315+00:00</li>
 <li><a href="runs/5dcb6010a222a61bb98a54b0f96a2cefa8d2fd0a-40594030043-1/">5dcb6010a222 · run 1, attempt 1</a> · 2026-10-27T22:31:45.292448+00:00</li>
