@@ -170,6 +170,7 @@ fn interaction_playground() {
 
 #[test]
 #[ignore]
+#[cfg(target_os = "linux")] // Native download cancellation/reporting is WebKitGTK-only.
 fn download_is_cancelled_and_reported() {
     let mut b = Browser::spawn();
     b.open("https://example.com/");

@@ -500,6 +500,8 @@
   }
 
   const methods = {
+    // Native WebView2 Source can lag behind a just-completed pushState action.
+    url: () => location.href,
     // `eval` is compiled by Rust into a function so page CSP cannot refuse it;
     // see evalFn below. This just awaits it.
     __fn(fn) {
