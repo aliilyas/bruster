@@ -281,8 +281,8 @@ impl Drop for Browser {
     }
 }
 
-/// WebView2's child processes can briefly retain profile handles after the
-/// bruster process exits. Retry Windows sharing/access errors during cleanup.
+/// Browser child processes can briefly retain profile handles or finish writes
+/// after bruster exits. Retry these transient cleanup errors on every platform.
 pub fn remove_profile_dir(path: &std::path::Path) {
     let start = Instant::now();
     loop {
@@ -290,8 +290,9 @@ pub fn remove_profile_dir(path: &std::path::Path) {
             Ok(()) => return,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => return,
             Err(e)
-                if cfg!(target_os = "windows")
-                    && matches!(e.raw_os_error(), Some(5 | 32 | 33 | 145))
+                if (e.kind() == std::io::ErrorKind::DirectoryNotEmpty
+                    || (cfg!(target_os = "windows")
+                        && matches!(e.raw_os_error(), Some(5 | 32 | 33 | 145))))
                     && start.elapsed() < Duration::from_secs(10) =>
             {
                 std::thread::sleep(Duration::from_millis(100));
