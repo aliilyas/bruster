@@ -256,18 +256,7 @@ e4 checkbox "Remember me" checked=false</code></pre>
     </ul>
 
     <h2 id="performance">Performance</h2>
-    <p>CI measures these numbers on every push to <code>main</code> with
-      <code>scripts/bench.py</code>. The environment is a release build on
-      Ubuntu 24.04 x86_64 under Xvfb with WebKitGTK 4.1.</p>
-    <table class="metrics">
-      <tr><th>Metric</th><th>Value</th></tr>
-      <tr><td>Release binary size</td><td><span id="m-binary">n/a</span> MB</td></tr>
-      <tr><td>Idle memory (RSS)</td><td><span id="m-rss">n/a</span> MB</td></tr>
-      <tr><td>Page load (local file)</td><td><span id="m-page">n/a</span> ms</td></tr>
-      <tr><td>Cold start to ready</td><td><span id="m-cold">n/a</span> ms</td></tr>
-      <tr><td>Snapshot round-trip</td><td><span id="m-snapshot">n/a</span> ms</td></tr>
-    </table>
-    <p id="m-foot" style="font-size:.85rem;color:#6a737d">Benchmarks run automatically. The results are published here after the next CI run.</p>
+<p><a href="benchmarks/">Live comparison, runtime footprint and measurement history</a>. Includes Bruster, Playwright, Puppeteer and agent-browser.</p>
 
     <h2 id="development">Development</h2>
     <p><code>bin/bruster</code> runs the development build from a checkout.
@@ -290,19 +279,6 @@ e4 checkbox "Remember me" checked=false</code></pre>
   MIT License
 </footer>
 
-<script>
-function get(id){return document.getElementById(id);}
-function fmt(n){return Number(n).toLocaleString("en-US");}
-fetch("./metrics.json").then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(m){
-  if(m.binary_kb)get("m-binary").textContent=fmt(m.binary_kb);
-  if(m.idle_rss_mb)get("m-rss").textContent=fmt(m.idle_rss_mb);
-  if(m.page_load_ms)get("m-page").textContent=fmt(m.page_load_ms);
-  if(m.cold_start_ms)get("m-cold").textContent=fmt(m.cold_start_ms);
-  if(m.snapshot_ms)get("m-snapshot").textContent=fmt(m.snapshot_ms);
-  if(m.updated_utc)get("m-foot").textContent="Measured "+m.updated_utc+" · "+m.environment+(m.commit?" · commit "+m.commit.slice(0,7):"");
-}).catch(function(){
-  get("m-foot").textContent="Benchmarks pending. Results appear here after the next CI run on main.";
-});
-</script>
+
 </body>
 </html>
