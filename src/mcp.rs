@@ -215,7 +215,7 @@ fn content(result: &Value) -> Value {
     }
     match result {
         Value::String(s) => text(s),
-        Value::Null => text("ok"),
+        Value::Null => text("null"),
         other => text(&other.to_string()),
     }
 }
@@ -224,7 +224,7 @@ fn content(result: &Value) -> Value {
 fn tools() -> Vec<Value> {
     const TARGET: &str = "target";
     let specs: &[(&str, &str, &str, &[&str])] = &[
-        ("navigate", "Open a URL and wait for it. until: load (default), dom (DOMContentLoaded, fastest, fine for server-rendered pages) or idle (load plus a quiet network).", "url,until", &["url"]),
+        ("navigate", "Open a URL and wait for it. until: load (default), dom (DOMContentLoaded, fastest, fine for server-rendered pages) or idle (load plus a quiet network).", "url,until,timeout", &["url"]),
         ("snapshot", "List visible elements and text with refs usable in other tools, one per line: ref role \"name\" href=... selector scopes to a subtree, max caps the list, boxes adds rects, format=json for objects.", "selector,max,boxes,format", &[]),
         ("find", "Snapshot narrowed to elements whose name, text, value or href contains text or matches regex.", "text,regex,selector,max,boxes,format", &[]),
         ("screenshot", "PNG of the viewport. full=true for the whole page, or clip={x,y,width,height}. path writes the file instead of returning it.", "full,clip,path", &[]),
@@ -263,10 +263,10 @@ fn tools() -> Vec<Value> {
         ("back", "History back.", "", &[]),
         ("forward", "History forward.", "", &[]),
         ("reload", "Reload the page.", "", &[]),
-        ("new_tab", "Open a new tab, optionally at a URL. Returns its id.", "url", &[]),
+        ("new_tab", "Open a new tab, optionally at a URL. Returns its id; use switch_tab to make it current.", "url,timeout", &[]),
         ("tabs", "List open tabs.", "", &[]),
         ("switch_tab", "Make a tab the default for later calls.", "tab", &["tab"]),
-        ("close_tab", "Close a tab.", "", &[]),
+        ("close_tab", "Close a tab; the last tab cannot be closed (use close to shut down).", "", &[]),
     ];
 
     specs
@@ -291,6 +291,12 @@ fn tools() -> Vec<Value> {
                 "tab".into(),
                 json!({ "type": "integer", "description": "tab id, defaults to current" }),
             );
+            if !matches!(*name, "navigate" | "reload" | "back" | "forward" | "url" | "cookies" | "set_cookie" | "screenshot" | "resize" | "maximize" | "minimize" | "dark" | "light" | "close" | "new_tab" | "tabs" | "switch_tab" | "close_tab") {
+                properties.insert(
+                    "request_timeout".into(),
+                    json!({ "type": "integer", "minimum": 0, "description": "Outer page request deadline in milliseconds; defaults to at least 30000" }),
+                );
+            }
 
             json!({
                 "name": name,

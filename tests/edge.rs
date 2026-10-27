@@ -97,6 +97,176 @@ fn navigate_times_out_and_is_superseded() {
 }
 
 #[test]
+fn page_requests_time_out_without_duplicate_replies() {
+    let mut b = Browser::spawn();
+    let base = serve();
+    b.open(&format!("{base}/other"));
+    for invalid in [json!(-1), json!(1.5), json!("200"), Value::Null] {
+        assert!(b
+            .err(
+                "eval",
+                json!({ "expression": "1", "request_timeout": invalid })
+            )
+            .contains("request_timeout"));
+    }
+    assert!(b
+        .err(
+            "eval",
+            json!({ "expression": "window.zeroTimeoutRan = true", "request_timeout": 0 })
+        )
+        .contains("timed out"));
+    assert_eq!(
+        b.ok(
+            "eval",
+            json!({ "expression": "window.zeroTimeoutRan === undefined" })
+        ),
+        true
+    );
+
+    let start = Instant::now();
+    let err = b.err(
+        "eval",
+        json!({ "expression": "new Promise(() => {})", "request_timeout": 200 }),
+    );
+    assert!(err.contains("timed out"), "{err}");
+    assert!(
+        start.elapsed() < Duration::from_secs(3),
+        "{:?}",
+        start.elapsed()
+    );
+    assert_eq!(b.ok("title", json!({})), "other");
+
+    let id = b.send("eval", json!({ "expression": "new Promise(r => { window.finishLate = r; })", "request_timeout": 200 }));
+    assert!(b.recv(id).unwrap_err().contains("timed out"));
+    // Explicitly resolve the old promise: background timer throttling must not
+    // turn this into a false pass where the late reply never actually happened.
+    b.ok("eval", json!({ "expression": "finishLate(42)" }));
+    assert_eq!(b.ok("title", json!({})), "other");
+    assert!(
+        !b.stash.iter().any(|v| v["id"] == id),
+        "late reply: {:?}",
+        b.stash
+    );
+}
+
+#[test]
+fn queued_page_requests_expire_without_running_after_navigation() {
+    let mut b = Browser::spawn();
+    let base = serve();
+    b.open(&format!("{base}/more"));
+    b.ok(
+        "eval",
+        json!({ "expression": "document.getElementById('away').href = '/hang'" }),
+    );
+    b.ok("click", json!({ "selector": "#away" }));
+    let start = Instant::now();
+    assert!(b
+        .err(
+            "eval",
+            json!({ "expression": "window.expiredCallRan = true", "request_timeout": 200 })
+        )
+        .contains("timed out"));
+    assert!(start.elapsed() < Duration::from_secs(3));
+    b.open(&format!("{base}/other"));
+    assert_eq!(
+        b.ok(
+            "eval",
+            json!({ "expression": "window.expiredCallRan === undefined" })
+        ),
+        true
+    );
+}
+
+#[test]
+fn page_request_deadlines_survive_redispatch() {
+    let mut b = Browser::spawn();
+    let base = serve();
+    b.open(&format!("{base}/other"));
+    let start = Instant::now();
+    let id = b.send(
+        "eval",
+        json!({ "expression": "new Promise(() => {})", "request_timeout": 2000 }),
+    );
+    // Let most of the deadline pass, then commit a new document. The old
+    // promise is re-dispatched, but must not get a fresh two-second budget.
+    std::thread::sleep(Duration::from_millis(1400));
+    b.open(&format!("{base}/form"));
+    assert!(b.recv(id).unwrap_err().contains("timed out"));
+    assert!(
+        start.elapsed() < Duration::from_millis(3000),
+        "{:?}",
+        start.elapsed()
+    );
+    assert_eq!(b.ok("title", json!({})), "form");
+}
+
+#[test]
+fn busy_page_does_not_block_native_commands() {
+    let mut b = Browser::spawn();
+    let base = serve();
+    b.open(&format!("{base}/other"));
+    let start = Instant::now();
+    assert!(b
+        .err(
+            "eval",
+            json!({ "expression": "(() => { for (;;) {} })()", "request_timeout": 200 })
+        )
+        .contains("timed out"));
+    assert!(start.elapsed() < Duration::from_secs(3));
+    assert_eq!(b.ok("tabs", json!({})).as_array().unwrap().len(), 1);
+    assert!(b
+        .err("title", json!({ "request_timeout": 200 }))
+        .contains("timed out"));
+}
+
+#[test]
+fn page_cannot_break_ipc_by_replacing_json_stringify() {
+    let mut b = Browser::spawn();
+    let base = serve();
+    b.open(&format!("{base}/other"));
+    b.ok("eval", json!({ "expression": "JSON.stringify = () => 'broken'; document.querySelector = () => null" }));
+    assert_eq!(b.ok("text", json!({ "selector": "p" })), "other page");
+    assert!(b
+        .ok("snapshot", json!({ "format": "text" }))
+        .as_str()
+        .unwrap()
+        .contains("other page"));
+}
+
+#[test]
+fn last_tab_stays_open_and_new_tab_load_is_bounded() {
+    let mut b = Browser::spawn();
+    let base = serve();
+    b.open(&format!("{base}/other"));
+    assert!(b.err("close_tab", json!({})).contains("last tab"));
+    assert_eq!(b.ok("title", json!({})), "other");
+    let start = Instant::now();
+    assert!(b
+        .err(
+            "new_tab",
+            json!({ "url": format!("{base}/hang"), "timeout": 300 })
+        )
+        .contains("timed out"));
+    assert!(start.elapsed() < Duration::from_secs(3));
+    assert_eq!(b.ok("title", json!({})), "other");
+    let tabs = b.ok("tabs", json!({}));
+    let tab = tabs
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|t| t["current"] == false)
+        .unwrap()["tab"]
+        .clone();
+    b.ok(
+        "navigate",
+        json!({ "tab": tab, "url": format!("{base}/form") }),
+    );
+    assert_eq!(b.ok("title", json!({ "tab": tab })), "form");
+    b.ok("close_tab", json!({ "tab": tab }));
+    assert_eq!(b.ok("title", json!({})), "other");
+}
+
+#[test]
 fn odd_documents() {
     let mut b = Browser::spawn();
     let base = serve();
@@ -126,8 +296,29 @@ fn odd_documents() {
         .unwrap()
         .ends_with("/spa/about"));
     assert_eq!(b.ok("text", json!({ "selector": "#p" })), "about");
-    b.ok("back", json!({}));
+    let back = b.ok("back", json!({}));
+    assert!(back["url"].as_str().unwrap().ends_with("/spa"));
     assert!(b.ok("url", json!({})).as_str().unwrap().ends_with("/spa"));
+    let forward = b.ok("forward", json!({}));
+    assert!(forward["url"].as_str().unwrap().ends_with("/spa/about"));
+    assert_eq!(b.ok("forward", json!({})), Value::Null);
+    b.ok("eval", json!({ "expression": "history.pushState({step: 1}, '', location.href); history.pushState({step: 2}, '', location.href)" }));
+    assert!(b.ok("back", json!({}))["url"]
+        .as_str()
+        .unwrap()
+        .ends_with("/spa/about"));
+    assert_eq!(
+        b.ok("eval", json!({ "expression": "history.state.step" })),
+        1
+    );
+    assert!(b.ok("forward", json!({}))["url"]
+        .as_str()
+        .unwrap()
+        .ends_with("/spa/about"));
+    assert_eq!(
+        b.ok("eval", json!({ "expression": "history.state.step" })),
+        2
+    );
 
     // Five nested open shadow roots.
     b.open(&format!("{base}/shadowdeep"));
@@ -282,10 +473,9 @@ fn tabs_and_memory_recover() {
         );
     }
 
-    // Closing the last tab leaves no current one; new_tab makes it current again.
-    b.ok("close_tab", json!({}));
-    assert!(b.err("title", json!({})).contains("no such tab"));
-    b.ok("new_tab", json!({ "url": format!("{base}/form") }));
+    // Closing the last tab is rejected; the current tab remains usable.
+    assert!(b.err("close_tab", json!({})).contains("last tab"));
+    b.open(&format!("{base}/form"));
     assert_eq!(b.ok("title", json!({})), "form");
 
     // 30 navigations with snapshots, then idle: the web process gives memory back.
