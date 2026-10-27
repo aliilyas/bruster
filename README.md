@@ -5,7 +5,7 @@
     <strong>Native webview browser driven by an agent over JSON lines on stdio.</strong>
   </p>
   <p>
-    WKWebView · WebKitGTK · WebView2. No Chromium download. No Node. One process of less than 1&nbsp;MB.
+    WKWebView · WebKitGTK · WebView2. A small Rust executable using native browser runtimes. No Node required.
   </p>
   <p>
     <a href="https://github.com/aliilyas/bruster/actions/workflows/ci.yml"><img src="https://github.com/aliilyas/bruster/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
@@ -22,21 +22,21 @@
     <a href="#mcp">MCP</a> ·
     <a href="#protocol">Protocol</a> ·
     <a href="#api">API</a> ·
-    <a href="https://aliilyas.github.io/bruster/">Performance</a>
+    <a href="https://aliilyas.github.io/bruster/benchmarks/">Performance</a>
   </p>
 </div>
 
 <br>
 
-bruster uses the browser engines that your operating system already supplies.
-It is one lightweight process. It reads and writes JSON lines on stdin and
-stdout. This design is good for agents, scripts, and test harnesses. The
+bruster uses native browser engines, installed separately where required.
+Its Rust controller reads and writes JSON lines on stdin and stdout; rendering
+also uses browser helper processes. This design is good for agents, scripts, and test harnesses. The
 `--mcp` option exposes every method as a tool.
 
 ## Why bruster?
 
 - **No Chromium.** bruster uses WKWebView on macOS, WebKitGTK on Linux, and WebView2 on Windows. It uses [wry](https://github.com/tauri-apps/wry) to control them.
-- **Small size.** One release binary, usually **< 1&nbsp;MB**. There is no bundled runtime and no download on the first run.
+- **Small controller.** One small release executable, with a separately installed native browser runtime. The complete runtime footprint includes its libraries and helper processes.
 - **Agent support.** [MCP](#mcp) support with `--mcp`. Screenshots return as image content, and page events return as notifications.
 - **Cross-platform.** Prebuilt for macOS (arm64, x86_64), Linux (x86_64, arm64), and Windows (x86_64).
 - **Practical API.** Navigate, snapshot, click, fill forms, drag, upload, take screenshots, inspect the network and console, manage tabs, and keep a session with `--profile`.
@@ -44,7 +44,7 @@ stdout. This design is good for agents, scripts, and test harnesses. The
 - **Fast.** A persistent HTTP cache and profiles make repeat visits faster. The first tab loads `about:blank` while the agent starts.
 
 > [!TIP]
-> Live performance numbers (cold start, page load, snapshot, and idle memory) are published at [aliilyas.github.io/bruster/](https://aliilyas.github.io/bruster/).
+> [Live benchmarks](https://aliilyas.github.io/bruster/benchmarks/) compare Bruster with the latest stable Playwright, Puppeteer, and agent-browser after every merge to `main`: startup, navigation, extraction, screenshots, total process memory, and installed runtime files. See [benchmark setup and methodology](benchmarks/README.md).
 
 ## Install
 

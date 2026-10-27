@@ -3,3 +3,6 @@ tests/integrations/node_modules/
 tests/integrations/package*.json
 .DS_Store
 __MACOSX/
+benchmarks/node_modules/
+benchmarks/results/
+__pycache__/
