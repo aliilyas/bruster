@@ -83,7 +83,7 @@ fn beforeunload_does_not_block() {
 
 #[test]
 fn duplicate_load_does_not_release_requests_for_the_next_page() {
-    let mut b = Browser::spawn();
+    let mut b = Browser::spawn_env(&[], &[("BRUSTER_TRACE_NAV", "1")]);
     let base = serve();
     b.open(&format!("{base}/more"));
     // The page's load IPC answers navigate before WebKit's native Finished.
@@ -105,9 +105,16 @@ fn duplicate_load_does_not_release_requests_for_the_next_page() {
     "# }),
     );
     b.ok("click", json!({ "selector": "#away" }));
+    let start = Instant::now();
     let id = b.send("title", json!({ "request_timeout": 3000 }));
     b.wait_event("duplicate_load_sent");
-    assert!(b.recv(id).unwrap_err().contains("timed out"));
+    let result = b.recv(id);
+    assert!(
+        result.as_ref().is_err_and(|e| e.contains("timed out")),
+        "{result:?} after {:?}; events: {:?}",
+        start.elapsed(),
+        b.stash
+    );
     b.open(&format!("{base}/other"));
     assert_eq!(b.ok("title", json!({})), "other");
 }

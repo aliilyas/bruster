@@ -68,7 +68,18 @@ fn wiki_search_then_back() {
     if visible != true {
         b.ok("click", json!({ "selector": "#p-search .search-toggle" }));
     }
-    b.ok("type", json!({ "selector": "#searchInput", "text": "WebKitGTK", "submit": true }));
+    if let Err(err) = b.call("type", json!({ "selector": "#searchInput", "text": "WebKitGTK", "submit": true })) {
+        let state = b.call("eval", json!({ "expression": r#"({
+            url: location.href, viewport: [innerWidth, innerHeight], ready: document.readyState,
+            classes: document.documentElement.className,
+            search: document.getElementById('p-search')?.outerHTML,
+            inputs: [...document.querySelectorAll('input[name=search]')].map(e => ({
+                html: e.outerHTML, visible: e.checkVisibility?.(), box: e.getBoundingClientRect().toJSON(),
+                display: getComputedStyle(e).display, visibility: getComputedStyle(e).visibility
+            }))
+        })"# }));
+        panic!("type failed: {err}; initial visible={visible}; state={state:?}");
+    }
     b.ok("wait_for", json!({ "url": "/wiki/WebKit", "timeout": SITE_TIMEOUT }));
     assert!(b.ok("title", json!({})).as_str().unwrap().contains("WebKit"));
     let snap = b.ok("snapshot", json!({ "format": "text" }));

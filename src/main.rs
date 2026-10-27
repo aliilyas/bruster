@@ -270,9 +270,16 @@ struct Pending {
     loaded: bool,
 }
 
+fn trace_navigation(stage: &str, tab: TabId, p: &Pending, url: &str) {
+    if std::env::var_os("BRUSTER_TRACE_NAV").is_some() {
+        eprintln!("navigation {stage}: tab={tab} url={url:?} loading={} loaded={} hint={:?} navigate={:?}", p.loading, p.loaded, p.hinted, p.navigate);
+    }
+}
+
 /// A page finished loading, by its own load event or WebKit's. Answers the
 /// pending navigate, releases held requests, emits `load`, once per page.
 fn page_loaded(p: &mut Pending, tab: TabId, url: &str, proxy: &EventLoopProxy<UserEvent>) {
+    trace_navigation("loaded", tab, p, url);
     // The runtime load IPC can precede the native Finished callback. A click
     // may already have started the next provisional load in between them;
     // the duplicate must not release requests into the old document.
@@ -564,8 +571,10 @@ fn main() -> wry::Result<()> {
                         // Wry reports WKWebView's Started at commit, not at
                         // provisional start. A slow response is still loading.
                         if navigation_in_progress(&t.webview) {
+                            trace_navigation("hint still loading", tab, &p, "");
                             hint_timeout(app.proxy.clone(), tab, id);
                         } else {
+                            trace_navigation("hint expired", tab, &p, "");
                             p.hinted = None;
                             p.loading = false;
                             drop(p);
@@ -882,6 +891,7 @@ impl App {
             .evaluate_script(&color_scheme_script(self.opts.dark));
         let queued = {
             let mut pending = tab.pending.borrow_mut();
+            trace_navigation("flush", t, &pending, "");
             pending.loading = false;
             pending.hinted = None;
             std::mem::take(&mut pending.queue)
@@ -1321,6 +1331,7 @@ fn build_webview(
                 {
                     p.loading = true;
                     p.hinted = Some(id);
+                    trace_navigation("hint", tab, &p, "");
                     hint_timeout(ipc_proxy.clone(), tab, id);
                 }
             }
@@ -1341,6 +1352,7 @@ fn build_webview(
             }
             match ev {
                 PageLoadEvent::Started => {
+                    trace_navigation("committed", tab, &p, &url);
                     // The old document is gone, so are its in-flight promises:
                     // re-run them once the new page is in, a few times at most.
                     p.loading = true;
