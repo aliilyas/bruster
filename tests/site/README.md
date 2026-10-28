@@ -43,6 +43,9 @@ suspends animation callbacks in off-screen windows. The macOS catalog check also
 uses a visible window for its responsive screenshots. On headless Linux these
 windows run inside Xvfb. The catalog check gates its manifest response to verify
 that early search input survives initialization before exercising the controls.
+Responsive fixtures and catalog screenshots wait for the requested viewport
+dimensions before checking layout: native resize replies acknowledge the request
+before the window manager necessarily applies it.
 Linux lab launches disable desktop-bus integration by default, including visible
 fixtures; `BRUSTER_USE_SESSION_BUS=1` explicitly enables it. The software renderer
 also defaults `WEBKIT_DISABLE_DMABUF_RENDERER=1` while respecting an explicit value.

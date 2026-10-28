@@ -7,6 +7,7 @@ import copy
 import json
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 from lab.build import ROOT, build
@@ -103,6 +104,13 @@ def check_catalog(binary, site, manifest, output, report_file, transport, server
             client.call('wait_for',{'text':'Imported 2 observations'})
             for width,height,name in [(375,812,'mobile'),(1280,900,'desktop')]:
                 client.call('resize',{'width':width,'height':height})
+                # GTK can acknowledge the request before WebKit gets its new
+                # viewport; animation frames alone do not establish readiness.
+                deadline = time.monotonic()+5
+                while (size := client.call('eval',{'expression':'[innerWidth,innerHeight]'})) != [width,height]:
+                    if time.monotonic() >= deadline:
+                        raise AssertionError(f'Catalog viewport stayed at {size}, expected {[width,height]}')
+                    time.sleep(.02)
                 client.call('eval',{'expression':'(async()=>{scrollTo(0,0);await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))})()'})
                 verify(client,'document.documentElement.scrollWidth<=innerWidth')
                 shot = client.call('screenshot')

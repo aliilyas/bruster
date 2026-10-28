@@ -206,7 +206,9 @@ def rendering():
     for width in (480,960):
         case(f'responsive-{width}', f'Responsive breakpoint at viewport {width}', 'Rendering','<div id="box">Responsive</div>',
              [command('resize',{'width':width,'height':640}),
-              evaluate("await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))"),
+              # The native resize reply acknowledges a request. Frame callbacks
+              # can still run before the window manager applies its dimensions.
+              evaluate(f"await __lab.until(()=>innerWidth==={width} && innerHeight===640);await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))"),
               check('innerWidth',width),check('getComputedStyle(box).color','rgb(255, 0, 0)' if width<600 else 'rgb(0, 0, 255)')],
               css='#box{color:blue}@media(max-width:599px){#box{color:red}}',launch=['--visible'])
     case('container-query', 'Container queries respond to their container width', 'Rendering', '<section id="container"><span id="child">Content</span></section>',
