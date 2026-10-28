@@ -34,7 +34,7 @@
           }
         }
       },
-      "elapsed_ms": 730.289
+      "elapsed_ms": 691.518
     },
     {
       "request": {
@@ -1199,7 +1199,7 @@
           ]
         }
       },
-      "elapsed_ms": 3.671
+      "elapsed_ms": 2.351
     },
     {
       "request": {
@@ -1209,7 +1209,7 @@
         "params": {
           "name": "navigate",
           "arguments": {
-            "url": "http://127.0.0.1:40185/"
+            "url": "http://127.0.0.1:43845/"
           }
         }
       },
@@ -1219,13 +1219,13 @@
         "result": {
           "content": [
             {
-              "text": "{\"tab\":1,\"url\":\"http://127.0.0.1:40185/\"}",
+              "text": "{\"tab\":1,\"url\":\"http://127.0.0.1:43845/\"}",
               "type": "text"
             }
           ]
         }
       },
-      "elapsed_ms": 1791.447
+      "elapsed_ms": 611.516
     },
     {
       "request": {
@@ -1251,7 +1251,7 @@
           ]
         }
       },
-      "elapsed_ms": 26.483
+      "elapsed_ms": 26.218
     },
     {
       "request": {
@@ -1269,13 +1269,13 @@
         "result": {
           "content": [
             {
-              "text": "http://127.0.0.1:40185/\nBruster browser lab\ne1 text \"bruster / browser lab\"\ne2 text \"LOCAL DEMO \u00b7 NO ACCOUNT\"\ne3 heading \"Create a browser smoke test\"\ne4 text \"A small form for trying navigation, snapshots, inputs, and screenshots.\"\ne5 label \"Your name\"\ne6 textbox \"Your name\"\ne7 label \"Project\"\ne8 textbox \"Project\"\ne9 label \"Workflow\"\ne10 combobox \"Workflow\" value=\"navigation\"\ne11 label \"Include screenshots\"\ne12 checkbox \"Include screenshots\" checked=false\ne13 button \"Create smoke test\"\ne14 text \"This fixture runs entirely in your browser. Nothing is sent to a service.\"",
+              "text": "http://127.0.0.1:43845/\nBruster browser lab\ne1 text \"bruster / browser lab\"\ne2 text \"LOCAL DEMO \u00b7 NO ACCOUNT\"\ne3 heading \"Create a browser smoke test\"\ne4 text \"A small form for trying navigation, snapshots, inputs, and screenshots.\"\ne5 label \"Your name\"\ne6 textbox \"Your name\"\ne7 label \"Project\"\ne8 textbox \"Project\"\ne9 label \"Workflow\"\ne10 combobox \"Workflow\" value=\"navigation\"\ne11 label \"Include screenshots\"\ne12 checkbox \"Include screenshots\" checked=false\ne13 button \"Create smoke test\"\ne14 text \"This fixture runs entirely in your browser. Nothing is sent to a service.\"",
               "type": "text"
             }
           ]
         }
       },
-      "elapsed_ms": 4.161
+      "elapsed_ms": 3.987
     },
     {
       "request": {
@@ -1301,7 +1301,7 @@
           ]
         }
       },
-      "elapsed_ms": 21.187
+      "elapsed_ms": 21.058
     },
     {
       "request": {
@@ -1336,7 +1336,7 @@
           ]
         }
       },
-      "elapsed_ms": 4.491
+      "elapsed_ms": 3.776
     },
     {
       "request": {
@@ -1362,7 +1362,7 @@
           ]
         }
       },
-      "elapsed_ms": 22.671
+      "elapsed_ms": 21.617
     },
     {
       "request": {
@@ -1397,7 +1397,7 @@
           ]
         }
       },
-      "elapsed_ms": 2.895
+      "elapsed_ms": 2.592
     },
     {
       "request": {
@@ -1423,7 +1423,7 @@
           ]
         }
       },
-      "elapsed_ms": 21.42
+      "elapsed_ms": 20.8
     },
     {
       "request": {
@@ -1449,7 +1449,7 @@
           ]
         }
       },
-      "elapsed_ms": 2.318
+      "elapsed_ms": 1.917
     },
     {
       "request": {
@@ -1475,7 +1475,7 @@
           ]
         }
       },
-      "elapsed_ms": 9.639
+      "elapsed_ms": 9.42
     },
     {
       "request": {
@@ -1501,7 +1501,7 @@
           ]
         }
       },
-      "elapsed_ms": 26.375
+      "elapsed_ms": 24.829
     },
     {
       "request": {
@@ -1527,7 +1527,7 @@
           ]
         }
       },
-      "elapsed_ms": 22.387
+      "elapsed_ms": 22.172
     }
   ]
 }

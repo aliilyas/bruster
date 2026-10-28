@@ -22,6 +22,8 @@ text, and receives PNG image content. Each actual capture is held for five
 seconds. This is a reproducible protocol demo, not an LLM recording or a timing
 benchmark.
 
+Final media capture: [run 40687424772](https://github.com/aliilyas/bruster/actions/runs/40687424772).
+
 ## Try the demo
 
 Install Bruster on macOS or Linux:
