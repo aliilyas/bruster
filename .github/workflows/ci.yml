@@ -82,10 +82,16 @@ jobs:
 
       - name: Smoke tests (Windows)
         if: runner.os == 'Windows'
+        env:
+          BRUSTER_TEST_STDERR: 1
+          BRUSTER_TRACE_NAV: 1
         run: cargo test --release --locked --target ${{ matrix.target }} --test smoke -- --test-threads=1
 
       - name: Edge tests (Windows)
         if: runner.os == 'Windows'
+        env:
+          BRUSTER_TEST_STDERR: 1
+          BRUSTER_TRACE_NAV: 1
         run: cargo test --release --locked --target ${{ matrix.target }} --test edge -- --test-threads=1
 
       - name: MCP launch check
@@ -142,6 +148,9 @@ jobs:
         run: xvfb-run -a cargo test --release --locked --test e2e -- --ignored --test-threads=2
       - name: Public-site tests (Windows)
         if: runner.os == 'Windows'
+        env:
+          BRUSTER_TEST_STDERR: 1
+          BRUSTER_TRACE_NAV: 1
         run: cargo test --release --locked --test e2e -- --ignored --test-threads=1
 
   integrations:

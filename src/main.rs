@@ -37,6 +37,8 @@ use wry::{
 mod mcp;
 #[cfg(target_os = "macos")]
 mod navigation_macos;
+#[cfg(target_os = "windows")]
+mod navigation_windows;
 mod screenshot;
 mod window_state;
 
@@ -146,13 +148,13 @@ enum UserEvent {
     HistoryTimeout {
         tab: TabId,
         id: u64,
-        generation: u64,
+        token: u64,
     },
     /// A navigate ran out of time.
     NavigateTimeout {
         tab: TabId,
         id: u64,
-        generation: u64,
+        token: u64,
     },
     /// Wake the event loop to expire requests, even when GTK has no events.
     Deadline,
@@ -253,11 +255,16 @@ impl Queued {
 struct Pending {
     navigation_deadline: Option<std::time::Instant>,
     history_deadline: Option<std::time::Instant>,
+    /// Identifies the waiting command even if a page-initiated load advances
+    /// the document generation before an already-posted timeout is handled.
+    navigation_token: u64,
     next_attempt: u64,
     /// Intent advances before calling native APIs, which can call back synchronously.
     generation: u64,
     /// The native load whose Started signal has actually arrived.
     native_generation: u64,
+    #[cfg(target_os = "windows")]
+    native_id: Option<u64>,
     awaiting_start: bool,
     committed: bool,
     document: Option<String>,
@@ -319,6 +326,10 @@ impl Pending {
         }
     }
 
+    fn waiting_for(&self, id: u64, token: u64) -> bool {
+        self.navigation_token == token && self.navigate.is_some_and(|(active, _)| active == id)
+    }
+
     fn current_milestone(&self, document: Option<&str>, generation: Option<u64>) -> bool {
         !self.warming
             && !self.awaiting_start
@@ -346,7 +357,56 @@ impl Pending {
 
 fn trace_navigation(stage: &str, tab: TabId, p: &Pending, url: &str) {
     if std::env::var_os("BRUSTER_TRACE_NAV").is_some() {
-        eprintln!("navigation {stage}: tab={tab} url={url:?} loading={} loaded={} hint={:?} navigate={:?}", p.loading, p.loaded, p.hinted, p.navigate);
+        eprintln!("navigation {stage}: tab={tab} url={url:?} generation={} native={} warming={} loading={} loaded={} hint={:?} navigate={:?}", p.generation, p.native_generation, p.warming, p.loading, p.loaded, p.hinted, p.navigate);
+    }
+}
+
+fn page_load(
+    p: &mut Pending,
+    ev: PageLoadEvent,
+    tab: TabId,
+    url: &str,
+    proxy: &EventLoopProxy<UserEvent>,
+) {
+    if p.warming {
+        p.warming = !matches!(ev, PageLoadEvent::Finished);
+        if !p.warming && p.navigate.is_none() {
+            p.committed = true;
+            let _ = proxy.send_event(p.flush_event(tab));
+        }
+        return;
+    }
+    match ev {
+        PageLoadEvent::Started => {
+            if p.native_generation != p.generation {
+                return;
+            }
+            p.committed = true;
+            p.document = None;
+            let _ = proxy.send_event(UserEvent::BindDocument {
+                tab,
+                generation: p.generation,
+            });
+            trace_navigation("committed", tab, p, url);
+            // The old document and its promises are gone. Re-run pending calls
+            // in the new page, a few times at most, retaining their deadlines.
+            p.loading = true;
+            p.hinted = None;
+            p.loaded = false;
+            for (id, mut q) in p.js.drain().collect::<Vec<_>>() {
+                q.retries += 1;
+                if q.retries > MAX_REDISPATCH {
+                    fail(id, "navigation interrupted");
+                } else {
+                    p.queue.push((id, q));
+                }
+            }
+            if let Some(nav) = p.navigate.as_mut() {
+                nav.1 = true;
+            }
+            emit(json!({ "event": "navigating", "tab": tab, "url": url }));
+        }
+        PageLoadEvent::Finished => page_loaded(p, tab, url, proxy),
     }
 }
 
@@ -711,14 +771,10 @@ fn main() -> wry::Result<()> {
             Event::UserEvent(UserEvent::EvalFailed { tab, id, attempt }) => {
                 app.eval_failed(tab, id, attempt)
             }
-            Event::UserEvent(UserEvent::NavigateTimeout {
-                tab,
-                id,
-                generation,
-            }) => {
+            Event::UserEvent(UserEvent::NavigateTimeout { tab, id, token }) => {
                 if let Some(t) = app.tabs.get(&tab) {
                     let mut p = t.pending.borrow_mut();
-                    if p.generation == generation && p.navigate.is_some_and(|(nid, _)| nid == id) {
+                    if p.waiting_for(id, token) {
                         let url = p.navigate_url.take().unwrap_or_default();
                         p.navigate = None;
                         p.loading = false;
@@ -731,15 +787,11 @@ fn main() -> wry::Result<()> {
                     }
                 }
             }
-            Event::UserEvent(UserEvent::HistoryTimeout {
-                tab,
-                id,
-                generation,
-            }) => {
+            Event::UserEvent(UserEvent::HistoryTimeout { tab, id, token }) => {
                 // Fallback for engines restoring a page without load events.
                 if let Some(t) = app.tabs.get(&tab) {
                     let mut p = t.pending.borrow_mut();
-                    if p.generation == generation && p.navigate == Some((id, false))
+                    if p.waiting_for(id, token) && p.navigate == Some((id, false))
                         // WebView2 must acknowledge HistoryChanged before the
                         // next back/forward reads CanGoBack/CanGoForward.
                         && !cfg!(target_os = "windows")
@@ -894,18 +946,18 @@ impl App {
                         continue;
                     }
                     if at <= now {
-                        let generation = pending.generation;
+                        let token = pending.navigation_token;
                         let event = if history {
                             UserEvent::HistoryTimeout {
                                 tab: tab_id,
                                 id,
-                                generation,
+                                token,
                             }
                         } else {
                             UserEvent::NavigateTimeout {
                                 tab: tab_id,
                                 id,
-                                generation,
+                                token,
                             }
                         };
                         let _ = self.proxy.send_event(event);
@@ -1180,6 +1232,7 @@ impl App {
                     Ok(t) if url.is_some() => {
                         let mut pending = self.tabs[&t].pending.borrow_mut();
                         pending.navigate = Some((id, false));
+                        pending.navigation_token = pending.generation;
                         pending.navigate_url = url.map(str::to_owned);
                         pending.navigation_deadline = Some(deadline);
                     }
@@ -1476,8 +1529,6 @@ fn build_webview(
     context: &mut WebContext,
 ) -> wry::Result<WebView> {
     let ipc_pending = pending.clone();
-    let load_pending = pending.clone();
-    let load_proxy = proxy.clone();
     let ipc_proxy = proxy.clone();
     let window_proxy = proxy.clone();
 
@@ -1596,68 +1647,19 @@ fn build_webview(
         .with_new_window_req_handler(move |url, _| {
             let _ = window_proxy.send_event(UserEvent::OpenTab(url));
             NewWindowResponse::Deny
-        })
-        .with_on_page_load_handler(move |ev, url| {
-            let mut p = load_pending.borrow_mut();
-            if p.warming {
-                p.warming = !matches!(ev, PageLoadEvent::Finished);
-                if !p.warming && p.navigate.is_none() {
-                    p.committed = true;
-                    let _ = load_proxy.send_event(p.flush_event(tab));
-                }
-                return;
-            }
-            match ev {
-                PageLoadEvent::Started => {
-                    if p.native_generation != p.generation {
-                        return;
-                    }
-                    p.committed = true;
-                    p.document = None;
-                    let _ = load_proxy.send_event(UserEvent::BindDocument {
-                        tab,
-                        generation: p.generation,
-                    });
-                    trace_navigation("committed", tab, &p, &url);
-                    // The old document is gone, so are its in-flight promises:
-                    // re-run them once the new page is in, a few times at most.
-                    p.loading = true;
-                    p.hinted = None;
-                    p.loaded = false;
-                    for (id, mut q) in p.js.drain().collect::<Vec<_>>() {
-                        q.retries += 1;
-                        if q.retries > MAX_REDISPATCH {
-                            fail(id, "navigation interrupted");
-                        } else {
-                            p.queue.push((id, q));
-                        }
-                    }
-                    if let Some(nav) = p.navigate.as_mut() {
-                        nav.1 = true;
-                    }
-                    emit(json!({ "event": "navigating", "tab": tab, "url": url }));
-                }
-                PageLoadEvent::Finished => page_loaded(&mut p, tab, &url, &load_proxy),
-            }
         });
 
-    // Like Wry's WebKit Started, WebView2's ContentLoading arrives only after
-    // the server responds. Hold page calls from the provisional start instead.
-    #[cfg(target_os = "windows")]
+    #[cfg(not(target_os = "windows"))]
     {
-        let start_pending = pending.clone();
-        builder = builder.with_navigation_handler(move |_| {
-            let mut p = start_pending.borrow_mut();
-            if !p.warming {
-                p.provisional_start();
-            }
-            true
+        let load_pending = pending.clone();
+        let load_proxy = proxy.clone();
+        builder = builder.with_on_page_load_handler(move |ev, url| {
+            page_load(&mut load_pending.borrow_mut(), ev, tab, &url, &load_proxy);
         });
+        // Warm the renderer. Windows attaches ID-bearing handlers before its
+        // initial load below: overlapping NavigationCompleted is not ordered.
+        builder = builder.with_url(url.unwrap_or("about:blank"));
     }
-
-    // Load about:blank right away so the web and network processes exist
-    // before the agent's first navigate.
-    builder = builder.with_url(url.unwrap_or("about:blank"));
 
     if let Some(js) = &opts.init_script {
         builder = builder.with_initialization_script(js.clone());
@@ -1686,7 +1688,11 @@ fn build_webview(
     #[cfg(not(target_os = "linux"))]
     let webview = builder.build(window)?;
     #[cfg(target_os = "windows")]
-    track_history(&webview, tab, pending, proxy)?;
+    {
+        navigation_windows::observe(&webview, tab, pending.clone(), proxy.clone())?;
+        track_history(&webview, tab, pending, proxy)?;
+        webview.load_url(url.unwrap_or("about:blank"))?;
+    }
     #[cfg(target_os = "linux")]
     let webview = {
         use tao::platform::unix::WindowExtUnix;
@@ -1969,6 +1975,7 @@ fn tab_dispatch(tab: &Tab, t: TabId, id: u64, request: Queued, proxy: &EventLoop
         }
         p.navigate = Some((id, false));
         p.begin_navigation();
+        p.navigation_token = p.generation;
         p.navigate_until = until;
         p.navigate_url = url.map(str::to_owned);
         p.history_url = if matches!(method, "back" | "forward") {
@@ -2266,6 +2273,25 @@ fn trim_webkit(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn navigation_timeout_follows_the_waiter_across_document_changes() {
+        let mut p = Pending::default();
+        p.begin_navigation();
+        p.navigate = Some((7, true));
+        p.navigation_token = p.generation;
+        let expired_token = p.navigation_token;
+        // The timeout is queued, then a redirect starts before it is handled.
+        p.begin_navigation();
+        assert!(p.waiting_for(7, expired_token));
+        // A replacement command, even with a reused public ID, invalidates it.
+        p.begin_navigation();
+        p.navigation_token = p.generation;
+        assert!(!p.waiting_for(7, expired_token));
+        assert!(p.waiting_for(7, p.navigation_token));
+        p.navigate = None;
+        assert!(!p.waiting_for(7, p.navigation_token));
+    }
 
     #[test]
     fn parses_options() {

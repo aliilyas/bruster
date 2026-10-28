@@ -461,7 +461,7 @@ fn last_tab_stays_open_and_new_tab_load_is_bounded() {
         json!({ "url": format!("{base}/hang"), "timeout": 300 }),
     );
     // Native window/web-process construction is synchronous and can take
-    // seconds on CI. The URL-load timeout starts after that construction.
+    // seconds on CI. Its timeout cannot be handled until construction returns.
     let tabs = b.ok("tabs", json!({}));
     assert_eq!(tabs.as_array().unwrap().len(), 2);
     let start = Instant::now();
