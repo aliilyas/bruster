@@ -17,6 +17,7 @@
     <a href="https://aliilyas.github.io/bruster/"><img src="https://img.shields.io/badge/docs-%E2%9C%93-6ee7f7.svg" alt="Website"></a>
   </p>
   <p>
+    <a href="#demo">Demo</a> ·
     <a href="#install">Install</a> ·
     <a href="#quickstart">Quickstart</a> ·
     <a href="#mcp">MCP</a> ·
@@ -36,7 +37,7 @@ also uses browser helper processes. This design is good for agents, scripts, and
 
 ## Why bruster?
 
-- **No Chromium.** bruster uses WKWebView on macOS, WebKitGTK on Linux, and WebView2 on Windows. It uses [wry](https://github.com/tauri-apps/wry) to control them.
+- **Native webviews, no Node.js required.** bruster uses WKWebView on macOS, WebKitGTK on Linux, and WebView2 on Windows through [wry](https://github.com/tauri-apps/wry). WebView2 is Chromium-based; browser runtimes are installed separately where required.
 - **Small controller.** One small release executable, with a separately installed native browser runtime. The complete runtime footprint includes its libraries and helper processes.
 - **Agent support.** [MCP](#mcp) support with `--mcp`. Screenshots return as image content, and page events return as notifications.
 - **Cross-platform.** Prebuilt for macOS (arm64, x86_64), Linux (x86_64, arm64), and Windows (x86_64).
@@ -46,6 +47,18 @@ also uses browser helper processes. This design is good for agents, scripts, and
 
 > [!TIP]
 > [Live benchmarks](https://aliilyas.github.io/bruster/benchmarks/) compare Bruster with the latest stable Playwright, Puppeteer, and agent-browser after every merge to `main`: startup, navigation, extraction, screenshots, total process memory, and installed runtime files. See [benchmark setup and methodology](benchmarks/README.md).
+
+## Demo
+
+![Bruster navigating a local page, inspecting controls, filling a form, and returning a screenshot through MCP](launch/assets/demo/demo.gif)
+
+[30-second video](https://github.com/aliilyas/bruster/releases/download/v0.3.2/bruster-mcp-demo.mp4) ·
+[Try the same workflow](launch/README.md#try-the-demo) ·
+[Benchmark chart and source data](launch/README.md#benchmark-chart)
+
+These are actual WebKitGTK screenshots from a scripted MCP client. Each step is
+held for five seconds for readability; the presentation is not a speed test or
+a recording of an LLM session.
 
 ## Install
 
@@ -60,6 +73,15 @@ The script installs the correct build for your OS and CPU into `~/.local/bin`.
 ### Prebuilt releases
 
 Download archives for all platforms from the [Releases page](https://github.com/aliilyas/bruster/releases).
+
+### MCP bundle
+
+For clients that support MCP bundles, download
+[`bruster-0.3.2.mcpb`](https://github.com/aliilyas/bruster/releases/download/v0.3.2/bruster-0.3.2.mcpb).
+It contains the native executables for all five supported OS/CPU combinations.
+Linux still requires WebKitGTK 4.1 and a display or Xvfb; Windows requires WebView2.
+The official MCP Registry name is `io.github.aliilyas/bruster`; [server.json](server.json)
+pins the bundle and its SHA-256 hash.
 
 ### From source
 

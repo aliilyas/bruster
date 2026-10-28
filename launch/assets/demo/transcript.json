@@ -1,0 +1,1533 @@
+{
+  "server": {
+    "name": "bruster",
+    "version": "0.3.2"
+  },
+  "presentation": "Six actual screenshots, each held for five seconds. Scripted MCP client, not an LLM recording or a timing benchmark.",
+  "calls": [
+    {
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {},
+          "clientInfo": {
+            "name": "bruster-launch-demo",
+            "version": "1"
+          }
+        }
+      },
+      "response": {
+        "id": 1,
+        "jsonrpc": "2.0",
+        "result": {
+          "capabilities": {
+            "logging": {},
+            "tools": {}
+          },
+          "protocolVersion": "2024-11-05",
+          "serverInfo": {
+            "name": "bruster",
+            "version": "0.3.2"
+          }
+        }
+      },
+      "elapsed_ms": 691.518
+    },
+    {
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "tools/list",
+        "params": {}
+      },
+      "response": {
+        "id": 2,
+        "jsonrpc": "2.0",
+        "result": {
+          "tools": [
+            {
+              "description": "Open a URL and wait for it. until: load (default), dom (DOMContentLoaded, fastest, fine for server-rendered pages) or idle (load plus a quiet network).",
+              "inputSchema": {
+                "properties": {
+                  "tab": {
+                    "description": "tab id, defaults to current",
+                    "type": "integer"
+                  },
+                  "timeout": {
+                    "type": "integer"
+                  },
+                  "until": {
+                    "description": "page milestone to wait for, default load",
+                    "enum": [
+                      "dom",
+                      "load",
+                      "idle"
+                    ],
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "url"
+                ],
+                "type": "object"
+              },
+              "name": "navigate"
+            },
+            {
+              "description": "List visible elements and text with refs usable in other tools, one per line: ref role \"name\" href=... selector scopes to a subtree, max caps the list, boxes adds rects, format=json for objects.",
+              "inputSchema": {
+                "properties": {
+                  "boxes": {
+                    "type": "boolean"
+                  },
+                  "format": {
+                    "description": "text (default) or json",
+                    "enum": [
+                      "text",
+                      "json"
+                    ],
+                    "type": "string"
+                  },
+                  "max": {
+                    "type": "integer"
+                  },
+                  "request_timeout": {
+                    "description": "Outer page request deadline in milliseconds; defaults to at least 30000",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "selector": {
+                    "type": "string"
+                  },
+                  "tab": {
+                    "description": "tab id, defaults to current",
+                    "type": "integer"
+                  }
+                },
+                "required": [],
+                "type": "object"
+              },
+              "name": "snapshot"
+            },
+            {
+              "description": "Snapshot narrowed to elements whose name, text, value or href contains text or matches regex.",
+              "inputSchema": {
+                "properties": {
+                  "boxes": {
+                    "type": "boolean"
+                  },
+                  "format": {
+                    "description": "text (default) or json",
+                    "enum": [
+                      "text",
+                      "json"
+                    ],
+                    "type": "string"
+                  },
+                  "max": {
+                    "type": "integer"
+                  },
+                  "regex": {
+                    "type": "string"
+                  },
+                  "request_timeout": {
+                    "description": "Outer page request deadline in milliseconds; defaults to at least 30000",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "selector": {
+                    "type": "string"
+                  },
+                  "tab": {
+                    "description": "tab id, defaults to current",
+                    "type": "integer"
+                  },
+                  "text": {
+                    "type": "string"
+                  }
+                },
+                "required": [],
+                "type": "object"
+              },
+              "name": "find"
+            },
+            {
+              "description": "PNG of the viewport. full=true for the whole page, or clip={x,y,width,height}. path writes the file instead of returning it.",
+              "inputSchema": {
+                "properties": {
+                  "clip": {
+                    "properties": {
+                      "height": {
+                        "type": "number"
+                      },
+                      "width": {
+                        "type": "number"
+                      },
+                      "x": {
+                        "type": "number"
+                      },
+                      "y": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "full": {
+                    "type": "boolean"
+                  },
+                  "path": {
+                    "type": "string"
+                  },
+                  "tab": {
+                    "description": "tab id, defaults to current",
+                    "type": "integer"
+                  }
+                },
+                "required": [],
+                "type": "object"
+              },
+              "name": "screenshot"
+            },
+            {
+              "description": "Click an element, or a viewport point with x,y. Waits until it is visible, enabled and not covered; force skips that.",
+              "inputSchema": {
+                "properties": {
+                  "force": {
+                    "type": "boolean"
+                  },
+                  "ref": {
+                    "description": "ref from snapshot, e.g. e3",
+                    "type": "string"
+                  },
+                  "request_timeout": {
+                    "description": "Outer page request deadline in milliseconds; defaults to at least 30000",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "selector": {
+                    "description": "CSS selector",
+                    "type": "string"
+                  },
+                  "tab": {
+                    "description": "tab id, defaults to current",
+                    "type": "integer"
+                  },
+                  "timeout": {
+                    "type": "integer"
+                  },
+                  "x": {
+                    "type": "integer"
+                  },
+                  "y": {
+                    "type": "integer"
+                  }
+                },
+                "required": [],
+                "type": "object"
+              },
+              "name": "click"
+            },
+            {
+              "description": "Hover an element.",
+              "inputSchema": {
+                "properties": {
+                  "force": {
+                    "type": "boolean"
+                  },
+                  "ref": {
+                    "description": "ref from snapshot, e.g. e3",
+                    "type": "string"
+                  },
+                  "request_timeout": {
+                    "description": "Outer page request deadline in milliseconds; defaults to at least 30000",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "selector": {
+                    "description": "CSS selector",
+                    "type": "string"
+                  },
+                  "tab": {
+                    "description": "tab id, defaults to current",
+                    "type": "integer"
+                  },
+                  "timeout": {
+                    "type": "integer"
+                  }
+                },
+                "required": [],
+                "type": "object"
+              },
+              "name": "hover"
+            },
+            {
+              "description": "Set an input's value (fires input/change).",
+              "inputSchema": {
+                "properties": {
+                  "force": {
+                    "type": "boolean"
+                  },
+                  "ref": {
+                    "description": "ref from snapshot, e.g. e3",
+                    "type": "string"
+                  },
+                  "request_timeout": {
+                    "description": "Outer page request deadline in milliseconds; defaults to at least 30000",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "selector": {
+                    "description": "CSS selector",
+                    "type": "string"
+                  },
+                  "tab": {
+                    "description": "tab id, defaults to current",
+                    "type": "integer"
+                  },
+                  "timeout": {
+                    "type": "integer"
+                  },
+                  "value": {
+                    "description": "string, or array of strings for multi-select"
+                  }
+                },
+                "required": [
+                  "value"
+                ],
+                "type": "object"
+              },
+              "name": "fill"
+            },
+            {
+              "description": "Fill several fields at once: [{selector|ref, value}]. Checkboxes take a boolean, selects a value or array.",
+              "inputSchema": {
+                "properties": {
+                  "fields": {
+                    "items": {
+                      "properties": {
+                        "ref": {
+                          "type": "string"
+                        },
+                        "selector": {
+                          "type": "string"
+                        },
+                        "value": {}
+                      },
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "request_timeout": {
+                    "description": "Outer page request deadline in milliseconds; defaults to at least 30000",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "tab": {
+                    "description": "tab id, defaults to current",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "fields"
+                ],
+                "type": "object"
+              },
+              "name": "fill_form"
+            },
+            {
+              "description": "Type text key by key into an element. submit presses Enter afterwards.",
+              "inputSchema": {
+                "properties": {
+                  "delay": {
+                    "type": "integer"
+                  },
+                  "force": {
+                    "type": "boolean"
+                  },
+                  "ref": {
+                    "description": "ref from snapshot, e.g. e3",
+                    "type": "string"
+                  },
+                  "request_timeout": {
+                    "description": "Outer page request deadline in milliseconds; defaults to at least 30000",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "selector": {
+                    "description": "CSS selector",
+                    "type": "string"
+                  },
+                  "submit": {
+                    "type": "boolean"
+                  },
+                  "tab": {
+                    "description": "tab id, defaults to current",
+                    "type": "integer"
+                  },
+                  "text": {
+                    "type": "string"
+                  },
+                  "timeout": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "text"
+                ],
+                "type": "object"
+              },
+              "name": "type"
+            },
+            {
+              "description": "Press a key, e.g. Enter, Escape, Tab, Control+a.",
+              "inputSchema": {
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "ref": {
+                    "description": "ref from snapshot, e.g. e3",
+                    "type": "string"
+                  },
+                  "request_timeout": {
+                    "description": "Outer page request deadline in milliseconds; defaults to at least 30000",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "selector": {
+                    "description": "CSS selector",
+                    "type": "string"
+                  },
+                  "tab": {
+                    "description": "tab id, defaults to current",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "key"
+                ],
+                "type": "object"
+              },
+              "name": "press"
+            },
+            {
+              "description": "Choose option(s) in a <select>.",
+              "inputSchema": {
+                "properties": {
+                  "force": {
+                    "type": "boolean"
+                  },
+                  "ref": {
+                    "description": "ref from snapshot, e.g. e3",
+                    "type": "string"
+                  },
+                  "request_timeout": {
+                    "description": "Outer page request deadline in milliseconds; defaults to at least 30000",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "selector": {
+                    "description": "CSS selector",
+                    "type": "string"
+                  },
+                  "tab": {
+                    "description": "tab id, defaults to current",
+                    "type": "integer"
+                  },
+                  "timeout": {
+                    "type": "integer"
+                  },
+                  "value": {
+                    "description": "string, or array of strings for multi-select"
+                  }
+                },
+                "required": [
+                  "value"
+                ],
+                "type": "object"
+              },
+              "name": "select"
+            },
+            {
+              "description": "Set a checkbox or radio.",
+              "inputSchema": {
+                "properties": {
+                  "checked": {
+                    "type": "boolean"
+                  },
+                  "force": {
+                    "type": "boolean"
+                  },
+                  "ref": {
+                    "description": "ref from snapshot, e.g. e3",
+                    "type": "string"
+                  },
+                  "request_timeout": {
+                    "description": "Outer page request deadline in milliseconds; defaults to at least 30000",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "selector": {
+                    "description": "CSS selector",
+                    "type": "string"
+                  },
+                  "tab": {
+                    "description": "tab id, defaults to current",
+                    "type": "integer"
+                  },
+                  "timeout": {
+                    "type": "integer"
+                  }
+                },
+                "required": [],
+                "type": "object"
+              },
+              "name": "check"
+            },
+            {
+              "description": "Drag one element onto another (HTML5 drag events).",
+              "inputSchema": {
+                "properties": {
+                  "from": {
+                    "properties": {
+                      "ref": {
+                        "type": "string"
+                      },
+                      "selector": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "request_timeout": {
+                    "description": "Outer page request deadline in milliseconds; defaults to at least 30000",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "tab": {
+                    "description": "tab id, defaults to current",
+                    "type": "integer"
+                  },
+                  "to": {
+                    "properties": {
+                      "ref": {
+                        "type": "string"
+                      },
+                      "selector": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "from",
+                  "to"
+                ],
+                "type": "object"
+              },
+              "name": "drag"
+            },
+            {
+              "description": "Set files on a file input from local paths.",
+              "inputSchema": {
+                "properties": {
+                  "paths": {
+                    "description": "local file paths",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "ref": {
+                    "description": "ref from snapshot, e.g. e3",
+                    "type": "string"
+                  },
+                  "request_timeout": {
+                    "description": "Outer page request deadline in milliseconds; defaults to at least 30000",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "selector": {
+                    "description": "CSS selector",
+                    "type": "string"
+                  },
+                  "tab": {
+                    "description": "tab id, defaults to current",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "paths"
+                ],
+                "type": "object"
+              },
+              "name": "upload"
+            },
+            {
+              "description": "Scroll an element into view, or by x/y.",
+              "inputSchema": {
+                "properties": {
+                  "ref": {
+                    "description": "ref from snapshot, e.g. e3",
+                    "type": "string"
+                  },
+                  "request_timeout": {
+                    "description": "Outer page request deadline in milliseconds; defaults to at least 30000",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "selector": {
+                    "description": "CSS selector",
+                    "type": "string"
+                  },
+                  "tab": {
+                    "description": "tab id, defaults to current",
+                    "type": "integer"
+                  },
+                  "x": {
+                    "type": "integer"
+                  },
+                  "y": {
+                    "type": "integer"
+                  }
+                },
+                "required": [],
+                "type": "object"
+              },
+              "name": "scroll"
+            },
+            {
+              "description": "Resize the viewport.",
+              "inputSchema": {
+                "properties": {
+                  "height": {
+                    "type": "integer"
+                  },
+                  "tab": {
+                    "description": "tab id, defaults to current",
+                    "type": "integer"
+                  },
+                  "width": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "width",
+                  "height"
+                ],
+                "type": "object"
+              },
+              "name": "resize"
+            },
+            {
+              "description": "Maximize this window and persist the requested mode for future runs. Hidden windows only persist the mode.",
+              "inputSchema": {
+                "properties": {
+                  "tab": {
+                    "description": "tab id, defaults to current",
+                    "type": "integer"
+                  }
+                },
+                "required": [],
+                "type": "object"
+              },
+              "name": "maximize"
+            },
+            {
+              "description": "Hide this native window and persist minimized mode. Hidden windows stay off-screen and only persist the mode.",
+              "inputSchema": {
+                "properties": {
+                  "tab": {
+                    "description": "tab id, defaults to current",
+                    "type": "integer"
+                  }
+                },
+                "required": [],
+                "type": "object"
+              },
+              "name": "minimize"
+            },
+            {
+              "description": "Persist dark color-scheme for all existing and future pages.",
+              "inputSchema": {
+                "properties": {
+                  "tab": {
+                    "description": "tab id, defaults to current",
+                    "type": "integer"
+                  }
+                },
+                "required": [],
+                "type": "object"
+              },
+              "name": "dark"
+            },
+            {
+              "description": "Persist light color-scheme for all existing and future pages.",
+              "inputSchema": {
+                "properties": {
+                  "tab": {
+                    "description": "tab id, defaults to current",
+                    "type": "integer"
+                  }
+                },
+                "required": [],
+                "type": "object"
+              },
+              "name": "light"
+            },
+            {
+              "description": "Shut down Bruster, closing all tabs and the stdio server. Use close_tab to close only one tab.",
+              "inputSchema": {
+                "properties": {
+                  "tab": {
+                    "description": "tab id, defaults to current",
+                    "type": "integer"
+                  }
+                },
+                "required": [],
+                "type": "object"
+              },
+              "name": "close"
+            },
+            {
+              "description": "innerText of an element, truncated to max characters.",
+              "inputSchema": {
+                "properties": {
+                  "max": {
+                    "type": "integer"
+                  },
+                  "ref": {
+                    "description": "ref from snapshot, e.g. e3",
+                    "type": "string"
+                  },
+                  "request_timeout": {
+                    "description": "Outer page request deadline in milliseconds; defaults to at least 30000",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "selector": {
+                    "description": "CSS selector",
+                    "type": "string"
+                  },
+                  "tab": {
+                    "description": "tab id, defaults to current",
+                    "type": "integer"
+                  }
+                },
+                "required": [],
+                "type": "object"
+              },
+              "name": "text"
+            },
+            {
+              "description": "outerHTML of an element.",
+              "inputSchema": {
+                "properties": {
+                  "ref": {
+                    "description": "ref from snapshot, e.g. e3",
+                    "type": "string"
+                  },
+                  "request_timeout": {
+                    "description": "Outer page request deadline in milliseconds; defaults to at least 30000",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "selector": {
+                    "description": "CSS selector",
+                    "type": "string"
+                  },
+                  "tab": {
+                    "description": "tab id, defaults to current",
+                    "type": "integer"
+                  }
+                },
+                "required": [],
+                "type": "object"
+              },
+              "name": "html"
+            },
+            {
+              "description": "Attribute value of an element.",
+              "inputSchema": {
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "ref": {
+                    "description": "ref from snapshot, e.g. e3",
+                    "type": "string"
+                  },
+                  "request_timeout": {
+                    "description": "Outer page request deadline in milliseconds; defaults to at least 30000",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "selector": {
+                    "description": "CSS selector",
+                    "type": "string"
+                  },
+                  "tab": {
+                    "description": "tab id, defaults to current",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "type": "object"
+              },
+              "name": "attr"
+            },
+            {
+              "description": "Bounding box of an element (for screenshot clip).",
+              "inputSchema": {
+                "properties": {
+                  "ref": {
+                    "description": "ref from snapshot, e.g. e3",
+                    "type": "string"
+                  },
+                  "request_timeout": {
+                    "description": "Outer page request deadline in milliseconds; defaults to at least 30000",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "selector": {
+                    "description": "CSS selector",
+                    "type": "string"
+                  },
+                  "tab": {
+                    "description": "tab id, defaults to current",
+                    "type": "integer"
+                  }
+                },
+                "required": [],
+                "type": "object"
+              },
+              "name": "rect"
+            },
+            {
+              "description": "Number of elements matching a selector.",
+              "inputSchema": {
+                "properties": {
+                  "request_timeout": {
+                    "description": "Outer page request deadline in milliseconds; defaults to at least 30000",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "selector": {
+                    "type": "string"
+                  },
+                  "tab": {
+                    "description": "tab id, defaults to current",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "selector"
+                ],
+                "type": "object"
+              },
+              "name": "count"
+            },
+            {
+              "description": "Evaluate a JavaScript expression in the page.",
+              "inputSchema": {
+                "properties": {
+                  "expression": {
+                    "type": "string"
+                  },
+                  "request_timeout": {
+                    "description": "Outer page request deadline in milliseconds; defaults to at least 30000",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "tab": {
+                    "description": "tab id, defaults to current",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "expression"
+                ],
+                "type": "object"
+              },
+              "name": "eval"
+            },
+            {
+              "description": "Wait for selector state (visible/attached/hidden), text present or gone, url substring, network idle, or time ms.",
+              "inputSchema": {
+                "properties": {
+                  "idle": {
+                    "type": "boolean"
+                  },
+                  "ref": {
+                    "description": "ref from snapshot, e.g. e3",
+                    "type": "string"
+                  },
+                  "request_timeout": {
+                    "description": "Outer page request deadline in milliseconds; defaults to at least 30000",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "selector": {
+                    "description": "CSS selector",
+                    "type": "string"
+                  },
+                  "state": {
+                    "enum": [
+                      "visible",
+                      "attached",
+                      "hidden"
+                    ],
+                    "type": "string"
+                  },
+                  "tab": {
+                    "description": "tab id, defaults to current",
+                    "type": "integer"
+                  },
+                  "text": {
+                    "type": "string"
+                  },
+                  "textGone": {
+                    "type": "string"
+                  },
+                  "time": {
+                    "type": "integer"
+                  },
+                  "timeout": {
+                    "type": "integer"
+                  },
+                  "url": {
+                    "type": "string"
+                  }
+                },
+                "required": [],
+                "type": "object"
+              },
+              "name": "wait_for"
+            },
+            {
+              "description": "Requests made by the page: fetch, xhr and resources. index feeds network_request.",
+              "inputSchema": {
+                "properties": {
+                  "clear": {
+                    "type": "boolean"
+                  },
+                  "request_timeout": {
+                    "description": "Outer page request deadline in milliseconds; defaults to at least 30000",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "tab": {
+                    "description": "tab id, defaults to current",
+                    "type": "integer"
+                  }
+                },
+                "required": [],
+                "type": "object"
+              },
+              "name": "network"
+            },
+            {
+              "description": "Headers and body prefix of one fetch/xhr entry from network.",
+              "inputSchema": {
+                "properties": {
+                  "index": {
+                    "type": "integer"
+                  },
+                  "request_timeout": {
+                    "description": "Outer page request deadline in milliseconds; defaults to at least 30000",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "tab": {
+                    "description": "tab id, defaults to current",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "index"
+                ],
+                "type": "object"
+              },
+              "name": "network_request"
+            },
+            {
+              "description": "Console messages and page errors since the last navigation.",
+              "inputSchema": {
+                "properties": {
+                  "clear": {
+                    "type": "boolean"
+                  },
+                  "request_timeout": {
+                    "description": "Outer page request deadline in milliseconds; defaults to at least 30000",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "tab": {
+                    "description": "tab id, defaults to current",
+                    "type": "integer"
+                  }
+                },
+                "required": [],
+                "type": "object"
+              },
+              "name": "console"
+            },
+            {
+              "description": "Set how alert/confirm/prompt are answered from now on, and list dialogs seen so far.",
+              "inputSchema": {
+                "properties": {
+                  "accept": {
+                    "type": "boolean"
+                  },
+                  "clear": {
+                    "type": "boolean"
+                  },
+                  "request_timeout": {
+                    "description": "Outer page request deadline in milliseconds; defaults to at least 30000",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "tab": {
+                    "description": "tab id, defaults to current",
+                    "type": "integer"
+                  },
+                  "text": {
+                    "type": "string"
+                  }
+                },
+                "required": [],
+                "type": "object"
+              },
+              "name": "dialog"
+            },
+            {
+              "description": "All cookies.",
+              "inputSchema": {
+                "properties": {
+                  "tab": {
+                    "description": "tab id, defaults to current",
+                    "type": "integer"
+                  }
+                },
+                "required": [],
+                "type": "object"
+              },
+              "name": "cookies"
+            },
+            {
+              "description": "Set a cookie.",
+              "inputSchema": {
+                "properties": {
+                  "domain": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "path": {
+                    "type": "string"
+                  },
+                  "tab": {
+                    "description": "tab id, defaults to current",
+                    "type": "integer"
+                  },
+                  "value": {
+                    "description": "string, or array of strings for multi-select"
+                  }
+                },
+                "required": [
+                  "name",
+                  "value"
+                ],
+                "type": "object"
+              },
+              "name": "set_cookie"
+            },
+            {
+              "description": "Current URL.",
+              "inputSchema": {
+                "properties": {
+                  "request_timeout": {
+                    "description": "Outer page request deadline in milliseconds; defaults to at least 30000",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "tab": {
+                    "description": "tab id, defaults to current",
+                    "type": "integer"
+                  }
+                },
+                "required": [],
+                "type": "object"
+              },
+              "name": "url"
+            },
+            {
+              "description": "Page title.",
+              "inputSchema": {
+                "properties": {
+                  "request_timeout": {
+                    "description": "Outer page request deadline in milliseconds; defaults to at least 30000",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "tab": {
+                    "description": "tab id, defaults to current",
+                    "type": "integer"
+                  }
+                },
+                "required": [],
+                "type": "object"
+              },
+              "name": "title"
+            },
+            {
+              "description": "History back.",
+              "inputSchema": {
+                "properties": {
+                  "tab": {
+                    "description": "tab id, defaults to current",
+                    "type": "integer"
+                  }
+                },
+                "required": [],
+                "type": "object"
+              },
+              "name": "back"
+            },
+            {
+              "description": "History forward.",
+              "inputSchema": {
+                "properties": {
+                  "tab": {
+                    "description": "tab id, defaults to current",
+                    "type": "integer"
+                  }
+                },
+                "required": [],
+                "type": "object"
+              },
+              "name": "forward"
+            },
+            {
+              "description": "Reload the page.",
+              "inputSchema": {
+                "properties": {
+                  "tab": {
+                    "description": "tab id, defaults to current",
+                    "type": "integer"
+                  }
+                },
+                "required": [],
+                "type": "object"
+              },
+              "name": "reload"
+            },
+            {
+              "description": "Open a new tab, optionally at a URL. Returns its id; use switch_tab to make it current.",
+              "inputSchema": {
+                "properties": {
+                  "tab": {
+                    "description": "tab id, defaults to current",
+                    "type": "integer"
+                  },
+                  "timeout": {
+                    "type": "integer"
+                  },
+                  "url": {
+                    "type": "string"
+                  }
+                },
+                "required": [],
+                "type": "object"
+              },
+              "name": "new_tab"
+            },
+            {
+              "description": "List open tabs.",
+              "inputSchema": {
+                "properties": {
+                  "tab": {
+                    "description": "tab id, defaults to current",
+                    "type": "integer"
+                  }
+                },
+                "required": [],
+                "type": "object"
+              },
+              "name": "tabs"
+            },
+            {
+              "description": "Make a tab the default for later calls.",
+              "inputSchema": {
+                "properties": {
+                  "tab": {
+                    "description": "tab id, defaults to current",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "tab"
+                ],
+                "type": "object"
+              },
+              "name": "switch_tab"
+            },
+            {
+              "description": "Close a tab; the last tab cannot be closed (use close to shut down).",
+              "inputSchema": {
+                "properties": {
+                  "tab": {
+                    "description": "tab id, defaults to current",
+                    "type": "integer"
+                  }
+                },
+                "required": [],
+                "type": "object"
+              },
+              "name": "close_tab"
+            }
+          ]
+        }
+      },
+      "elapsed_ms": 2.351
+    },
+    {
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "tools/call",
+        "params": {
+          "name": "navigate",
+          "arguments": {
+            "url": "http://127.0.0.1:43845/"
+          }
+        }
+      },
+      "response": {
+        "id": 3,
+        "jsonrpc": "2.0",
+        "result": {
+          "content": [
+            {
+              "text": "{\"tab\":1,\"url\":\"http://127.0.0.1:43845/\"}",
+              "type": "text"
+            }
+          ]
+        }
+      },
+      "elapsed_ms": 611.516
+    },
+    {
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "tools/call",
+        "params": {
+          "name": "screenshot",
+          "arguments": {}
+        }
+      },
+      "response": {
+        "id": 4,
+        "jsonrpc": "2.0",
+        "result": {
+          "content": [
+            {
+              "mimeType": "image/png",
+              "type": "image",
+              "image_sha256": "2fdd493aba8460a1a0f615d4493f48def65d90315520d5bae001d84171e457a5",
+              "image_bytes": 37300
+            }
+          ]
+        }
+      },
+      "elapsed_ms": 26.218
+    },
+    {
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "method": "tools/call",
+        "params": {
+          "name": "snapshot",
+          "arguments": {}
+        }
+      },
+      "response": {
+        "id": 5,
+        "jsonrpc": "2.0",
+        "result": {
+          "content": [
+            {
+              "text": "http://127.0.0.1:43845/\nBruster browser lab\ne1 text \"bruster / browser lab\"\ne2 text \"LOCAL DEMO \u00b7 NO ACCOUNT\"\ne3 heading \"Create a browser smoke test\"\ne4 text \"A small form for trying navigation, snapshots, inputs, and screenshots.\"\ne5 label \"Your name\"\ne6 textbox \"Your name\"\ne7 label \"Project\"\ne8 textbox \"Project\"\ne9 label \"Workflow\"\ne10 combobox \"Workflow\" value=\"navigation\"\ne11 label \"Include screenshots\"\ne12 checkbox \"Include screenshots\" checked=false\ne13 button \"Create smoke test\"\ne14 text \"This fixture runs entirely in your browser. Nothing is sent to a service.\"",
+              "type": "text"
+            }
+          ]
+        }
+      },
+      "elapsed_ms": 3.987
+    },
+    {
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 6,
+        "method": "tools/call",
+        "params": {
+          "name": "screenshot",
+          "arguments": {}
+        }
+      },
+      "response": {
+        "id": 6,
+        "jsonrpc": "2.0",
+        "result": {
+          "content": [
+            {
+              "mimeType": "image/png",
+              "type": "image",
+              "image_sha256": "2fdd493aba8460a1a0f615d4493f48def65d90315520d5bae001d84171e457a5",
+              "image_bytes": 37300
+            }
+          ]
+        }
+      },
+      "elapsed_ms": 21.058
+    },
+    {
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 7,
+        "method": "tools/call",
+        "params": {
+          "name": "fill_form",
+          "arguments": {
+            "fields": [
+              {
+                "selector": "#name",
+                "value": "Ada Lovelace"
+              },
+              {
+                "selector": "#project",
+                "value": "Bruster"
+              }
+            ]
+          }
+        }
+      },
+      "response": {
+        "id": 7,
+        "jsonrpc": "2.0",
+        "result": {
+          "content": [
+            {
+              "text": "null",
+              "type": "text"
+            }
+          ]
+        }
+      },
+      "elapsed_ms": 3.776
+    },
+    {
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 8,
+        "method": "tools/call",
+        "params": {
+          "name": "screenshot",
+          "arguments": {}
+        }
+      },
+      "response": {
+        "id": 8,
+        "jsonrpc": "2.0",
+        "result": {
+          "content": [
+            {
+              "mimeType": "image/png",
+              "type": "image",
+              "image_sha256": "ad624fc7973cd1d1e88d76f671cbb50a2197f1de94601dd21ca57ada5e1b4f66",
+              "image_bytes": 37556
+            }
+          ]
+        }
+      },
+      "elapsed_ms": 21.617
+    },
+    {
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 9,
+        "method": "tools/call",
+        "params": {
+          "name": "fill_form",
+          "arguments": {
+            "fields": [
+              {
+                "selector": "#workflow",
+                "value": "forms"
+              },
+              {
+                "selector": "#screenshots",
+                "value": true
+              }
+            ]
+          }
+        }
+      },
+      "response": {
+        "id": 9,
+        "jsonrpc": "2.0",
+        "result": {
+          "content": [
+            {
+              "text": "null",
+              "type": "text"
+            }
+          ]
+        }
+      },
+      "elapsed_ms": 2.592
+    },
+    {
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 10,
+        "method": "tools/call",
+        "params": {
+          "name": "screenshot",
+          "arguments": {}
+        }
+      },
+      "response": {
+        "id": 10,
+        "jsonrpc": "2.0",
+        "result": {
+          "content": [
+            {
+              "mimeType": "image/png",
+              "type": "image",
+              "image_sha256": "9305fd229b29a5382d796ecdfb608b30cb623a52f50c4d7f561e8b31c68ecd37",
+              "image_bytes": 37511
+            }
+          ]
+        }
+      },
+      "elapsed_ms": 20.8
+    },
+    {
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 11,
+        "method": "tools/call",
+        "params": {
+          "name": "click",
+          "arguments": {
+            "selector": "button[type=submit]"
+          }
+        }
+      },
+      "response": {
+        "id": 11,
+        "jsonrpc": "2.0",
+        "result": {
+          "content": [
+            {
+              "text": "null",
+              "type": "text"
+            }
+          ]
+        }
+      },
+      "elapsed_ms": 1.917
+    },
+    {
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 12,
+        "method": "tools/call",
+        "params": {
+          "name": "text",
+          "arguments": {
+            "selector": "#result"
+          }
+        }
+      },
+      "response": {
+        "id": 12,
+        "jsonrpc": "2.0",
+        "result": {
+          "content": [
+            {
+              "text": "Smoke test created for Bruster Ada Lovelace \u00b7 Form submission \u00b7 Screenshots: on",
+              "type": "text"
+            }
+          ]
+        }
+      },
+      "elapsed_ms": 9.42
+    },
+    {
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 13,
+        "method": "tools/call",
+        "params": {
+          "name": "screenshot",
+          "arguments": {}
+        }
+      },
+      "response": {
+        "id": 13,
+        "jsonrpc": "2.0",
+        "result": {
+          "content": [
+            {
+              "mimeType": "image/png",
+              "type": "image",
+              "image_sha256": "019fabe2142b7a08d95e1c9c9ea1001c33b822612a903e734f3f18dd035e7123",
+              "image_bytes": 46979
+            }
+          ]
+        }
+      },
+      "elapsed_ms": 24.829
+    },
+    {
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 14,
+        "method": "tools/call",
+        "params": {
+          "name": "screenshot",
+          "arguments": {}
+        }
+      },
+      "response": {
+        "id": 14,
+        "jsonrpc": "2.0",
+        "result": {
+          "content": [
+            {
+              "mimeType": "image/png",
+              "type": "image",
+              "image_sha256": "019fabe2142b7a08d95e1c9c9ea1001c33b822612a903e734f3f18dd035e7123",
+              "image_bytes": 46979
+            }
+          ]
+        }
+      },
+      "elapsed_ms": 22.172
+    }
+  ]
+}
