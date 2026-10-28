@@ -145,24 +145,38 @@ bruster [--mcp] [--hidden|--visible] [--quiet] [options]
 | `--proxy URL` | `http://host:port` or `socks5://host:port` |
 | `--init-script FILE` | JavaScript that runs in every page before its own scripts |
 | `--dark` | persist dark color-scheme for this profile (or the default state); use `light` to reset |
+| `--insecure` | ignore TLS errors (Linux only) |
+| `--no-images` | do not load images. Pages load about 30% faster (Linux only) |
 
 ### Window and color controls
 
-Native commands and MCP tools `minimize` and `maximize` persist the requested
-window mode. `minimize` hides the native window (rather than iconifying it);
-`maximize` restores visibility and maximizes. In hidden/MCP mode both commands
-are accepted and saved, but windows stay off-screen for rendering.
+Native commands and MCP tools `minimize` and `maximize` target the specified `tab`
+(or the current tab), return `"minimized"` or `"maximized"`, and persist the requested
+window mode. Each mode replaces the previous one. `minimize` hides the native
+window (rather than iconifying it); `maximize` restores visibility and maximizes.
+In hidden/MCP mode both commands are accepted and saved, but windows stay
+off-screen for rendering.
 
 `dark` and `light` persist a color preference independently of window mode and
 apply it to all existing tabs, new tabs, and subsequent navigations. The portable
 page-level fallback sets the root CSS `color-scheme` (including native controls
 and default page colors); it does not emulate `prefers-color-scheme` media queries
 or recolor a site's explicit colors. Custom `--init-script` scripts still run.
-Preferences are stored outside WebView data, per profile or in the default
-platform state directory; legacy window-only state files are still accepted.
-`close` still shuts down the server and all tabs; `close_tab` closes only a tab.
-| `--insecure` | ignore TLS errors (Linux only) |
-| `--no-images` | do not load images. Pages load about 30% faster (Linux only) |
+
+Preferences are stored outside WebView data. With `--profile PATH`, metadata is
+a sibling of the canonical profile directory, named `PATH.bruster-window.json`.
+Without a profile, the file is:
+
+- Linux: `$XDG_STATE_HOME/bruster/window.json`, falling back to
+  `$HOME/.local/state/bruster/window.json`.
+- macOS: `$HOME/Library/Application Support/bruster/window.json`.
+- Windows: `%LOCALAPPDATA%/bruster/window.json`.
+
+Settings are profile-wide; the last successful command wins. Missing or malformed
+metadata uses defaults, and legacy window-only state files are still accepted.
+Persistence failures return protocol errors. OS window-manager changes are not
+saved. `close` shuts down the server and all tabs; `close_tab` or closing a window
+through the OS closes only that tab. Closing stdin also shuts down the server.
 
 Linux uses software rendering. Hidden views skip off-screen GTK painting while
 remaining mapped for layout, animation, and native screenshots. Set
@@ -177,6 +191,14 @@ arguments (default: `-screen 0 1280x1024x24 -nolisten tcp -extension GLX`). Set
 ## Tests
 
 `tests/run_all.sh [--rounds N] [--no-e2e]` runs the full suite. The suite does a build, unit tests, smoke tests, edge tests, a leftover-process check, an MCP launch check, and end-to-end tests. On Linux, run the script under `xvfb-run -a`. CI builds and tests every platform. CI also publishes release archives on `v*` tags.
+
+The Linux desktop-portal startup regression requires D-Bus, `python3-dbus`, and
+`python3-gi`:
+
+```sh
+cargo build --release --locked
+xvfb-run -a /usr/bin/python3 tests/startup_portal.py target/release/bruster
+```
 
 ## Protocol
 

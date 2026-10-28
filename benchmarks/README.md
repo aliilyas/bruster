@@ -25,10 +25,8 @@ full-Chrome configurations use the same executable.
    `workflow_run` deployment trigger to operate.
 
 Results: <https://aliilyas.github.io/bruster/benchmarks/>. Existing site files and
-custom domains are preserved. The known legacy `scripts/bench.py` performance
-section, if present, is replaced with a link to the corrected comparison page.
-
-[Review of published runs 1–4 and the startup investigation](REVIEW.md).
+custom domains are preserved. The legacy performance section, if present, is
+replaced with a link to the corrected comparison page.
 
 ## Measurements and publication
 
@@ -125,6 +123,3 @@ python3 -m unittest discover -s scripts -p 'test_bench_*.py'
 
 Runner variance and changing competitor versions make cross-run changes
 ambiguous; inspect versions and hardware before attributing a change to Bruster.
-The original controlled experiment and failure investigation are in
-[`COMPETITOR_COMPARISON.md`](../COMPETITOR_COMPARISON.md). Its historical versions
-describe that experiment; the continuous workflow always resolves latest releases.
