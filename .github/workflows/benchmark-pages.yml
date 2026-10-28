@@ -9,6 +9,28 @@ on:
       - 'scripts/test_lab.py'
       - 'scripts/test_lab_check.mjs'
       - 'scripts/test_test_lab.py'
+      - 'site/**'
+      - 'assets/logo.svg'
+      - 'scripts/site_*.py'
+      - 'scripts/test_site_*.py'
+      - 'scripts/bench_report.*'
+      - 'README.md'
+      - 'Cargo.toml'
+      - '.github/workflows/benchmark-pages.yml'
+  pull_request:
+    paths:
+      - 'tests/site/**'
+      - 'scripts/lab/**'
+      - 'scripts/test_lab.py'
+      - 'scripts/test_lab_check.mjs'
+      - 'scripts/test_test_lab.py'
+      - 'site/**'
+      - 'assets/logo.svg'
+      - 'scripts/site_*.py'
+      - 'scripts/test_site_*.py'
+      - 'scripts/bench_report.*'
+      - 'README.md'
+      - 'Cargo.toml'
       - '.github/workflows/benchmark-pages.yml'
   # GITHUB_TOKEN pushes do not start another push workflow. workflow_run does.
   workflow_run:
@@ -19,21 +41,37 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
-
-# Only deployment is coalesced. Every measurement is already durable on gh-pages.
-# Read the latest branch AFTER taking the lock, so older completions cannot
-# deploy an old snapshot over newer measurements.
-concurrency:
-  group: github-pages
-  cancel-in-progress: false
 
 jobs:
+  check:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check site and publication contracts
+        run: |
+          python3 -m unittest discover -s scripts -p 'test_site_*.py'
+          python3 -m unittest discover -s scripts -p 'test_bench_publish.py'
+          python3 -m unittest discover -s scripts -p 'test_test_lab.py'
+      - name: Build preview without measurements
+        run: python3 scripts/site_build.py --output "$RUNNER_TEMP/site-preview"
   deploy:
     if: github.ref == 'refs/heads/main' && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    # Fetch both branches after taking the deployment lock. An older workflow
+    # completion must not put stale source or measurements back on the live site.
+    concurrency:
+      group: github-pages
+      cancel-in-progress: false
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -41,12 +79,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: main
-          path: source
           persist-credentials: false
       - uses: actions/checkout@v4
         with:
           ref: gh-pages
-          path: site
+          path: _measurements
           persist-credentials: false
       - uses: actions/setup-python@v5
         with:
@@ -55,18 +92,26 @@ jobs:
         with:
           node-version: '24'
           cache: npm
-          cache-dependency-path: source/tests/site/frameworks/package-lock.json
+          cache-dependency-path: tests/site/frameworks/package-lock.json
       - name: Build pinned framework fixtures
         run: |
-          npm ci --prefix source/tests/site/frameworks --ignore-scripts --no-audit --no-fund
-          node source/tests/site/frameworks/build.mjs "$RUNNER_TEMP/lab-frameworks"
-      - name: Check publication and fixture contracts
-        run: python3 -m unittest discover -s source/scripts -p 'test_test_lab.py'
-      - name: Assemble documentation, benchmarks, and test lab
+          npm ci --prefix tests/site/frameworks --ignore-scripts --no-audit --no-fund
+          node tests/site/frameworks/build.mjs "$RUNNER_TEMP/lab-frameworks"
+      - name: Check site and publication contracts
         run: |
-          python3 source/scripts/test_lab.py assemble --existing site --output published --frameworks "$RUNNER_TEMP/lab-frameworks"
-          node source/scripts/test_lab_check.mjs published/test-lab
+          python3 -m unittest discover -s scripts -p 'test_site_*.py'
+          python3 -m unittest discover -s scripts -p 'test_bench_publish.py'
+          python3 -m unittest discover -s scripts -p 'test_test_lab.py'
       - uses: actions/configure-pages@v5
+        id: pages
+      - name: Build website with published measurements
+        env:
+          SITE_URL: ${{ steps.pages.outputs.base_url }}
+        run: python3 scripts/site_build.py --measurements _measurements --output _site --base-url "$SITE_URL"
+      - name: Assemble website, benchmarks, and test lab
+        run: |
+          python3 scripts/test_lab.py assemble --existing _site --output published --frameworks "$RUNNER_TEMP/lab-frameworks"
+          node scripts/test_lab_check.mjs published/test-lab
       - uses: actions/upload-pages-artifact@v3
         with:
           path: published
