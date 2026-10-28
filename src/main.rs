@@ -558,14 +558,21 @@ struct App {
 }
 
 fn emit(v: Value) {
+    // Check MCP's logging level under the same lock as its acknowledgment. An
+    // event accepted before logging/setLevel must not be written after its reply.
+    let out = std::io::stdout().lock();
     let Some(v) = mcp::outgoing(v) else { return };
-    write_json(&v);
+    write_json_to(out, &v);
 }
 
 /// Buffer a complete record under one stdout lock, then flush immediately.
 /// Serde otherwise turns a large result into thousands of small pipe writes.
 fn write_json(v: &impl serde::Serialize) {
-    let mut out = std::io::BufWriter::new(std::io::stdout().lock());
+    write_json_to(std::io::stdout().lock(), v);
+}
+
+fn write_json_to(out: impl Write, v: &impl serde::Serialize) {
+    let mut out = std::io::BufWriter::new(out);
     let _ = serde_json::to_writer(&mut out, &v);
     let _ = out.write_all(b"\n");
     let _ = out.flush();

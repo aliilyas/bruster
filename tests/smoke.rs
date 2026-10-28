@@ -1737,33 +1737,37 @@ fn speaks_mcp() {
     assert_eq!(nav["id"], 13, "cancelled wait_for must stay silent");
 
     // logging/setLevel above info mutes events; back to info restores them.
-    assert_eq!(
+    // Repeatedly race the preceding navigation's load notification against the
+    // stdin thread's level-change reply. No old info event may follow that reply.
+    for round in 0..10 {
+        assert_eq!(
+            rpc(
+                json!({ "jsonrpc": "2.0", "id": 14, "method": "logging/setLevel", "params": { "level": "warning" } })
+            )["result"],
+            json!({})
+        );
+        notes.borrow_mut().clear();
+        rpc(call(
+            json!(15),
+            "navigate",
+            json!({ "url": format!("{base}/form") }),
+        ));
+        rpc(json!({ "jsonrpc": "2.0", "id": 16, "method": "ping" }));
+        assert!(
+            notes.borrow().is_empty(),
+            "events must be muted at warning (round {round}): {:?}",
+            notes.borrow()
+        );
         rpc(
-            json!({ "jsonrpc": "2.0", "id": 14, "method": "logging/setLevel", "params": { "level": "warning" } })
-        )["result"],
-        json!({})
-    );
-    notes.borrow_mut().clear();
-    rpc(call(
-        json!(15),
-        "navigate",
-        json!({ "url": format!("{base}/form") }),
-    ));
-    rpc(json!({ "jsonrpc": "2.0", "id": 16, "method": "ping" }));
-    assert!(
-        notes.borrow().is_empty(),
-        "events must be muted at warning: {:?}",
-        notes.borrow()
-    );
-    rpc(
-        json!({ "jsonrpc": "2.0", "id": 17, "method": "logging/setLevel", "params": { "level": "info" } }),
-    );
-    rpc(call(
-        json!(18),
-        "navigate",
-        json!({ "url": format!("{base}/") }),
-    ));
-    assert!(events().contains(&"navigating".to_owned()));
+            json!({ "jsonrpc": "2.0", "id": 17, "method": "logging/setLevel", "params": { "level": "info" } }),
+        );
+        rpc(call(
+            json!(18),
+            "navigate",
+            json!({ "url": format!("{base}/") }),
+        ));
+        assert!(events().contains(&"navigating".to_owned()));
+    }
     let lvl = rpc(
         json!({ "jsonrpc": "2.0", "id": 19, "method": "logging/setLevel", "params": { "level": "loud" } }),
     );
