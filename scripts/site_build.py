@@ -18,12 +18,12 @@ PAGES = (
     ('', 'Bruster — Native Browser Automation for Scripts & Tests',
      'Automate native browsers with a small Rust controller. JSON-lines API, built-in MCP, '
      'and reproducible benchmarks. macOS, Linux, Windows. No Node.js required.', ''),
-    ('docs/', 'Bruster Docs — Install, Python Quickstart & Browser API',
-     'Install Bruster and automate a native browser from Python or JSON lines. '
-     'Platform setup, CI with Xvfb, CLI options, and the complete browser automation API.', 'Docs'),
+    ('docs/', 'Bruster Docs — Install, Docker, Python & Browser API',
+     'Install Bruster or run its Docker image. Automate a browser with Python, JSON lines, '
+     'or MCP. Platform setup, container commands, CLI options, and browser API.', 'Docs'),
     ('mcp/', 'Browser MCP Server Setup — Bruster',
      'Connect Bruster’s native browser MCP server to OpenCode, Claude Code, Cursor, Codex, '
-     'or VS Code. Client configurations, browser tools, and troubleshooting.', 'MCP setup'),
+     'or VS Code. Native and Docker configurations, browser tools, and troubleshooting.', 'MCP setup'),
     ('compare/', 'Bruster vs Playwright & Puppeteer — Browser Automation',
      'Compare Bruster, Playwright, and Puppeteer for browser automation and testing: '
      'engines, APIs, runtime requirements, limitations, and reproducible benchmarks.', 'Compare'),
