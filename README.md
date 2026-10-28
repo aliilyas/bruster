@@ -76,6 +76,8 @@ The [Dockerfile](Dockerfile) builds the locked Rust source and includes WebKitGT
 Xvfb, fonts, and HTTPS certificates. The runtime image runs as a non-root user;
 the compiler and development packages stay in the build stage. Linux amd64 and
 arm64 images are built and exercised in [Docker CI](.github/workflows/docker.yml).
+Both base images are pinned to multi-platform SHA-256 digests. Refresh those
+digests when updating the base images, then rerun both architecture checks.
 
 ```sh
 docker build -t bruster:local .

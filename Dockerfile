@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
-ARG RUST_VERSION=1.90.0
-FROM rust:${RUST_VERSION}-slim-bookworm AS build
+# Pin multi-platform indexes so amd64 and arm64 use the same base-image release.
+FROM rust:1.90.0-slim-bookworm@sha256:64232e656c058f4468e8d024e990acff04f0fd5a5c0a88a574dc37773d7325c9 AS build
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends dbus-x11 libwebkit2gtk-4.1-dev pkg-config \
@@ -18,7 +18,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
     cargo build --release --locked --bin bruster --jobs "${CARGO_BUILD_JOBS}" \
     && install -Dm755 target/release/bruster /out/bruster
 
-FROM debian:bookworm-slim AS runtime
+FROM debian:bookworm-slim@sha256:99c0b25c46d0214d5a2091092e7908907dcaecd6a962cde0ac700acee222b6f3 AS runtime
 
 LABEL org.opencontainers.image.title="Bruster" \
     org.opencontainers.image.description="Native WebKitGTK browser automation over stdio MCP" \
