@@ -57,6 +57,25 @@ fn login_form_error_under_csp() {
     assert_eq!(b.ok("eval", json!({ "expression": "1 + 1" })), 2);
 }
 
+fn wiki_retry_rate_limit(b: &mut Browser) {
+    // Wikimedia can return its CDN's 429 error document as a completed load.
+    // Reload only that explicit response, with bounded exponential backoff;
+    // reloading preserves the history entry the test is exercising.
+    for attempt in 0..=3 {
+        let page = b.ok("snapshot", json!({}));
+        let limited = page["title"] == "Wikimedia Error" && page["elements"].as_array().unwrap().iter()
+            .any(|e| e["text"].as_str().is_some_and(|s| s.contains("Error: 429")));
+        if !limited {
+            return;
+        }
+        assert!(attempt < 3, "Wikipedia still rate-limited after three reloads: {page}");
+        let seconds = 15 << attempt;
+        eprintln!("Wikipedia HTTP 429 at {}; waiting {seconds}s before reload {} of 3", page["url"], attempt + 1);
+        std::thread::sleep(Duration::from_secs(seconds));
+        b.ok("reload", json!({}));
+    }
+}
+
 fn wiki_history_page(b: &mut Browser, url: &Value) -> Value {
     // MediaWiki replaces analytics and default namespace/profile parameters
     // after rendering. Compare the actual page and decoded search query.
@@ -70,6 +89,7 @@ fn wiki_history_page(b: &mut Browser, url: &Value) -> Value {
 fn wiki_back_page(b: &mut Browser) -> Value {
     let back = b.ok("back", json!({}));
     assert!(back["url"].is_string(), "Wikipedia history ended before the entry page: {back}");
+    wiki_retry_rate_limit(b);
     let current = b.ok("url", json!({}));
     let page = wiki_history_page(b, &back["url"]);
     assert_eq!(page, wiki_history_page(b, &current), "back reply disagrees with live URL: {back}; {current}");
@@ -82,15 +102,23 @@ fn wiki_back_page(b: &mut Browser) -> Value {
 fn wiki_search_then_back() {
     // Cover the expanded header, responsive toggle, and Special:Search even
     // when the toggle's JavaScript happens to expand the header inline.
-    for (viewport, page) in [("1400x800", "Main_Page"), ("900x800", "Main_Page"), ("900x800", "Special:Search")] {
-        let mut b = Browser::spawn_with(&["--viewport", viewport]);
+    // Reuse the browser's asset cache and pace the routes to avoid bursts of
+    // uncached requests from fresh WebView2 profiles.
+    let mut b = Browser::spawn_with(&["--viewport", "1400x800"]);
+    for (route, (width, page)) in [(1400, "Main_Page"), (900, "Main_Page"), (900, "Special:Search")].into_iter().enumerate() {
+        if route > 0 {
+            std::thread::sleep(Duration::from_secs(15));
+            b.ok("resize", json!({ "width": width, "height": 800 }));
+        }
+        let viewport = format!("{width}x800");
         eprintln!("Wikipedia {viewport} {page}: opening search");
         b.open(&format!("https://en.wikipedia.org/wiki/{page}"));
+        wiki_retry_rate_limit(&mut b);
         // Special:Search can have an empty label, so find by role and form
         // name rather than filtering snapshot elements by accessible name.
         // Its scripts can replace the form after load. An absent input does
         // not necessarily mean the responsive header toggle is available.
-        let start = Instant::now();
+        let mut start = Instant::now();
         let mut toggled = false;
         let input = loop {
             if let Some(input) = visible_input_named(&mut b, "search") {
@@ -100,6 +128,8 @@ fn wiki_search_then_back() {
             if !toggled && b.ok("eval", json!({ "expression": "!!document.querySelector('#p-search .search-toggle')?.checkVisibility()" })) == true {
                 // The toggle can expand inline or follow its Special:Search href.
                 b.ok("click", json!({ "selector": "#p-search .search-toggle" }));
+                wiki_retry_rate_limit(&mut b);
+                start = Instant::now();
                 toggled = true;
             } else {
                 std::thread::sleep(Duration::from_millis(100));
@@ -107,6 +137,7 @@ fn wiki_search_then_back() {
         };
         let entry_url = b.ok("url", json!({}));
         b.ok("type", json!({ "ref": input, "text": "WebKitGTK", "submit": true }));
+        wiki_retry_rate_limit(&mut b);
         let mut result_url = b.ok("url", json!({}));
         // Special:Search submits a full-text search rather than jumping
         // straight to the article as the header's search does.
@@ -118,6 +149,7 @@ fn wiki_search_then_back() {
                 .unwrap_or_else(|| panic!("no WebKit result at {result_url}: {found}"));
             result_url = b.ok("url", json!({}));
             b.ok("click", json!({ "ref": link["ref"] }));
+            wiki_retry_rate_limit(&mut b);
         }
         b.ok("wait_for", json!({ "url": "/wiki/WebKit", "timeout": SITE_TIMEOUT }));
         assert!(b.ok("title", json!({})).as_str().unwrap().contains("WebKit"));
