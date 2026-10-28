@@ -9,7 +9,9 @@ import os
 import signal
 import subprocess
 import sys
+import tempfile
 import threading
+import time
 from pathlib import Path
 
 
@@ -21,6 +23,7 @@ def check(binary):
 
     sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
     from bench_compare import ProcessClient, isolated_environment
+    from lab.client import Client
 
     DBusGMainLoop(set_as_default=True)
     bus = dbus.SessionBus()
@@ -76,9 +79,23 @@ def check(binary):
             client.close()
         assert client.close_error is None, client.close_error
 
+        # Animation fixtures request visible windows, but the lab still isolates
+        # desktop integration. Exercise both transports against the stalled bus.
+        for transport in ('native','mcp'):
+            with tempfile.TemporaryDirectory(prefix='bruster-portal-lab-') as temp:
+                client = Client(binary,transport,Path(temp),launch=('--visible',))
+                try:
+                    startup_ms = (time.monotonic()-client.started)*1000
+                    assert startup_ms < 10_000, startup_ms
+                    client.call('new_tab')
+                    assert not calls, calls
+                    print(f'PASS: visible {transport} lab ready in {startup_ms:.1f} ms; new tab bypasses stalled portal')
+                finally:
+                    error = client.close()
+                assert error is None, error
+
         # MCP implies hidden mode; exercise real JSON-RPC startup and a browser
         # command, not just initialize (which the stdin thread answers itself).
-        import tempfile
         with tempfile.TemporaryDirectory(prefix='bruster-portal-mcp-') as temp:
             requests = [
                 {'jsonrpc': '2.0', 'id': 1, 'method': 'initialize', 'params': {}},

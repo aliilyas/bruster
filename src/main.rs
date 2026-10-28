@@ -1727,6 +1727,12 @@ fn build_webview(
     #[cfg(target_os = "macos")]
     {
         use wry::WebViewBuilderExtDarwin;
+        if opts.hidden {
+            // Automation must keep DOM timers and network-idle checks running
+            // when WKWebView considers an off-screen tab inactive (macOS 14+).
+            // Animation frames still require a visible window.
+            builder = builder.with_background_throttling(wry::BackgroundThrottlingPolicy::Disabled);
+        }
         builder = builder.with_data_store_identifier(
             opts.profile
                 .as_deref()
