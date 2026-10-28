@@ -196,18 +196,31 @@ arguments (default: `-screen 0 1280x1024x24 -nolisten tcp -extension GLX`). Set
 ## Tests
 
 The [Test Lab](https://aliilyas.github.io/bruster/test-lab/) provides individual
-HTML/CSS/JavaScript fixtures with executable assertions. Run the same cases
-through Bruster's native JSONL and MCP transports:
+HTML/CSS/JavaScript fixtures with executable assertions. Cargo builds Bruster
+and runs 39 focused fixtures through both native JSONL and MCP (Python 3.10+
+required; prefix with `xvfb-run -a` on headless Linux):
 
 ```sh
-python3 scripts/test_lab.py run --binary target/release/bruster --transport both
+cargo test --release --test test_lab
+
+# Opt-in check against the published site, including real React/Vue/Svelte apps.
+cargo test --release --test test_lab -- --ignored --exact published_test_lab
 ```
 
-Use `--case 'ref-*'` for a focused run and `--suite stress` for larger workloads.
-See [test-lab setup and coverage](tests/site/README.md) for the local server,
-pinned React/Vue/Svelte bundles, reports, and GitHub Pages publication.
+See [test-lab setup and coverage](tests/site/README.md) for the complete core
+suite (`full_test_lab`), individual case filters, stress cases, pinned framework
+bundles, and reports. The Python runner also accepts an existing executable:
 
-`tests/run_all.sh [--rounds N] [--no-e2e]` runs the full suite. The suite does a build, unit tests, smoke tests, edge tests, a leftover-process check, an MCP launch check, and end-to-end tests. On Linux, run the script under `xvfb-run -a`. CI builds and tests every platform. CI also publishes release archives on `v*` tags.
+```sh
+python3 scripts/test_lab.py run --binary target/release/bruster --case 'ref-*' --transport both
+```
+
+`tests/run_all.sh [--rounds N] [--no-e2e] [--no-lab]` runs the full test cycle:
+build, unit, smoke, edge, focused test-lab groups, a leftover-process check, MCP
+launch, and end-to-end tests including the published lab. `--no-e2e` keeps the
+cycle local; `--no-lab` omits both lab runs. On Linux, run the script under
+`xvfb-run -a`. CI runs the complete core lab on every platform and publishes
+release archives on `v*` tags.
 
 The Linux desktop-portal startup regression requires D-Bus, `python3-dbus`, and
 `python3-gi`:
@@ -295,10 +308,10 @@ Calls routed through the page runtime (`eval`, `url`, `title`, `snapshot`, inter
 ## Development
 
 - `bin/bruster` runs the development build from this checkout.
-- `tests/run_all.sh` runs the build, unit tests, smoke tests, edge tests, the MCP launch check, and end-to-end tests.
+- `tests/run_all.sh` runs the build, unit tests, smoke tests, edge tests, test-lab groups, the MCP launch check, and end-to-end tests.
 - CI (`.github/workflows/ci.yml`) builds all platforms, runs the tests, and publishes release archives on `v*` tags.
 - Benchmarks: `scripts/bench_compare.py` compares five configurations; `scripts/bench_footprint.py` inventories runtime files and `scripts/bench_report.py` validates and publishes results. See [setup and methodology](benchmarks/README.md).
-- Test Lab: `scripts/test_lab.py` builds, serves, and runs the published fixtures. See [case authoring and verification](tests/site/README.md).
+- Test Lab: `tests/test_lab.rs` integrates the shared fixtures into Cargo; `scripts/test_lab.py` builds, serves, and runs them. See [case authoring and verification](tests/site/README.md).
 - Website: `site/` contains the GitHub Pages source. See [local preview and publishing](site/README.md).
 
 ## License

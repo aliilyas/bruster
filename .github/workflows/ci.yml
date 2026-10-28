@@ -136,11 +136,11 @@ jobs:
         shell: bash
         env:
           PYTHONUTF8: '1'
+          BRUSTER_TEST_PYTHON: python
+          BRUSTER_TEST_LAB_OUTPUT: target/test-lab-results/cargo
         run: |
-          BIN=target/${{ matrix.target }}/release/bruster
-          if [ "$RUNNER_OS" = Windows ]; then BIN="$BIN.exe"; fi
           if [ "$RUNNER_OS" = Linux ]; then set -- xvfb-run -a; else set --; fi
-          "$@" python scripts/test_lab.py run --binary "$BIN" --frameworks target/test-lab-frameworks --transport both --output target/test-lab-results
+          "$@" cargo test --release --locked --target ${{ matrix.target }} --test test_lab -- --ignored --exact full_test_lab --nocapture
       - name: Check test lab catalog in Bruster
         if: ${{ !cancelled() && steps.lab_fixtures.outcome == 'success' }}
         shell: bash
@@ -197,6 +197,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - name: Linux deps
         if: runner.os == 'Linux'
         run: |
@@ -211,6 +214,23 @@ jobs:
           BRUSTER_TEST_STDERR: 1
           BRUSTER_TRACE_NAV: 1
         run: cargo test --release --locked --test e2e -- --ignored --test-threads=1
+      - name: Published test lab (native JSONL and MCP)
+        if: ${{ !cancelled() }}
+        shell: bash
+        env:
+          BRUSTER_TEST_PYTHON: python
+          BRUSTER_TEST_LAB_OUTPUT: target/test-lab-live-results
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then set -- xvfb-run -a; else set --; fi
+          "$@" cargo test --release --locked --test test_lab -- --ignored --exact published_test_lab --nocapture
+      - name: Retain published test lab evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-lab-live-${{ matrix.os }}
+          path: target/test-lab-live-results/
+          if-no-files-found: warn
+          retention-days: 30
 
   integrations:
     # MCP clients other than our own harness: TypeScript SDK, Python SDK, Inspector CLI.

@@ -1,13 +1,16 @@
 #!/bin/sh
-# Full test cycle. Needs a display on Linux (run under xvfb-run) and the
-# network for the e2e part. Usage: tests/run_all.sh [--no-e2e] [--rounds N]
+# Full test cycle. Needs a display on Linux (run under xvfb-run),
+# Python 3.10+ for the lab, and network for e2e. Usage:
+# tests/run_all.sh [--no-e2e] [--no-lab] [--rounds N]
 # Exit status is non-zero if any part fails.
 set -u
 E2E=1
+LAB=1
 ROUNDS=1
 while [ $# -gt 0 ]; do
   case "$1" in
     --no-e2e) E2E=0 ;;
+    --no-lab) LAB=0 ;;
     --rounds) ROUNDS="$2"; shift ;;
   esac
   shift
@@ -34,6 +37,9 @@ while [ "$i" -le "$ROUNDS" ]; do
   run "edge-$i" cargo test --release --test edge
   i=$((i + 1))
 done
+if [ "$LAB" = 1 ]; then
+  run test-lab cargo test --release --test test_lab
+fi
 # Process-tree hygiene: every bruster the tests spawned is gone.
 sleep 1
 if pgrep -f '^[^ ]*/bruster --hidden' > /dev/null; then
@@ -45,5 +51,8 @@ BIN="${CARGO_TARGET_DIR:-target}/release/bruster"
 run mcp-launch sh tests/mcp_launch.sh "$BIN" --hidden --mcp --quiet
 if [ "$E2E" = 1 ]; then
   run e2e cargo test --release --test e2e -- --ignored --test-threads=2
+  if [ "$LAB" = 1 ]; then
+    run test-lab-published cargo test --release --test test_lab -- --ignored --exact published_test_lab
+  fi
 fi
 exit $status
