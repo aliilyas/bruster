@@ -24,6 +24,9 @@ on:
 permissions:
   contents: read
 
+env:
+  DOCKER_IMAGE: ilyastmn/bruster
+
 concurrency:
   group: docker-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -52,6 +55,35 @@ jobs:
           cache-to: type=gha,mode=max,scope=bruster-${{ matrix.arch }}
       - name: MCP, browser, HTTPS, and shutdown checks
         run: python3 tests/docker.py --image bruster:docker-test --https --output target/docker-results.json
+      - name: Log in to Docker Hub
+        if: github.repository == 'aliilyas/bruster' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Push the tested image and record its digest
+        if: github.repository == 'aliilyas/bruster' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          image="${DOCKER_IMAGE}:sha-${GITHUB_SHA}-${ARCH}"
+          docker tag bruster:docker-test "$image"
+          docker push "$image"
+          digest=$(docker image inspect --format '{{index .RepoDigests 0}}' "$image")
+          case "$digest" in
+            "${DOCKER_IMAGE}@sha256:"*) ;;
+            *) echo "::error::Unexpected pushed image digest: $digest"; exit 1 ;;
+          esac
+          mkdir -p target/digests
+          printf '%s\n' "$digest" > "target/digests/${ARCH}"
+      - name: Retain the tested image digest
+        if: github.repository == 'aliilyas/bruster' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-digest-${{ matrix.arch }}
+          path: target/digests/${{ matrix.arch }}
+          if-no-files-found: error
+          retention-days: 7
       - name: Image and runtime measurements
         if: always()
         run: |
@@ -66,3 +98,47 @@ jobs:
           name: docker-${{ matrix.arch }}
           path: target/docker-results.json
           if-no-files-found: ignore
+
+  publish:
+    name: Publish Docker Hub multi-platform image
+    needs: image
+    if: github.repository == 'aliilyas/bruster' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: docker-digest-*
+          path: target/digests
+          merge-multiple: true
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Publish the exact digests that passed both architecture checks
+        run: |
+          docker buildx imagetools create \
+            --tag "${DOCKER_IMAGE}:sha-${GITHUB_SHA}" \
+            --tag "${DOCKER_IMAGE}:latest" \
+            "$(cat target/digests/amd64)" \
+            "$(cat target/digests/arm64)"
+          docker buildx imagetools inspect "${DOCKER_IMAGE}:sha-${GITHUB_SHA}" --raw > target/published-manifest.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          manifest = json.loads(Path('target/published-manifest.json').read_text())
+          platforms = {(item['platform']['os'], item['platform']['architecture']) for item in manifest['manifests']}
+          assert platforms == {('linux', 'amd64'), ('linux', 'arm64')}, platforms
+          print('Verified published linux/amd64 and linux/arm64 manifests')
+          PY
+      - name: Pull and launch the published image
+        run: |
+          docker pull "${DOCKER_IMAGE}:sha-${GITHUB_SHA}"
+          sh tests/mcp_launch.sh docker run --rm -i "${DOCKER_IMAGE}:sha-${GITHUB_SHA}"
+      - name: Publish image references
+        run: |
+          echo "Published \`${DOCKER_IMAGE}:latest\` for linux/amd64 and linux/arm64." >> "$GITHUB_STEP_SUMMARY"
+          echo "Source revision: \`${DOCKER_IMAGE}:sha-${GITHUB_SHA}\`." >> "$GITHUB_STEP_SUMMARY"
+          docker buildx imagetools inspect "${DOCKER_IMAGE}:sha-${GITHUB_SHA}"

@@ -102,19 +102,23 @@ Both base images are pinned to multi-platform SHA-256 digests. Refresh those
 digests when updating the base images, then rerun both architecture checks.
 
 ```sh
-docker build -t bruster:local .
-docker run --rm -i bruster:local
+docker run --rm -i ilyastmn/bruster:latest
 ```
+
+The [Docker Hub image](https://hub.docker.com/r/ilyastmn/bruster) includes both
+architectures. `latest` tracks tested `main` builds; `sha-<full-git-commit>` selects
+a particular source revision. CI publishes the exact tested images and updates
+the multi-platform tags only after both architecture checks pass.
 
 The default command serves MCP on stdin/stdout. Keep `-i` and omit `-t` for MCP
 clients; no port mapping or host display is needed. For example:
 
 ```json
-{ "mcpServers": { "bruster": { "command": "docker", "args": ["run", "--rm", "-i", "bruster:local"] } } }
+{ "mcpServers": { "bruster": { "command": "docker", "args": ["run", "--rm", "-i", "ilyastmn/bruster:latest"] } } }
 ```
 
 To pass additional options, include `--mcp` again, for example
-`docker run --rm -i bruster:local --mcp --viewport 1920x1080`.
+`docker run --rm -i ilyastmn/bruster:latest --mcp --viewport 1920x1080`.
 The image uses software rendering and disables WebKit's nested sandbox because
 Docker's default seccomp profile blocks its user namespaces. It needs no
 `--privileged` or extra capabilities. Tini forwards shutdown signals and reaps
@@ -124,9 +128,11 @@ For Glama, submit the Dockerfile in the listing's **Admin → Docker builds**
 configuration, using this repository as the build context, then run its evaluation.
 The default command answers `initialize` and `tools/list` without credentials.
 
-To test the image on a Linux Docker host (Python standard library only):
+To build the current checkout and test it on a Linux Docker host (Python standard
+library only):
 
 ```sh
+docker build -t bruster:local .
 python3 tests/docker.py --image bruster:local --https
 ```
 
