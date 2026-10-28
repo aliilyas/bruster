@@ -1,38 +1,267 @@
-<!doctype html><html lang="en"><meta charset="utf-8">
+<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Browser benchmark results, runtime footprint, reliability checks, and reproducible measurements for Bruster, Playwright, Puppeteer, and agent-browser.">
 <title>Bruster browser benchmarks</title><style>
-body{font:16px/1.6 system-ui,sans-serif;margin:2rem auto;padding:0 1rem;max-width:1200px;color:#202938}
-a{color:#075ab4}.scroll{overflow:auto}table{border-collapse:collapse;width:100%}
-th,td{padding:.6rem;border:1px solid #ccd3dc;text-align:right}th:first-child,td:first-child{text-align:left}
-th{background:#edf2f7}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f5f7fa;padding:1rem}
-</style><body><h1>Browser benchmarks</h1>
-<p>Commit <code>1d60e7188f0ab0e21219a8e75c76fccfefdc9052</code> · <a href="https://github.com/aliilyas/bruster/actions/runs/40594943590">Workflow and raw artifacts</a></p>
-<p>Measured 2026-10-27T22:38:46.090302+00:00 · 10 sessions per configuration. Values are medians.</p>
-<p>Playwright 1.64.1 · Puppeteer 25.16.0 · agent-browser 0.40.0 · Google Chrome for Testing 156.0.8078.4 · Node v26.12.1</p>
-<div class="scroll"><table><thead><tr><th>Metric</th><th>Bruster / WebKitGTK</th><th>Playwright / Headless Shell</th><th>Playwright / full Chrome</th><th>Puppeteer / full Chrome</th><th>agent-browser / full Chrome</th></tr></thead><tbody>
-<tr><td>Launch → first loaded page (ms)</td><td>30709.0</td><td>442.6</td><td>609.6</td><td>473.3</td><td>713.7</td></tr>
-<tr><td>Warm tiny-page navigation (ms)</td><td>7.3</td><td>9.8</td><td>15.9</td><td>17.7</td><td>32.2</td></tr>
-<tr><td>Tiny DOM extraction (ms)</td><td>0.9</td><td>2.8</td><td>6.1</td><td>5.2</td><td>3.9</td></tr>
-<tr><td>Large-page navigation (ms)</td><td>24.8</td><td>29.1</td><td>34.0</td><td>34.9</td><td>72.0</td></tr>
-<tr><td>Large DOM extraction, object return (ms)</td><td>16.4</td><td>87.0</td><td>88.6</td><td>28.5</td><td>29.0</td></tr>
-<tr><td>Large DOM extraction, JSON-string return (ms)</td><td>16.2</td><td>13.7</td><td>17.5</td><td>20.5</td><td>11.8</td></tr>
-<tr><td>Image-page navigation (ms)</td><td>115.3</td><td>117.1</td><td>120.4</td><td>125.7</td><td>127.7</td></tr>
-<tr><td>PNG screenshot (ms)</td><td>29.5</td><td>34.9</td><td>33.2</td><td>55.2</td><td>62.0</td></tr>
-<tr><td>Idle total PSS, including display (MiB)</td><td>286.4</td><td>325.9</td><td>513.7</td><td>424.0</td><td>520.6</td></tr>
-<tr><td>Idle process RSS, excluding display (MiB)</td><td>406.8</td><td>593.3</td><td>1179.7</td><td>1064.2</td><td>1597.9</td></tr>
-<tr><td>Installed runtime files, lower bound (MB)</td><td>427.9</td><td>475.5</td><td>630.8</td><td>644.7</td><td>483.2</td></tr>
-<tr><td>Sessions with fault-probe failures</td><td>0/10</td><td>10/10</td><td>10/10</td><td>0/10</td><td>0/10</td></tr>
-</tbody></table></div><h2>Method</h2>
-<p>Ten sessions per configuration by default, with rotating order and fresh browser profiles. 1280×800 viewport; localhost fixtures; no-store HTTP responses; navigation waits for load. OS filesystem caches are not flushed. Identical extraction JavaScript and cross-tool result hashes. Timings include controller round trips; agent-browser includes its per-command native CLI. Memory covers the complete owned process forest (including detached daemons and helpers), plus Xvfb for Bruster. PSS apportions shared pages; summed RSS double-counts them. Memory is small-page idle usage, not peak usage. Native snapshots have different semantics and are retained in the raw artifacts rather than ranked as equal work. MB = 1,000,000 bytes; MiB = 1,048,576 bytes. Installed-file inventories are lower bounds including browser/engine, linked libraries, observed mapped files and Node where required; unobserved OS resources may add more. GitHub-hosted runner hardware and OS packages can change: compare the configurations within a run and inspect provenance before interpreting trends.</p>
-<p><a href="measurement.json">measurement.json</a> · <a href="summary.json">summary.json</a> · <a href="samples.json">samples.json</a> · <a href="footprint.json">footprint.json</a> · <a href="report.md">report.md</a> · <a href="package.json">package.json</a> · <a href="package-lock.json">package-lock.json</a></p>
-<h2>Fault probes</h2><p>Failures remain visible even when a later retry succeeds. These probes run after the timed workloads.</p><ul>
-<li>Bruster / WebKitGTK — failures: none; successful 100 ms recovery retries: 0</li>
-<li>Playwright / Headless Shell — failures: recovery_after_navigation_error: 10; successful 100 ms recovery retries: 10</li>
-<li>Playwright / full Chrome — failures: recovery_after_navigation_error: 10; successful 100 ms recovery retries: 10</li>
-<li>Puppeteer / full Chrome — failures: none; successful 100 ms recovery retries: 0</li>
-<li>agent-browser / full Chrome — failures: none; successful 100 ms recovery retries: 0</li>
-</ul><details><summary>Environment, versions and hashes</summary>
-<pre>{
+:root {
+  color-scheme: light;
+  --ink: #182a42;
+  --muted: #536479;
+  --line: #dce4ed;
+  --blue: #175ca4;
+  --surface: #fff;
+  --soft: #f4f7fb;
+}
+* { box-sizing: border-box; }
+html { scroll-padding-top: 1.5rem; }
+body { margin: 0; background: var(--soft); color: var(--ink); font: 15px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
+a { color: var(--blue); text-underline-offset: .2em; }
+a:hover { text-decoration-thickness: 2px; }
+:focus-visible { outline: 3px solid #1681cc; outline-offset: 4px; }
+code, pre { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+code { font-size: .88em; }
+h1, h2, h3, p { margin: 0; }
+h1 { font-size: clamp(2rem, 4vw, 3rem); line-height: 1.15; letter-spacing: -.04em; }
+h2 { font-size: 1.4rem; letter-spacing: -.025em; line-height: 1.3; }
+h3 { font-size: 1rem; line-height: 1.4; }
+.container { width: min(100% - 3rem, 1280px); margin-inline: auto; }
+.skip-link { position: absolute; top: -5rem; left: 1rem; z-index: 10; padding: .6rem 1rem; background: white; }
+.skip-link:focus { top: 1rem; }
+.topbar { background: #182a42; border-bottom: 3px solid #7dd3e8; }
+.topbar-inner { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; min-height: 72px; }
+.brand { display: inline-flex; align-items: center; gap: .65rem; color: white; text-decoration: none; font-weight: 700; font-size: 1.25rem; letter-spacing: -.03em; }
+.brand img { width: 34px; height: 34px; }
+.top-links { display: flex; gap: 1.5rem; }
+.top-links a { color: #e2eaf4; font-size: .875rem; text-decoration: none; white-space: nowrap; }
+.top-links a:hover { color: white; text-decoration: underline; }
+main { padding-block: 2.25rem 3.5rem; }
+.eyebrow { color: var(--blue); font-size: .72rem; font-weight: 750; letter-spacing: .14em; text-transform: uppercase; margin-bottom: .65rem; }
+.lead { color: var(--muted); font-size: 1.075rem; margin-top: .85rem; max-width: 48rem; }
+.run-meta { display: flex; align-items: center; flex-wrap: wrap; gap: .65rem 1.1rem; color: var(--muted); font-size: .85rem; margin-top: 1.3rem; }
+.run-meta a { text-decoration: none; }
+.run-meta a:hover { text-decoration: underline; }
+.badge { display: inline-block; border-radius: 6px; padding: .2rem .55rem; font-size: .75rem; font-weight: 650; line-height: 1.5; white-space: nowrap; }
+.badge-blue { background: #e4effa; color: #174f87; }
+.badge-neutral { background: #edf2f7; color: #41556d; }
+.badge-warn { background: #fff1da; color: #834807; }
+.facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 1.5rem 0 0; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); overflow: hidden; }
+.facts > div { padding: 1rem 1.4rem; }
+.facts > div + div { border-left: 1px solid var(--line); }
+.facts dt { font-size: .76rem; color: var(--muted); }
+.facts dd { margin: .25rem 0 0; font-size: 1.4rem; font-weight: 700; letter-spacing: -.025em; font-variant-numeric: tabular-nums; }
+.section-nav { display: flex; gap: 1.6rem; margin: 1.5rem 0 2rem; padding: .2rem 0 .85rem; border-bottom: 1px solid var(--line); overflow-x: auto; }
+.section-nav a { flex: none; padding: .25rem 0; font-size: .85rem; font-weight: 600; text-decoration: none; }
+.section-nav a:hover { text-decoration: underline; }
+.section { margin-top: 2.75rem; }
+.section-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 1rem; margin-bottom: 1rem; }
+.section-head p { color: var(--muted); font-size: .875rem; margin-top: .4rem; max-width: 60rem; }
+.section-head > a { flex: none; font-size: .85rem; }
+.legend { color: var(--muted); font-size: .8rem; text-align: right; }
+.legend strong { color: var(--ink); }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.table-scroll { overflow-x: auto; overscroll-behavior-x: contain; }
+table { border-collapse: separate; border-spacing: 0; width: 100%; font-variant-numeric: tabular-nums; }
+.results-table { min-width: 1050px; table-layout: fixed; }
+.results-table col:first-child { width: 28%; }
+th, td { padding: .85rem 1rem; text-align: right; vertical-align: middle; border-bottom: 1px solid var(--line); }
+thead th { background: #edf2f8; padding-block: 1.1rem; font-weight: 650; font-size: .84rem; }
+thead th span { display: block; }
+.engine { display: block; color: var(--muted); font-size: .74rem; font-weight: 450; margin-top: .2rem; }
+.results-table th:first-child { position: sticky; left: 0; z-index: 1; text-align: left; background: var(--surface); box-shadow: 1px 0 0 var(--line); }
+.results-table thead th:first-child { background: #edf2f8; z-index: 2; }
+.results-table tbody th { font-size: .83rem; font-weight: 500; line-height: 1.45; }
+.results-table .group-row th { position: static; background: #f3f6fa; color: #48617e; font-size: .67rem; text-transform: uppercase; letter-spacing: .1em; font-weight: 750; padding: .5rem 1rem; box-shadow: none; }
+.results-table tbody tr:not(.group-row):hover > * { background: #f4f9ff; }
+.number { display: block; font-size: .95rem; font-weight: 650; line-height: 1.4; white-space: nowrap; }
+.range { display: block; margin-top: .25rem; color: var(--muted); font-size: .71rem; line-height: 1.4; white-space: nowrap; }
+tbody:last-child tr:last-child > * { border-bottom: 0; }
+.table-note { border-top: 1px solid var(--line); padding: .8rem 1rem; color: var(--muted); font-size: .78rem; background: #fafbfd; }
+.scroll-hint { display: none; margin-bottom: .7rem; color: var(--muted); font-size: .78rem; }
+.environment-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.environment-card { padding: 1.4rem; }
+.environment-card h3 { margin-bottom: 1rem; }
+.detail-list { margin: 0; }
+.detail-list > div { display: grid; grid-template-columns: 8.5rem minmax(0, 1fr); gap: .75rem; padding: .55rem 0; border-top: 1px solid #edf0f5; font-size: .83rem; }
+.detail-list dt { color: var(--muted); }
+.detail-list dd { margin: 0; overflow-wrap: anywhere; }
+.method-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.method-card { padding: 1.4rem; }
+.method-card p { margin-top: .65rem; color: var(--muted); font-size: .85rem; }
+.reliability-table { min-width: 970px; font-size: .82rem; }
+.reliability-table th, .reliability-table td { text-align: left; vertical-align: top; }
+.reliability-table tbody th { font-weight: 600; min-width: 175px; }
+.reliability-table td { overflow-wrap: anywhere; }
+.probe-list { margin: 0; padding-left: 1rem; }
+.probe-list li + li { margin-top: .35rem; }
+.files { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .65rem; }
+.files a { display: flex; align-items: center; justify-content: space-between; gap: .75rem; min-height: 54px; height: 100%; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); padding: .75rem 1rem; text-decoration: none; }
+.files a:hover { background: #edf5fd; border-color: #9ab9da; }
+.files code { overflow-wrap: anywhere; }
+.files span { color: var(--muted); font-size: .75rem; }
+.provenance { margin-top: 1rem; }
+.provenance summary { padding: 1rem 1.3rem; cursor: pointer; font-size: .875rem; font-weight: 600; }
+.provenance[open] summary { border-bottom: 1px solid var(--line); }
+.provenance pre { margin: 0; max-height: 440px; overflow: auto; background: #f8fafc; padding: 1.3rem; font-size: .76rem; line-height: 1.7; tab-size: 2; }
+.history-list { list-style: none; padding: 0; margin: 0; }
+.history-list li + li { border-top: 1px solid var(--line); }
+.history-entry { display: grid; grid-template-columns: 13.5rem minmax(0, 1fr); gap: 1.5rem; padding: 1.1rem 1.4rem; }
+.history-entry a { font-weight: 650; font-size: .875rem; }
+.history-entry code { display: block; margin-top: .3rem; color: var(--muted); }
+.history-entry time { font-size: .82rem; font-weight: 550; }
+.history-entry p { font-size: .76rem; color: var(--muted); margin-top: .35rem; overflow-wrap: anywhere; }
+.history-entry .badge { margin-left: .4rem; }
+.back-link { margin-top: 2rem; }
+footer { border-top: 1px solid var(--line); color: var(--muted); font-size: .8rem; }
+.footer-inner { display: flex; justify-content: space-between; gap: 1rem; padding-block: 1.5rem; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+@media (max-width: 1150px) {
+  .scroll-hint { display: block; }
+}
+@media (max-width: 760px) {
+  .container { width: calc(100% - 2rem); }
+  main { padding-top: 1.5rem; }
+  .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .facts > div { padding: .75rem 1rem; }
+  .facts > div:nth-child(3) { border-left: 0; }
+  .facts > div:nth-child(n+3) { border-top: 1px solid var(--line); }
+  .section-nav { gap: 1.3rem; margin-bottom: 2rem; }
+  .section-head { align-items: flex-start; flex-direction: column; gap: .6rem; }
+  .legend { text-align: left; }
+  .environment-grid, .method-grid { grid-template-columns: 1fr; }
+  .files { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .results-table { min-width: 920px; }
+  .results-table col:first-child { width: 180px; }
+  .results-table th, .results-table td { padding-inline: .8rem; }
+  .history-entry { grid-template-columns: 1fr; gap: .65rem; }
+  .history-entry code { display: inline-block; margin-left: .75rem; }
+  .footer-inner { flex-direction: column; gap: .3rem; }
+}
+@media (max-width: 420px) {
+  .topbar-inner { gap: .65rem; }
+  .brand { gap: .5rem; font-size: 1.1rem; }
+  .brand img { width: 30px; height: 30px; }
+  .top-links { gap: .75rem; }
+  .top-links a { font-size: .78rem; }
+  .files { grid-template-columns: 1fr; }
+  .results-table { min-width: 848px; }
+  .results-table col:first-child { width: 148px; }
+  .detail-list > div { grid-template-columns: 7rem minmax(0, 1fr); }
+  .environment-card, .method-card { padding: 1.1rem; }
+}
+@media print {
+  body { background: white; font-size: 10pt; }
+  .container { width: 100%; }
+  .topbar, .section-nav, .skip-link, .scroll-hint, footer { display: none; }
+  .table-scroll, .panel { overflow: visible; }
+  .results-table, .reliability-table { min-width: 0; }
+  th, td { padding: .4rem; }
+  .number { font-size: .8rem; }
+  .range { font-size: .6rem; white-space: normal; }
+  .results-table th:first-child { position: static; }
+  .section { break-inside: avoid; }
+}
+
+</style></head><body><a class="skip-link" href="#main">Skip to results</a>
+<header class="topbar"><div class="container topbar-inner">
+<a class="brand" href="../../../"><img src="../../../assets/logo.svg" alt="" width="34" height="34">bruster</a>
+<nav class="top-links" aria-label="Site"><a href="../../../">Documentation</a><a href="https://github.com/aliilyas/bruster">GitHub ↗</a></nav>
+</div></header><main class="container" id="main">
+<p class="eyebrow">Performance / Browser comparison</p><h1>Browser benchmarks</h1>
+<p class="lead">Compare timing, memory, runtime footprint, and reliability across five browser configurations.</p>
+<div class="run-meta">
+<span class="badge badge-blue">Archived measurement</span>
+<time datetime="2026-10-27T22:38:46.090302+00:00">27 Oct 2026 · 22:38 UTC</time>
+<a href="https://github.com/aliilyas/bruster/commit/1d60e7188f0ab0e21219a8e75c76fccfefdc9052" title="1d60e7188f0ab0e21219a8e75c76fccfefdc9052">Commit <code>1d60e7188f0a</code></a>
+<a href="https://github.com/aliilyas/bruster/actions/runs/40594943590">Workflow #3 ↗</a></div>
+<dl class="facts">
+<div><dt>Configurations</dt><dd>5</dd></div>
+<div><dt>Sessions / configuration</dt><dd>10</dd></div>
+<div><dt>Tiny iterations / session</dt><dd>10</dd></div>
+<div><dt>Viewport (px)</dt><dd>1280 × 800</dd></div></dl>
+<nav class="section-nav" aria-label="Benchmark sections">
+<a href="#results">Results</a><a href="#environment">Environment</a><a href="#method">Method</a>
+<a href="#reliability">Reliability</a><a href="#downloads">Downloads</a>
+<a href="../../#history">All measurements</a>
+</nav><section id="results" aria-labelledby="results-title">
+<div class="section-head"><div><h2 id="results-title">Performance results</h2>
+<p>Timings include controller round trips. Lower values mean less time, memory, or disk space.</p></div>
+<div class="legend"><strong>Median</strong><br>[observed min–max]</div></div>
+<p class="scroll-hint">Scroll the table horizontally to compare all five configurations.</p>
+<div class="panel"><div class="table-scroll" role="region" aria-labelledby="results-title" tabindex="0">
+<table class="results-table"><caption class="sr-only">Performance comparison. Values are medians with observed minimum and maximum beneath, except runtime footprint and failure counts.</caption>
+<colgroup><col><col><col><col><col><col></colgroup><thead><tr><th scope="col">Metric / unit</th>
+<th scope="col"><span>Bruster</span><span class="engine">WebKitGTK</span></th>
+<th scope="col"><span>Playwright</span><span class="engine">Headless Shell</span></th>
+<th scope="col"><span>Playwright</span><span class="engine">full Chrome</span></th>
+<th scope="col"><span>Puppeteer</span><span class="engine">full Chrome</span></th>
+<th scope="col"><span>agent-browser</span><span class="engine">full Chrome</span></th>
+</tr></thead>
+<tbody><tr class="group-row"><th scope="rowgroup" colspan="6">Startup</th></tr>
+<tr><th scope="row">Launch → first loaded page (ms)</th><td><span class="number">30,709.0</span><span class="range">[25,273.0–31,334.2]</span></td><td><span class="number">442.6</span><span class="range">[425.0–514.2]</span></td><td><span class="number">609.6</span><span class="range">[595.2–650.1]</span></td><td><span class="number">473.3</span><span class="range">[447.9–524.2]</span></td><td><span class="number">713.7</span><span class="range">[651.6–860.2]</span></td></tr>
+<tr><th scope="row">Startup → ready / blank-page setup (ms)</th><td><span class="number">30,144.5</span><span class="range">[24,712.3–31,128.8]</span></td><td><span class="number">426.6</span><span class="range">[410.6–491.1]</span></td><td><span class="number">571.2</span><span class="range">[517.8–611.0]</span></td><td><span class="number">442.9</span><span class="range">[412.9–488.4]</span></td><td><span class="number">644.0</span><span class="range">[558.5–754.5]</span></td></tr>
+<tr><th scope="row">First navigation after setup (ms)</th><td><span class="number">561.1</span><span class="range">[205.2–574.8]</span></td><td><span class="number">15.5</span><span class="range">[14.1–23.0]</span></td><td><span class="number">39.3</span><span class="range">[33.6–89.7]</span></td><td><span class="number">29.6</span><span class="range">[23.2–35.2]</span></td><td><span class="number">77.1</span><span class="range">[58.2–143.2]</span></td></tr>
+</tbody>
+<tbody><tr class="group-row"><th scope="rowgroup" colspan="6">Navigation</th></tr>
+<tr><th scope="row">Warm tiny-page navigation (ms)</th><td><span class="number">7.3</span><span class="range">[3.0–11.2]</span></td><td><span class="number">9.8</span><span class="range">[6.6–27.3]</span></td><td><span class="number">15.9</span><span class="range">[11.5–38.5]</span></td><td><span class="number">17.7</span><span class="range">[12.9–32.2]</span></td><td><span class="number">32.2</span><span class="range">[18.5–205.2]</span></td></tr>
+<tr><th scope="row">Large-page navigation (ms)</th><td><span class="number">24.8</span><span class="range">[21.5–33.3]</span></td><td><span class="number">29.1</span><span class="range">[18.4–41.0]</span></td><td><span class="number">34.0</span><span class="range">[23.7–52.8]</span></td><td><span class="number">34.9</span><span class="range">[30.1–49.3]</span></td><td><span class="number">72.0</span><span class="range">[60.1–110.3]</span></td></tr>
+<tr><th scope="row">Image-page navigation (ms)</th><td><span class="number">115.3</span><span class="range">[110.2–120.1]</span></td><td><span class="number">117.1</span><span class="range">[114.2–142.2]</span></td><td><span class="number">120.4</span><span class="range">[117.2–137.9]</span></td><td><span class="number">125.7</span><span class="range">[119.9–141.2]</span></td><td><span class="number">127.7</span><span class="range">[122.4–143.3]</span></td></tr>
+</tbody>
+<tbody><tr class="group-row"><th scope="rowgroup" colspan="6">Extraction and screenshots</th></tr>
+<tr><th scope="row">Tiny DOM extraction (ms)</th><td><span class="number">0.9</span><span class="range">[0.5–5.5]</span></td><td><span class="number">2.8</span><span class="range">[1.9–9.2]</span></td><td><span class="number">6.1</span><span class="range">[2.6–21.2]</span></td><td><span class="number">5.2</span><span class="range">[1.1–12.2]</span></td><td><span class="number">3.9</span><span class="range">[2.8–46.8]</span></td></tr>
+<tr><th scope="row">Large DOM extraction, object return (ms)</th><td><span class="number">16.4</span><span class="range">[11.4–24.7]</span></td><td><span class="number">87.0</span><span class="range">[60.1–145.3]</span></td><td><span class="number">88.6</span><span class="range">[61.3–128.5]</span></td><td><span class="number">28.5</span><span class="range">[16.3–65.4]</span></td><td><span class="number">29.0</span><span class="range">[22.5–43.8]</span></td></tr>
+<tr><th scope="row">Large DOM extraction, JSON-string return (ms)</th><td><span class="number">16.2</span><span class="range">[6.4–24.5]</span></td><td><span class="number">13.7</span><span class="range">[7.2–41.1]</span></td><td><span class="number">17.5</span><span class="range">[7.1–36.4]</span></td><td><span class="number">20.5</span><span class="range">[7.5–46.9]</span></td><td><span class="number">11.8</span><span class="range">[9.7–22.0]</span></td></tr>
+<tr><th scope="row">PNG screenshot (ms)</th><td><span class="number">29.5</span><span class="range">[28.3–33.0]</span></td><td><span class="number">34.9</span><span class="range">[29.4–45.0]</span></td><td><span class="number">33.2</span><span class="range">[30.4–51.7]</span></td><td><span class="number">55.2</span><span class="range">[43.5–77.1]</span></td><td><span class="number">62.0</span><span class="range">[47.3–77.6]</span></td></tr>
+</tbody>
+<tbody><tr class="group-row"><th scope="rowgroup" colspan="6">Memory and runtime footprint</th></tr>
+<tr><th scope="row">Idle total PSS, including display (MiB)</th><td><span class="number">286.4</span><span class="range">[279.2–288.2]</span></td><td><span class="number">325.9</span><span class="range">[319.4–328.8]</span></td><td><span class="number">513.7</span><span class="range">[511.1–516.8]</span></td><td><span class="number">424.0</span><span class="range">[422.3–425.7]</span></td><td><span class="number">520.6</span><span class="range">[515.0–526.9]</span></td></tr>
+<tr><th scope="row">Idle process RSS, excluding display (MiB)</th><td><span class="number">406.8</span><span class="range">[403.5–407.4]</span></td><td><span class="number">593.3</span><span class="range">[588.7–599.2]</span></td><td><span class="number">1,179.7</span><span class="range">[1,170.9–1,186.1]</span></td><td><span class="number">1,064.2</span><span class="range">[1,054.4–1,081.5]</span></td><td><span class="number">1,597.9</span><span class="range">[1,562.6–1,618.9]</span></td></tr>
+<tr><th scope="row">Installed runtime files, lower bound (MB)</th><td><span class="number">427.9</span></td><td><span class="number">475.5</span></td><td><span class="number">630.8</span></td><td><span class="number">644.7</span></td><td><span class="number">483.2</span></td></tr>
+</tbody>
+<tbody><tr class="group-row"><th scope="rowgroup" colspan="6">Reliability</th></tr>
+<tr><th scope="row">Sessions with failures (including cleanup)</th><td><span class="badge badge-neutral">0/10</span></td><td><span class="badge badge-warn">10/10</span></td><td><span class="badge badge-warn">10/10</span></td><td><span class="badge badge-neutral">0/10</span></td><td><span class="badge badge-neutral">0/10</span></td></tr>
+</tbody>
+</table></div><p class="table-note">Ranges show observed variation, not confidence intervals. Memory is idle usage; installed runtime sizes are lower bounds. <a href="#method">Read the measurement method</a>.</p></div></section>
+<section class="section" id="environment" aria-labelledby="environment-title">
+<div class="section-head"><div><h2 id="environment-title">Environment &amp; versions</h2>
+<p>The machine and exact runtime versions behind this measurement.</p></div></div>
+<div class="environment-grid"><div class="panel environment-card"><h3>Runner</h3>
+<dl class="detail-list"><div><dt>Operating system</dt><dd>Ubuntu 24.04.5 LTS</dd></div><div><dt>Processor</dt><dd>AMD EPYC 9V74 80-Core Processor</dd></div><div><dt>Visible CPUs</dt><dd>4</dd></div><div><dt>System memory</dt><dd>15.6 GiB</dd></div><div><dt>Runner image</dt><dd>20261023.334.3</dd></div></dl>
+</div><div class="panel environment-card"><h3>Browser runtimes &amp; tools</h3>
+<dl class="detail-list"><div><dt>WebKitGTK</dt><dd>2.52.6</dd></div><div><dt>Playwright</dt><dd>1.64.1</dd></div><div><dt>Puppeteer</dt><dd>25.16.0</dd></div><div><dt>agent-browser</dt><dd>0.40.0</dd></div><div><dt>Chrome</dt><dd>Google Chrome for Testing 156.0.8078.4</dd></div><div><dt>Headless Shell</dt><dd>Google Chrome for Testing 156.0.8078.4</dd></div><div><dt>Node.js</dt><dd>v26.12.1</dd></div></dl>
+</div></div></section>
+<section class="section" id="method" aria-labelledby="method-title">
+<div class="section-head"><div><h2 id="method-title">How to read these results</h2>
+<p>Measurement conditions, accounting boundaries, and comparison guidance.</p></div></div><div class="method-grid">
+<article class="panel method-card"><h3>Sampling</h3><p>Ten sessions per configuration by default, with rotating order and fresh browser profiles. Values are medians [observed minimum–maximum], not confidence intervals. Startup and first navigation have one sample per session; repeated-operation timings pool all iterations; memory uses the median of three idle readings per session.</p></article>
+<article class="panel method-card"><h3>Startup and workloads</h3><p>Startup ends at the adapter ready event, or after blank-page/viewport setup for agent-browser. The combined launch-to-first-page measurement includes both setup and the first navigation. Xvfb is already running: its startup time is excluded, but its memory is included. 1280×800 viewport; localhost fixtures; no-store HTTP responses; navigation waits for load. OS filesystem caches are not flushed. Identical extraction JavaScript and cross-tool result hashes. Timings include controller round trips; agent-browser includes its per-command native CLI.</p></article>
+<article class="panel method-card"><h3>Memory and scope</h3><p>Memory covers the complete owned process forest (including detached daemons and helpers), plus Xvfb for Bruster. PSS apportions shared pages; summed RSS double-counts them. Memory is small-page idle usage, not peak usage. Native snapshots have different semantics and are retained in the raw artifacts rather than ranked as equal work. MB = 1,000,000 bytes; MiB = 1,048,576 bytes.</p></article>
+<article class="panel method-card"><h3>Footprint and comparability</h3><p>Installed-file inventories are lower bounds including browser/engine, linked libraries, observed mapped files and Node where required; unobserved OS resources may add more. GitHub-hosted runner hardware and OS packages can change: compare the configurations within a run and inspect provenance before interpreting trends.</p></article>
+</div></section><section class="section" id="reliability" aria-labelledby="reliability-title">
+<div class="section-head"><div><h2 id="reliability-title">Fault probes &amp; cleanup</h2>
+<p>These probes run after the timed workloads. Failed attempts remain counted even when a later retry succeeds.</p></div></div>
+<p class="scroll-hint">Scroll horizontally for fault, cleanup, and recovery details.</p>
+<div class="panel table-scroll" role="region" aria-labelledby="reliability-title" tabindex="0">
+<table class="reliability-table"><caption class="sr-only">Post-workload fault probes and cleanup outcomes for each configuration.</caption>
+<thead><tr><th scope="col">Configuration</th><th scope="col">Sessions with failures</th>
+<th scope="col">Fault-probe failures</th><th scope="col">Shutdown / cleanup failures</th><th scope="col">Successful 100 ms retries</th></tr></thead><tbody>
+<tr><th scope="row">Bruster<span class="engine">WebKitGTK</span></th><td><span class="badge badge-neutral">0/10</span></td><td><span class="badge badge-neutral">None</span></td><td><span class="badge badge-neutral">None</span></td><td>0</td></tr>
+<tr><th scope="row">Playwright<span class="engine">Headless Shell</span></th><td><span class="badge badge-warn">10/10</span></td><td><ul class="probe-list"><li>recovery after navigation error: <strong>10</strong></li></ul></td><td><span class="badge badge-neutral">None</span></td><td>10</td></tr>
+<tr><th scope="row">Playwright<span class="engine">full Chrome</span></th><td><span class="badge badge-warn">10/10</span></td><td><ul class="probe-list"><li>recovery after navigation error: <strong>10</strong></li></ul></td><td><span class="badge badge-neutral">None</span></td><td>10</td></tr>
+<tr><th scope="row">Puppeteer<span class="engine">full Chrome</span></th><td><span class="badge badge-neutral">0/10</span></td><td><span class="badge badge-neutral">None</span></td><td><span class="badge badge-neutral">None</span></td><td>0</td></tr>
+<tr><th scope="row">agent-browser<span class="engine">full Chrome</span></th><td><span class="badge badge-neutral">0/10</span></td><td><span class="badge badge-neutral">None</span></td><td><span class="badge badge-neutral">None</span></td><td>0</td></tr>
+</tbody></table></div></section>
+<section class="section" id="downloads" aria-labelledby="downloads-title"><div class="section-head"><div>
+<h2 id="downloads-title">Raw data &amp; reproducibility</h2>
+<p>Download the measurements, runtime inventory, and resolved dependency files for this run.</p></div>
+<a href="https://github.com/aliilyas/bruster/actions/runs/40594943590">Workflow and raw artifacts ↗</a></div><ul class="files">
+<li><a href="measurement.json"><code>measurement.json</code><span>JSON ↓</span></a></li>
+<li><a href="summary.json"><code>summary.json</code><span>JSON ↓</span></a></li>
+<li><a href="samples.json"><code>samples.json</code><span>JSON ↓</span></a></li>
+<li><a href="footprint.json"><code>footprint.json</code><span>JSON ↓</span></a></li>
+<li><a href="report.md"><code>report.md</code><span>Markdown ↓</span></a></li>
+<li><a href="package.json"><code>package.json</code><span>JSON ↓</span></a></li>
+<li><a href="package-lock.json"><code>package-lock.json</code><span>JSON ↓</span></a></li>
+</ul><details class="panel provenance"><summary>Full environment, versions and hashes</summary>
+<pre tabindex="0" aria-label="Measurement provenance">{
   &quot;started_utc&quot;: &quot;2026-10-27T22:29:44.892726+00:00&quot;,
   &quot;platform&quot;: &quot;Linux-6.17.0-1022-azure-x86_64-with-glibc2.39&quot;,
   &quot;os&quot;: {
@@ -99,6 +328,8 @@ th{background:#edf2f7}pre{white-space:pre-wrap;overflow-wrap:anywhere;background
     ]
   },
   &quot;finished_utc&quot;: &quot;2026-10-27T22:38:46.090302+00:00&quot;
-}</pre></details>
-<p><a href="../../">All measurements</a></p>
-</body></html>
+}</pre></details></section>
+<p class="back-link"><a href="../../">← All measurements</a></p>
+</main><footer><div class="container footer-inner"><span>bruster · Browser performance, measured.</span>
+<a href="https://github.com/aliilyas/bruster/blob/1d60e7188f0ab0e21219a8e75c76fccfefdc9052/benchmarks/README.md">Benchmark source &amp; methodology ↗</a>
+</div></footer></body></html>
