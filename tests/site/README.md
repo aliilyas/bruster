@@ -6,6 +6,78 @@ individual HTML route, setup, Bruster commands, and explicit observations.
 The catalog supports search, category/contract/environment filters, source and
 assertion inspection, and importing a matching `results.json` report.
 
+## Cargo tests
+
+[`tests/test_lab.rs`](../test_lab.rs) runs the shared Python assertions against
+Cargo's freshly built Bruster executable. Install Python 3.10+ and Bruster's
+native runtime, then run:
+
+```sh
+cargo test --release --test test_lab
+
+# Run just one regression group.
+cargo test --release --test test_lab -- --exact form_state_and_atomic_failures
+```
+
+On headless Linux, prefix these commands with `xvfb-run -a`. The default target
+needs no Node installation or network access during execution. Its eight groups
+cover **39 fixtures × two transports = 78 observations**:
+
+| Cargo test | Coverage |
+| --- | --- |
+| `references_and_snapshots` | Duplicate names, replaced nodes, refreshed references, labels, Unicode |
+| `form_state_and_atomic_failures` | Number inputs, emoji, disabled fieldsets, submit, atomic multiselect, checkboxes |
+| `css_actionability_and_events` | Grid, hidden/covered targets, coordinates, propagation, canceled keys |
+| `shadow_frames_and_uploads` | Open shadow roots, slots, same-origin frames, binary file contents |
+| `javascript_waits_and_deadlines` | Microtasks, visibility waits, timeouts, late replies, zero deadlines |
+| `navigation_and_tabs` | History, redirects, DOM milestones, closing tabs with pending requests |
+| `http_and_storage` | Headers, network-idle gates, CORS rejection, cookies, origin isolation |
+| `rendering_and_application_workflows` | Screenshot pixels, canvas updates, login decoys, modal cancellation |
+
+Groups run sequentially to bound native-engine resource use. Cargo requires
+every selected case to pass exactly once per transport; a missing, duplicate,
+or skipped observation fails the test.
+
+The **complete core suite** is opt-in locally and runs in CI. Build the pinned
+framework bundles first:
+
+```sh
+npm ci --prefix tests/site/frameworks --ignore-scripts --no-audit --no-fund
+node tests/site/frameworks/build.mjs target/test-lab-frameworks
+cargo test --release --test test_lab -- --ignored --exact full_test_lab --nocapture
+```
+
+This includes every core case in the generated manifest. Required failures and
+runner errors fail Cargo; declared compatibility probes and unavailable
+platform prerequisites remain visible in the report.
+
+The **published-site test** requires internet access and uses 13 static fixtures,
+including all three real framework apps, through both transports. All 26
+observations must pass:
+
+```sh
+cargo test --release --test test_lab -- --ignored --exact published_test_lab --nocapture
+```
+
+`tests/run_all.sh` includes the focused groups and, with e2e enabled, the
+published-site test. `--no-e2e` skips network-dependent tests; `--no-lab` skips
+both lab runs. `--rounds N` repeats smoke/edge tests; each lab selection runs once.
+
+Cargo retains reports, fixture pages, transcripts, and `runner.log` in unique
+`target/test-lab-results/cargo/<test>-<pid>-<timestamp>/` directories. Failed
+tests print the evidence path; `--nocapture` also prints it on success.
+
+| Environment variable | Default / purpose |
+| --- | --- |
+| `BRUSTER_TEST_PYTHON` | `python3` (`python` on Windows); Python executable path or name |
+| `BRUSTER_TEST_LAB_BINARY` | Cargo's `CARGO_BIN_EXE_bruster`; override with a launcher or another executable |
+| `BRUSTER_TEST_LAB_OUTPUT` | `target/test-lab-results/cargo`; parent directory for unique run outputs |
+| `BRUSTER_TEST_LAB_FRAMEWORKS` | `target/test-lab-frameworks`; bundle directory for `full_test_lab` |
+| `BRUSTER_TEST_LAB_URL` | `https://aliilyas.github.io/bruster/test-lab/`; site root for `published_test_lab` |
+
+Relative override paths resolve from the repository root. Executable overrides
+accept one executable, not a shell command with arguments.
+
 ## Build and run
 
 Use Python 3.10+, Node 20+, a built Bruster executable, and its native browser
@@ -146,8 +218,9 @@ node scripts/test_lab_check.mjs target/test-lab
 python3 scripts/test_lab_ui.py --binary target/release/bruster
 ```
 
-CI runs the core suite through native JSONL and MCP on its Linux, macOS, and
-Windows matrix and retains reports/evidence for 30 days, including failed runs.
+CI runs Cargo's `full_test_lab` through native JSONL and MCP on its Linux, macOS,
+and Windows matrix. The public-site jobs also run `published_test_lab` on Linux
+and Windows. Both retain reports/evidence for 30 days, including failed runs.
 
 ## Publication
 
