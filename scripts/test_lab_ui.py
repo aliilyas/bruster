@@ -29,7 +29,9 @@ def check_catalog(binary, site, manifest, output, report_file, transport, server
     with tempfile.TemporaryDirectory(prefix='lab-catalog-',dir=temporary_root) as temp:
         # WKWebView suspends animation frames for off-screen windows. This test
         # exercises actual rendered frames after resizing the catalog.
-        client = Client(binary,transport,Path(temp),viewport=(1280,900),
+        # These sizes fit the smaller macOS runner desktop, which constrains
+        # visible windows to its work area. 960px still exercises desktop CSS.
+        client = Client(binary,transport,Path(temp),viewport=(960,640),
                         launch=('--visible',) if sys.platform=='darwin' else ())
         try:
             client.call('navigate',{'url':site,'timeout':20000},timeout=25)
@@ -102,7 +104,7 @@ def check_catalog(binary, site, manifest, output, report_file, transport, server
                 client.call('fill',{'selector':'#search','value':''})
             client.call('upload',{'selector':'#report-file','paths':[str(report_file)]})
             client.call('wait_for',{'text':'Imported 2 observations'})
-            for width,height,name in [(375,812,'mobile'),(1280,900,'desktop')]:
+            for width,height,name in [(375,640,'mobile'),(960,640,'desktop')]:
                 client.call('resize',{'width':width,'height':height})
                 # GTK can acknowledge the request before WebKit gets its new
                 # viewport; animation frames alone do not establish readiness.

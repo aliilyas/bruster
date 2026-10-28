@@ -46,6 +46,8 @@ that early search input survives initialization before exercising the controls.
 Responsive fixtures and catalog screenshots wait for the requested viewport
 dimensions before checking layout: native resize replies acknowledge the request
 before the window manager necessarily applies it.
+Catalog screenshots use 375×640 and 960×640 viewports, fitting smaller macOS
+runner desktops while covering both sides of the responsive layout breakpoints.
 Linux lab launches disable desktop-bus integration by default, including visible
 fixtures; `BRUSTER_USE_SESSION_BUS=1` explicitly enables it. The software renderer
 also defaults `WEBKIT_DISABLE_DMABUF_RENDERER=1` while respecting an explicit value.
