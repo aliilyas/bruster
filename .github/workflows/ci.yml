@@ -55,6 +55,9 @@ jobs:
 
       - name: Smoke and edge tests (Linux)
         if: runner.os == 'Linux' && matrix.test == 'full'
+        env:
+          BRUSTER_TEST_STDERR: 1
+          BRUSTER_TRACE_NAV: 1
         run: xvfb-run -a cargo test --release --locked --target ${{ matrix.target }} --test smoke --test edge
 
       - name: Diagnostics (macOS, stderr of one navigate)

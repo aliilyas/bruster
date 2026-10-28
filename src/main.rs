@@ -1578,6 +1578,19 @@ fn build_webview(
                 let mut p = ipc_pending.borrow_mut();
                 if generation == Some(p.generation) && !p.awaiting_start {
                     p.document = document;
+                } else if generation == Some(0)
+                    && document.is_some()
+                    && p.committed
+                    && !p.awaiting_start
+                    && p.document.is_none()
+                {
+                    // Commit can arrive before the document-start runtime is
+                    // installed. Its initial announcement retries an early
+                    // BindDocument that found no __bruster yet.
+                    let _ = ipc_proxy.send_event(UserEvent::BindDocument {
+                        tab,
+                        generation: p.generation,
+                    });
                 }
                 return;
             }

@@ -175,6 +175,33 @@ fn page_replies_preserve_json_and_reject_stale_attempts() {
 }
 
 #[test]
+fn document_announcement_retries_an_early_native_bind() {
+    let script = std::env::temp_dir().join(format!("bruster-bind-edge-{}.js", std::process::id()));
+    std::fs::write(&script, r#"
+        const bind = __bruster.bind;
+        window.skippedBind = false;
+        __bruster.bind = generation => {
+            if (window.skippedBind) return bind(generation);
+            // Model a commit-time evaluation before the runtime existed.
+            // The runtime's initial document announcement arrives afterwards.
+            window.skippedBind = true;
+            window.ipc.postMessage(JSON.stringify({ bound: true, generation: 0, document: __bruster.document }));
+        };
+    "#).unwrap();
+    let mut b = Browser::spawn_with(&["--init-script", script.to_str().unwrap()]);
+    let base = serve();
+    for until in ["dom", "load", "idle"] {
+        b.ok(
+            "navigate",
+            json!({ "url": format!("{base}/other?{until}"), "until": until, "timeout": 5000 }),
+        );
+        assert_eq!(b.ok("eval", json!({ "expression": "skippedBind" })), true);
+        assert_eq!(b.ok("title", json!({})), "other");
+    }
+    std::fs::remove_file(script).unwrap();
+}
+
+#[test]
 fn duplicate_load_does_not_release_requests_for_the_next_page() {
     let mut b = Browser::spawn_env(&[], &[("BRUSTER_TRACE_NAV", "1")]);
     let base = serve();

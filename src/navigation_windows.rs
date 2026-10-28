@@ -14,9 +14,11 @@ use crate::{
 };
 
 impl Pending {
-    fn windows_start(&mut self, id: u64, url: &str) {
-        if self.native_id == Some(id) {
-            return; // HTTP redirects keep their NavigationId.
+    fn windows_start(&mut self, id: u64, url: &str, redirected: bool) {
+        if redirected || self.native_id == Some(id) {
+            // Redirects retain their NavigationId, including a late redirect
+            // from a retiring load after its replacement has started.
+            return;
         }
         self.native_id = Some(id);
         if self.warming && url == "about:blank" {
@@ -49,11 +51,13 @@ pub fn observe(
                 if let Some(args) = args {
                     let mut id = 0;
                     let mut url = PWSTR::null();
+                    let mut redirected = BOOL::default();
                     args.NavigationId(&mut id)?;
                     args.Uri(&mut url)?;
+                    args.IsRedirected(&mut redirected)?;
                     let url = take_pwstr(url);
                     let mut p = start_pending.borrow_mut();
-                    p.windows_start(id, &url);
+                    p.windows_start(id, &url, redirected.as_bool());
                     trace_navigation("provisional start", tab, &p, &url);
                 }
                 Ok(())
@@ -139,17 +143,19 @@ mod tests {
             warming: true,
             ..Default::default()
         };
-        p.windows_start(10, "about:blank");
+        p.windows_start(10, "about:blank", false);
         p.begin_navigation();
-        p.windows_start(11, "https://example.com/");
+        p.windows_start(11, "https://example.com/", false);
         assert!(!p.windows_current(10));
         assert!(p.windows_current(11));
         let generation = p.generation;
-        p.windows_start(11, "https://example.com/redirected");
+        p.windows_start(11, "https://example.com/redirected", true);
+        p.windows_start(10, "https://example.com/stale", true);
+        assert!(p.windows_current(11));
         assert_eq!(p.generation, generation);
         p.begin_navigation();
         assert!(!p.windows_current(11));
-        p.windows_start(12, "https://example.com/redirected");
+        p.windows_start(12, "https://example.com/redirected", false);
         assert!(!p.windows_current(11));
         assert!(p.windows_current(12));
     }
