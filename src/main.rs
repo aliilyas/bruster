@@ -158,6 +158,9 @@ enum UserEvent {
     },
     /// Wake the event loop to expire requests, even when GTK has no events.
     Deadline,
+    /// WebView2 has acknowledged the previous native navigation call.
+    #[cfg(target_os = "windows")]
+    StartNavigation(TabId),
     /// Bind runtime milestones to the document committed by this navigation.
     BindDocument {
         tab: TabId,
@@ -265,6 +268,10 @@ struct Pending {
     native_generation: u64,
     #[cfg(target_os = "windows")]
     native_id: Option<u64>,
+    #[cfg(target_os = "windows")]
+    native_start: Option<u64>,
+    #[cfg(target_os = "windows")]
+    native_next: Option<navigation_windows::Navigation>,
     awaiting_start: bool,
     committed: bool,
     document: Option<String>,
@@ -765,6 +772,12 @@ fn main() -> wry::Result<()> {
                     }
                 }
             }
+            #[cfg(target_os = "windows")]
+            Event::UserEvent(UserEvent::StartNavigation(tab)) => {
+                if let Some(t) = app.tabs.get(&tab) {
+                    navigation_windows::resume(&t.webview, tab, &t.pending, &app.proxy);
+                }
+            }
             Event::UserEvent(UserEvent::EvalRetry { tab, id, attempt }) => {
                 app.eval_retry(tab, id, attempt)
             }
@@ -780,8 +793,16 @@ fn main() -> wry::Result<()> {
                         p.loading = false;
                         p.awaiting_start = false;
                         let generation = p.generation;
+                        #[cfg(target_os = "windows")]
+                        let stop = p.native_start.is_none();
+                        #[cfg(not(target_os = "windows"))]
+                        let stop = true;
                         drop(p);
-                        stop_loading(&t.webview);
+                        // A queued WebView2 start still needs to identify its
+                        // call. The handler cancels it when it finally arrives.
+                        if stop {
+                            stop_loading(&t.webview);
+                        }
                         fail(id, format!("navigate {url}: timed out"));
                         app.flush(tab, generation);
                     }
@@ -1703,8 +1724,13 @@ fn build_webview(
     #[cfg(target_os = "windows")]
     {
         navigation_windows::observe(&webview, tab, pending.clone(), proxy.clone())?;
-        track_history(&webview, tab, pending, proxy)?;
-        webview.load_url(url.unwrap_or("about:blank"))?;
+        track_history(&webview, tab, pending.clone(), proxy)?;
+        navigation_windows::navigate(
+            &webview,
+            &pending,
+            "navigate",
+            Some(url.unwrap_or("about:blank")),
+        )?;
     }
     #[cfg(target_os = "linux")]
     let webview = {
@@ -1951,7 +1977,9 @@ fn attach_files(mut params: Value) -> Result<Value, String> {
 fn start_navigation(tab: &Tab, _id: u64, method: &str, url: Option<&str>) -> wry::Result<()> {
     #[cfg(target_os = "macos")]
     return tab.navigation.navigate(&tab.webview, _id, method, url);
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "windows")]
+    return navigation_windows::navigate(&tab.webview, &tab.pending, method, url);
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     match method {
         "navigate" => tab.webview.load_url(url.unwrap()),
         "reload" => tab.webview.reload(),
