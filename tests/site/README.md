@@ -75,6 +75,9 @@ both lab runs. `--rounds N` repeats smoke/edge tests; each lab selection runs on
 Cargo retains reports, fixture pages, transcripts, and `runner.log` in unique
 `target/test-lab-results/cargo/<test>-<pid>-<timestamp>/` directories. Failed
 tests print the evidence path; `--nocapture` also prints it on success.
+CI overrides these paths to use the runner's temporary directory: Rust-cache
+cleanup removes non-Cargo files under `target`, including the generated site's
+ownership marker. CI retains the temporary reports as workflow artifacts.
 
 | Environment variable | Default / purpose |
 | --- | --- |
