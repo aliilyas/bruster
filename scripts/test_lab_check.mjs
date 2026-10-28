@@ -15,10 +15,13 @@ async function walk(root) {
     const content = await readFile(file, 'utf8');
     for (const match of content.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)) {
       const src = match[1].match(/\bsrc="([^"]+)"/i);
-      if (src) await stat(path.resolve(path.dirname(file), src[1]));
+      const type = match[1].match(/\btype="([^"]+)"/i)?.[1];
+      if (type === 'application/ld+json' || type === 'application/json') JSON.parse(match[2]);
+      else if (src) await stat(path.resolve(path.dirname(file), src[1]));
       else new vm.Script(match[2], { filename: file });
     }
     for (const match of content.matchAll(/<link\b[^>]*href="([^"]+)"/gi)) {
+      if (/\brel="canonical"/i.test(match[0])) continue;
       await stat(path.resolve(path.dirname(file), match[1]));
     }
     count++;

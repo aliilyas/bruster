@@ -105,15 +105,19 @@ return as notifications.
 ### Common MCP client configs
 
 ```jsonc
-// opencode (opencode.json), Claude Desktop (claude_desktop_config.json),
-// Cursor (.cursor/mcp.json), Windsurf, Zed
+// Claude Desktop (claude_desktop_config.json), Cursor (.cursor/mcp.json)
 { "mcpServers": { "bruster": { "command": "bruster", "args": ["--mcp", "--quiet"] } } }
 ```
 
 ```sh
 claude mcp add bruster -- bruster --mcp --quiet          # Claude Code
 codex mcp add bruster -- bruster --mcp --quiet           # Codex CLI
+opencode mcp add bruster -- bruster --mcp --quiet        # OpenCode
 ```
+
+OpenCode V2 uses `mcp.servers` in `opencode.jsonc`. See the
+[client-specific MCP setup guide](https://aliilyas.github.io/bruster/mcp/)
+for complete configurations.
 
 ```jsonc
 // VS Code (.vscode/mcp.json)
@@ -308,6 +312,7 @@ Calls routed through the page runtime (`eval`, `url`, `title`, `snapshot`, inter
 - CI (`.github/workflows/ci.yml`) builds all platforms, runs the tests, and publishes release archives on `v*` tags.
 - Benchmarks: `scripts/bench_compare.py` compares five configurations; `scripts/bench_footprint.py` inventories runtime files and `scripts/bench_report.py` validates and publishes results. See [setup and methodology](benchmarks/README.md).
 - Test Lab: `tests/test_lab.rs` integrates the shared fixtures into Cargo; `scripts/test_lab.py` builds, serves, and runs them. See [case authoring and verification](tests/site/README.md).
+- Website: `site/` contains the GitHub Pages source. See [local preview and publishing](site/README.md).
 
 ## License
 

@@ -12,6 +12,7 @@ from lab.build import ROOT, assemble, build, validate
 from lab.cases import all_cases
 from lab.runner import run
 from lab.server import FixtureServer
+from site_layout import SITE_URL
 
 
 def main():
@@ -21,6 +22,7 @@ def main():
         sub = commands.add_parser(name)
         if name in ('build','serve','run','assemble'):
             sub.add_argument('--frameworks',type=Path,help='Directory containing locally built React/Vue/Svelte bundles')
+            sub.add_argument('--base-url',default=SITE_URL,help='Public product site URL for catalog metadata and sitemap')
         if name in ('build','serve','run'):
             sub.add_argument('--site-dir',type=Path,default=ROOT/'target/test-lab')
         if name=='build':
@@ -44,7 +46,7 @@ def main():
         print(f'Validated {count} executable case definitions')
         return 0
     if args.command=='assemble':
-        manifest = assemble(args.existing,args.output,args.frameworks)
+        manifest = assemble(args.existing,args.output,args.frameworks,args.base_url)
         print(f'Assembled {len(manifest["cases"])} fixtures at {args.output}/test-lab/')
         return 0
     if args.command=='run' and args.url:
@@ -58,7 +60,7 @@ def main():
                    patterns=args.case,strict_probes=args.strict_probes)
     destination = getattr(args,'output',None) if args.command=='build' else None
     destination = destination or args.site_dir
-    manifest = build(destination,args.frameworks)
+    manifest = build(destination,args.frameworks,args.base_url)
     if args.command=='build':
         print(f'Built {len(manifest["cases"])} fixtures at {destination}')
         return 0

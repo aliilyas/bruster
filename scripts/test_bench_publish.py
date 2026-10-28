@@ -148,8 +148,8 @@ class Reports(unittest.TestCase):
         record = json.loads((self.results / 'measurement.json').read_text())
         record['metadata']['chrome'] = '<script>alert(1)</script>'
         page = report.page(record)
-        self.assertNotIn('<script>', page)
-        self.assertIn('&lt;script&gt;', page)
+        self.assertNotIn(record['metadata']['chrome'], page)
+        self.assertIn('&lt;script&gt;alert(1)&lt;/script&gt;', page)
 
 
 class ProcessLifecycle(unittest.TestCase):

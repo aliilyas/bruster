@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from bench_audit import summary
+from site_layout import SITE_URL, render_page
 
 
 LABELS = {
@@ -223,7 +224,7 @@ def environment(metadata):
             f"runner image {metadata.get('runner_image', {}).get('ImageVersion') or 'unrecorded'}")
 
 
-def page(record, history=None):
+def page(record, history=None, base_url=SITE_URL):
     e = lambda value: html.escape(str(value), quote=True)
     c, m = record['context'], record['metadata']
     prefix = f"runs/{record_id(record)}/" if history is not None else ''
@@ -262,17 +263,9 @@ def page(record, history=None):
             f'<li>{e(name.replace("_", " "))}: <strong>{count}</strong></li>'
             for name, count in counts.items()) + '</ul>'
 
-    parts = ['<!doctype html><html lang="en"><head><meta charset="utf-8">',
-             '<meta name="viewport" content="width=device-width, initial-scale=1">',
-             '<meta name="description" content="Browser benchmark results, runtime footprint, reliability checks, and reproducible measurements for Bruster, Playwright, Puppeteer, and agent-browser.">',
-             '<title>Bruster browser benchmarks</title><style>',
-             Path(__file__).with_suffix('.css').read_text(),
-             '</style></head><body><a class="skip-link" href="#main">Skip to results</a>',
-             '<header class="topbar"><div class="container topbar-inner">',
-             f'<a class="brand" href="{home}"><img src="{home}assets/logo.svg" alt="" width="34" height="34">bruster</a>',
-             f'<nav class="top-links" aria-label="Site"><a href="{home}">Documentation</a><a href="{e(repo)}">GitHub ↗</a></nav>',
-             '</div></header><main class="container" id="main">',
-             '<p class="eyebrow">Performance / Browser comparison</p><h1>Browser benchmarks</h1>',
+    parts = ['<main class="container benchmark-content" id="main">',
+             f'<p class="breadcrumbs"><a href="{home}">bruster</a><span>/</span>Benchmarks</p>',
+             '<p class="eyebrow">Performance, with the context attached</p><h1>Browser benchmarks.</h1>',
              '<p class="lead">Compare timing, memory, runtime footprint, and reliability across five browser configurations.</p>',
              '<div class="run-meta">',
              f'<span class="badge badge-blue">{"Latest measurement" if history is not None else "Archived measurement"}</span>',
@@ -379,10 +372,33 @@ def page(record, history=None):
         parts.append('</ol></section>')
     else:
         parts.append('<p class="back-link"><a href="../../">← All measurements</a></p>')
-    parts.extend(['</main><footer><div class="container footer-inner"><span>bruster · Browser performance, measured.</span>',
-                  f'<a href="{e(repo)}/blob/{e(c["sha"])}/benchmarks/README.md">Benchmark source &amp; methodology ↗</a>',
-                  '</div></footer></body></html>\n'])
-    return '\n'.join(parts)
+    parts.extend([f'<p class="benchmark-source"><a href="{e(repo)}/blob/{e(c["sha"])}/benchmarks/README.md">Benchmark source &amp; methodology ↗</a></p>',
+                  '</main>'])
+    archive = history is None
+    path = f'benchmarks/runs/{record_id(record)}/' if archive else 'benchmarks/'
+    title = (f'Bruster Benchmark Run #{c["run_number"]} · Attempt {c["run_attempt"]}' if archive
+             else 'Browser Benchmarks: Bruster, Playwright & Puppeteer')
+    description = ('Compare Bruster, Playwright, Puppeteer, and agent-browser: startup, navigation, '
+                   'memory, runtime footprint, and reliability, with raw data and methodology.')
+    if archive:
+        description = f'Archived measurement from {m["finished_utc"]}. ' + description
+    return render_page(title, description, path, '\n'.join(parts), base_url=base_url,
+                       section='Benchmarks', body_class='benchmark-page', noindex=archive,
+                       extra_head='<style>\n' + Path(__file__).with_suffix('.css').read_text() + '</style>')
+
+
+def render_reports(root, base_url=SITE_URL):
+    """Refresh presentation from immutable records without running measurements."""
+    history = [json.loads(p.read_text()) for p in (root / 'runs').glob('*/measurement.json')]
+    history.sort(key=lambda r: (r['context']['run_number'], r['context']['run_attempt'], r['context']['run_id']), reverse=True)
+    if not history:
+        return []
+    for item in history:
+        (root / 'runs' / record_id(item) / 'index.html').write_text(page(item, base_url=base_url))
+    write_json(root / 'latest.json', history[0])
+    write_json(root / 'history.json', [dict(r['context'], path=f'runs/{record_id(r)}/') for r in history])
+    (root / 'index.html').write_text(page(history[0], history, base_url=base_url))
+    return history
 
 
 def install(results, site):
@@ -395,13 +411,7 @@ def install(results, site):
         content = (results / name).read_bytes()
         require(not target.exists() or target.read_bytes() == content, f'Refusing to overwrite immutable result: {target}')
         target.write_bytes(content)
-    history = [json.loads(p.read_text()) for p in (root / 'runs').glob('*/measurement.json')]
-    history.sort(key=lambda r: (r['context']['run_number'], r['context']['run_attempt'], r['context']['run_id']), reverse=True)
-    for item in history:
-        (root / 'runs' / record_id(item) / 'index.html').write_text(page(item))
-    write_json(root / 'latest.json', history[0])
-    write_json(root / 'history.json', [dict(r['context'], path=f'runs/{record_id(r)}/') for r in history])
-    (root / 'index.html').write_text(page(history[0], history))
+    render_reports(root)
     (site / '.nojekyll').touch()
     index = site / 'index.html'
     if not index.exists():

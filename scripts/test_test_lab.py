@@ -9,6 +9,7 @@ import tempfile
 import unittest
 import zlib
 from pathlib import Path
+from xml.etree import ElementTree as ET
 from unittest.mock import patch
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
@@ -58,14 +59,16 @@ class Catalog(unittest.TestCase):
             (old/'benchmarks/history.json').write_text('[{"run":1}]')
             (old/'.git').mkdir()
             (old/'.git/config').write_text('checkout credentials')
-            assemble(old,root/'first')
-            assemble(root/'first',root/'second')
+            assemble(old,root/'first',base_url='https://example.test/')
+            assemble(root/'first',root/'second',base_url='https://example.test/')
             for directory in (root/'first',root/'second'):
                 self.assertEqual((directory/'CNAME').read_text(),'example.test')
                 self.assertEqual((directory/'benchmarks/history.json').read_text(),'[{"run":1}]')
                 self.assertEqual((directory/'index.html').read_text().count('data-bruster-test-lab'),1)
                 self.assertFalse((directory/'.git').exists())
                 self.assertTrue((directory/'test-lab/cases/select-invalid-multi.html').is_file())
+                self.assertEqual([item.text for item in ET.parse(directory/'sitemap.xml').findall('.//{*}loc')],
+                                 ['https://example.test/test-lab/'])
             self.assertNotIn('data-bruster-test-lab',(old/'index.html').read_text())
 
     def test_build_does_not_replace_an_unowned_directory(self):

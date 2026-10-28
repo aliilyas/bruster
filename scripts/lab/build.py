@@ -6,6 +6,9 @@ import re
 import shutil
 import subprocess
 from pathlib import Path
+from xml.etree import ElementTree as ET
+
+from site_layout import SITE_URL, render_metadata, site_url, substitute
 
 from .cases import all_cases
 
@@ -71,6 +74,7 @@ def page(item, available):
     return f'''<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{title}</title><link rel="icon" href="../assets/icon.svg">
+<meta name="robots" content="noindex, follow">
 <style>body{{margin:24px;font:16px/1.5 system-ui,sans-serif}}button,input,select,textarea{{font:inherit}}button{{cursor:pointer}}iframe{{width:480px;height:240px}}{item['css']}</style>
 <script src="../server-config.js"></script><script src="../fixture.js"></script>
 {extra}</head><body>
@@ -87,7 +91,29 @@ window.addEventListener('load',async()=>{{
 '''
 
 
-def build(output, frameworks=None):
+def catalog(manifest, base_url):
+    cases = manifest['cases']
+    cards = []
+    for item in cases:
+        e = lambda value: html.escape(str(value),quote=True)
+        cards.append(f'<article class="case"><div class="case-id">{e(item["id"])}</div>'
+                     f'<h3><a href="{e(item["url"])}">{e(item["title"])}</a></h3>'
+                     f'<p>{len(item["steps"])} steps · {e(item["category"])}</p>'
+                     f'<p>{e(item["description"])}</p></article>')
+    return substitute((SOURCE/'index.html').read_text(encoding='utf-8'), {
+        'metadata': render_metadata(
+            'Browser Automation Test Lab — Bruster',
+            'Explore reproducible HTML, CSS, and JavaScript test fixtures for native browser automation. '
+            'Run executable assertions through Bruster’s JSON-lines and MCP APIs.',
+            'test-lab/',base_url=base_url,section='Test Lab',page_type='CollectionPage'),
+        'case_count': len(cases), 'category_count': len({item['category'] for item in cases}),
+        'probe_count': sum(item['contract']=='probe' for item in cases),
+        'revision': manifest['provenance']['sourceSha256'][:8], 'cards': '\n'.join(cards),
+    })
+
+
+def build(output, frameworks=None, base_url=SITE_URL):
+    base_url = site_url(base_url)
     cases = all_cases()
     validate(cases)
     if frameworks:
@@ -136,6 +162,7 @@ def build(output, frameworks=None):
         (output/name).write_text(page(item,available),encoding='utf-8')
         entries.append(dict(item,url=name))
     manifest = {'schemaVersion':1,'provenance':provenance(),'frameworks':available,'cases':entries}
+    (output/'index.html').write_text(catalog(manifest,base_url),encoding='utf-8')
     (output/'manifest.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
     (output/'.nojekyll').touch()
     inventory = sorted(p.relative_to(output).as_posix() for p in output.rglob('*') if p.is_file() and p!=marker)
@@ -143,7 +170,8 @@ def build(output, frameworks=None):
     return manifest
 
 
-def assemble(existing, output, frameworks=None):
+def assemble(existing, output, frameworks=None, base_url=SITE_URL):
+    base_url = site_url(base_url)
     existing, output = Path(existing).resolve(),Path(output).resolve()
     if output.exists() or output==existing or output.is_relative_to(existing):
         raise ValueError('Assembly requires a fresh output directory outside the existing site')
@@ -151,7 +179,16 @@ def assemble(existing, output, frameworks=None):
     lab = output/'test-lab'
     if lab.exists() and not (lab/'.bruster-test-lab').exists():
         raise ValueError('Existing test-lab path is not owned by this publisher')
-    manifest = build(lab,frameworks)
+    manifest = build(lab,frameworks,base_url)
+    namespace = '{http://www.sitemaps.org/schemas/sitemap/0.9}'
+    ET.register_namespace('',namespace[1:-1])
+    sitemap = output/'sitemap.xml'
+    tree = ET.parse(sitemap) if sitemap.exists() else ET.ElementTree(ET.Element(namespace+'urlset'))
+    catalog_url = base_url+'test-lab/'
+    if catalog_url not in {item.text for item in tree.findall('.//'+namespace+'loc')}:
+        entry = ET.SubElement(tree.getroot(),namespace+'url')
+        ET.SubElement(entry,namespace+'loc').text = catalog_url
+    tree.write(sitemap,encoding='utf-8',xml_declaration=True)
     index = output/'index.html'
     link = '<a data-bruster-test-lab href="test-lab/">Test Lab</a>'
     if index.exists():
