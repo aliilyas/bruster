@@ -97,6 +97,17 @@ jobs:
           BRUSTER_TRACE_NAV: 1
         run: cargo test --release --locked --target ${{ matrix.target }} --test edge -- --test-threads=1
 
+      - name: Repeat queued native starts (Windows)
+        if: runner.os == 'Windows'
+        env:
+          BRUSTER_TEST_STDERR: 1
+          BRUSTER_TRACE_NAV: 1
+        run: |
+          for ($round = 1; $round -le 5; $round++) {
+            cargo test --release --locked --target ${{ matrix.target }} --test edge -- --exact navigate_times_out_and_is_superseded same_url_replacement_loads_the_new_document --nocapture --test-threads=1
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
       - name: MCP launch check
         if: runner.os != 'Windows'
         run: |
