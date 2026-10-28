@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>bruster: Native webview browser for agents</title>
-<meta name="description" content="bruster is a native webview browser (WKWebView, WebKitGTK, WebView2) driven by an agent over JSON lines on stdio. No Chromium download, no Node, one process under 1 MB.">
+<meta name="description" content="Native browser automation for AI agents. Built in Rust with JSON-lines control and a built-in MCP server. No Node.js required.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🖥️</text></svg>">
 <style>
   html{scroll-behavior:smooth}
@@ -109,12 +109,13 @@
 
   <main class="content">
     <h1 id="top">bruster</h1>
-    <p class="lead">A native webview browser driven by an agent over JSON lines on
-      stdio. No Chromium download. No Node. One process of less than 1&nbsp;MB.</p>
-    <p>bruster controls the engine that the operating system already ships:
+    <p class="lead">Native browser automation for AI agents. Built in Rust with
+      JSON-lines control and a built-in MCP server. No Node.js required.</p>
+    <p>bruster uses each platform's native webview:
       <strong>WKWebView</strong> on macOS, <strong>WebKitGTK</strong> on Linux, and
-      <strong>WebView2</strong> on Windows. The program is a small Rust binary built on
-      <a href="https://github.com/tauri-apps/wry">wry</a>. Agents drive it with
+      <strong>WebView2</strong> on Windows. The program is a small Rust controller built on
+      <a href="https://github.com/tauri-apps/wry">wry</a>. Install the native browser
+      runtime where required. Agents drive it with
       one JSON object per line, or with the Model Context Protocol through
       <code>--mcp</code>.</p>
 
@@ -135,14 +136,14 @@
     </div>
 
     <h2 id="overview">Overview</h2>
-    <p>bruster reads commands from stdin and writes its native protocol to
-      stdout. It is one process with no bundled browser and no runtime. It uses
-      both a line-oriented JSON protocol and the Model Context Protocol. The
+    <p>bruster reads commands from stdin and writes results and events to
+      stdout. Rendering also uses native browser libraries and helper processes.
+      It supports a line-oriented JSON protocol and the Model Context Protocol. The
       same binary works for a scripted scrape, a test harness, or an agent tool
       stack.</p>
     <ul>
       <li><strong>Native engine.</strong> WKWebView, WebKitGTK 4.1 and WebView2, selected at build time.</li>
-      <li><strong>Small.</strong> One release binary of about <span id="inline-binary">1</span>&nbsp;MB. There is no separate browser download.</li>
+      <li><strong>Small controller.</strong> A compact release executable backed by the platform's browser runtime.</li>
       <li><strong>Complete.</strong> Navigation, DOM snapshots, forms, screenshots, cookies, tabs, network and console logs.</li>
       <li><strong>Portable.</strong> Prebuilt for macOS (arm64, x86_64), Linux (x86_64, arm64) and Windows (x86_64).</li>
       <li><strong>Agent-ready.</strong> <code>--mcp</code> exposes every method as a tool. Page events arrive as notifications.</li>
