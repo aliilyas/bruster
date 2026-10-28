@@ -1,0 +1,729 @@
+{
+  "schema_version": 1,
+  "context": {
+    "repository": "aliilyas/bruster",
+    "sha": "a0eec025995b1383087deec7a66f6cc82ceca09e",
+    "run_id": 40779563650,
+    "run_number": 23,
+    "run_attempt": 1,
+    "run_url": "https://github.com/aliilyas/bruster/actions/runs/40779563650"
+  },
+  "metadata": {
+    "started_utc": "2026-10-28T22:32:02.907847+00:00",
+    "platform": "Linux-7.0.0-1017-azure-x86_64-with-glibc2.39",
+    "os": {
+      "NAME": "Ubuntu",
+      "ID": "ubuntu",
+      "PRETTY_NAME": "Ubuntu 24.04.5 LTS",
+      "VERSION_ID": "24.04",
+      "VERSION": "24.04.5 LTS (Noble Numbat)",
+      "VERSION_CODENAME": "noble",
+      "ID_LIKE": "debian",
+      "HOME_URL": "https://www.ubuntu.com/",
+      "SUPPORT_URL": "https://help.ubuntu.com/",
+      "BUG_REPORT_URL": "https://bugs.launchpad.net/ubuntu/",
+      "PRIVACY_POLICY_URL": "https://www.ubuntu.com/legal/terms-and-policies/privacy-policy",
+      "UBUNTU_CODENAME": "noble",
+      "LOGO": "ubuntu-logo"
+    },
+    "node": "v26.13.0",
+    "chrome": "Google Chrome for Testing 156.0.8078.4",
+    "headless_shell": "Google Chrome for Testing 156.0.8078.4",
+    "cpu_count": 4,
+    "cpu_model": "AMD EPYC 9V45 96-Core Processor",
+    "mem_total_kib": 16367512,
+    "runner_image": {
+      "ImageOS": "ubuntu24",
+      "ImageVersion": "20261026.354.1",
+      "RUNNER_ARCH": "X64"
+    },
+    "session_environment": {
+      "display_set": true,
+      "session_bus_address_set": false,
+      "XDG_CURRENT_DESKTOP": null,
+      "GTK_USE_PORTAL": null,
+      "GTK_MODULES": null,
+      "NO_AT_BRIDGE": null,
+      "BRUSTER_USE_SESSION_BUS": null
+    },
+    "rustc": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+    "gtk": "3.24.41",
+    "webkitgtk": "2.52.6",
+    "packages": {
+      "playwright-core": "1.64.1",
+      "puppeteer-core": "25.16.0",
+      "agent-browser": "0.40.0"
+    },
+    "bruster_bytes": 1472144,
+    "bruster_sha256": "d01261cbfdaccd9ab87f702cc2a213d183a23feb39b065136190bd6e2a6dd5d4",
+    "chrome_sha256": "377a9fc07b495c3b8d0ab8ec1fdfd153641759f9756fea34d8dfce4de82f5025",
+    "headless_shell_sha256": "4fa61f0ba0b4f89b7bec242c32ca16d3bccf69dbfef0651924a9ba8fede5f9d6",
+    "rounds": 10,
+    "iterations": 10,
+    "common_extraction_js": "(() => ({\n  title: document.title,\n  elements: Array.from(document.querySelectorAll('h1,h2,h3,p,li,a,input,button,select,textarea'))\n    .filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; })\n    .map(e => ({tag: e.tagName.toLowerCase(),\n      name: (e.getAttribute('aria-label') || e.getAttribute('placeholder') || e.textContent || '').trim(),\n      href: e.getAttribute('href'), value: 'value' in e ? e.value : null}))\n}))()",
+    "harness_sha256": {
+      "bench_compare.py": "ebfa32d27a3fbde2e272272fbbb8e8318bc13b01e9d0fb27f27c7db2fe6e6759",
+      "bench_competitor_driver.mjs": "c9bb792d8d3a1a60f1b0f5fe6a1775e865ca715858f3b2da13ba2162f75077fe",
+      "bench_audit.py": "df91d7a203077227c82fc6730033498ea20badaf519c6dd8f6bf10b1c6ae006c"
+    },
+    "package_lock_sha256": "210628238686d22733351fad6e50abaee12565f3664605aa8ac740ad9931716e",
+    "args": {
+      "bruster": "/home/runner/work/bruster/bruster/target/release/bruster",
+      "node": "/opt/hostedtoolcache/node/26.13.0/x64/bin/node",
+      "chrome": "/home/runner/work/_temp/benchmark-browsers/chromium-1248/chrome-linux64/chrome",
+      "shell": "/home/runner/work/_temp/benchmark-browsers/chromium_headless_shell-1248/chrome-headless-shell-linux64/chrome-headless-shell",
+      "deps": "/home/runner/work/_temp/benchmark-deps",
+      "output": "/home/runner/work/_temp/benchmark-results",
+      "rounds": 10,
+      "iterations": 10,
+      "tools": [
+        "bruster",
+        "playwright",
+        "puppeteer",
+        "agent-browser",
+        "playwright-shell"
+      ]
+    },
+    "finished_utc": "2026-10-28T22:35:57.040799+00:00"
+  },
+  "summary": {
+    "bruster": {
+      "startup_ms": {
+        "n": 10,
+        "median": 78.971445,
+        "min": 71.88393,
+        "max": 262.535735
+      },
+      "first_navigation_ms": {
+        "n": 10,
+        "median": 89.69634099999999,
+        "min": 78.622314,
+        "max": 205.053283
+      },
+      "launch_to_first_page_ms": {
+        "n": 10,
+        "median": 165.4023065,
+        "min": 158.15177,
+        "max": 467.958467
+      },
+      "tiny_navigation_ms": {
+        "n": 100,
+        "median": 5.622668,
+        "min": 3.10787,
+        "max": 13.127439
+      },
+      "tiny_extract_ms": {
+        "n": 100,
+        "median": 4.4988364999999995,
+        "min": 0.672985,
+        "max": 7.670791
+      },
+      "large_navigation_ms": {
+        "n": 50,
+        "median": 29.7214355,
+        "min": 26.08731,
+        "max": 35.992163
+      },
+      "large_extract_ms": {
+        "n": 50,
+        "median": 10.8896825,
+        "min": 2.950883,
+        "max": 15.402818
+      },
+      "large_extract_json_ms": {
+        "n": 50,
+        "median": 5.953385,
+        "min": 3.230407,
+        "max": 16.628299
+      },
+      "image_navigation_ms": {
+        "n": 30,
+        "median": 112.209363,
+        "min": 109.062707,
+        "max": 119.497685
+      },
+      "screenshot_ms": {
+        "n": 20,
+        "median": 22.65923,
+        "min": 21.313518,
+        "max": 27.736317
+      },
+      "rss_mib": {
+        "n": 10,
+        "median": 340.3359375,
+        "min": 335.1015625,
+        "max": 344.06640625
+      },
+      "pss_mib": {
+        "n": 10,
+        "median": 180.75537109375,
+        "min": 180.5234375,
+        "max": 182.0078125
+      },
+      "display_pss_mib": {
+        "n": 10,
+        "median": 38.9951171875,
+        "min": 34.375,
+        "max": 39.0478515625
+      },
+      "total_pss_mib": {
+        "n": 10,
+        "median": 219.736328125,
+        "min": 214.8984375,
+        "max": 220.30859375
+      },
+      "process_count": {
+        "n": 10,
+        "median": 3.0,
+        "min": 3,
+        "max": 3
+      },
+      "sessions_with_failures": 0,
+      "fault_probe_failures": {},
+      "lifecycle_failures": {},
+      "recovery_retry_passes": 0,
+      "failures": []
+    },
+    "playwright-shell": {
+      "startup_ms": {
+        "n": 10,
+        "median": 372.3654105,
+        "min": 344.555732,
+        "max": 401.551263
+      },
+      "first_navigation_ms": {
+        "n": 10,
+        "median": 14.4857065,
+        "min": 12.664349,
+        "max": 17.475563
+      },
+      "launch_to_first_page_ms": {
+        "n": 10,
+        "median": 387.4625615,
+        "min": 358.119547,
+        "max": 417.609592
+      },
+      "tiny_navigation_ms": {
+        "n": 100,
+        "median": 8.059090999999999,
+        "min": 5.562236,
+        "max": 14.841169
+      },
+      "tiny_extract_ms": {
+        "n": 100,
+        "median": 2.4116095,
+        "min": 1.559007,
+        "max": 6.86354
+      },
+      "large_navigation_ms": {
+        "n": 50,
+        "median": 24.8536115,
+        "min": 16.071759,
+        "max": 29.238209
+      },
+      "large_extract_ms": {
+        "n": 50,
+        "median": 67.950162,
+        "min": 47.608042,
+        "max": 111.340358
+      },
+      "large_extract_json_ms": {
+        "n": 50,
+        "median": 17.7095385,
+        "min": 5.45019,
+        "max": 25.228355
+      },
+      "image_navigation_ms": {
+        "n": 30,
+        "median": 114.7963435,
+        "min": 112.019571,
+        "max": 126.499676
+      },
+      "screenshot_ms": {
+        "n": 20,
+        "median": 30.5499075,
+        "min": 23.296068,
+        "max": 56.690732
+      },
+      "rss_mib": {
+        "n": 10,
+        "median": 596.2265625,
+        "min": 593.4609375,
+        "max": 598.21875
+      },
+      "pss_mib": {
+        "n": 10,
+        "median": 324.2509765625,
+        "min": 322.6689453125,
+        "max": 325.23828125
+      },
+      "display_pss_mib": {
+        "n": 10,
+        "median": 0.0,
+        "min": 0.0,
+        "max": 0.0
+      },
+      "total_pss_mib": {
+        "n": 10,
+        "median": 324.2509765625,
+        "min": 322.6689453125,
+        "max": 325.23828125
+      },
+      "process_count": {
+        "n": 10,
+        "median": 7.0,
+        "min": 7,
+        "max": 7
+      },
+      "sessions_with_failures": 10,
+      "fault_probe_failures": {
+        "recovery_after_navigation_error": 10
+      },
+      "lifecycle_failures": {},
+      "recovery_retry_passes": 10,
+      "failures": [
+        {
+          "round": 1,
+          "name": "recovery_after_navigation_error",
+          "pass": false,
+          "error": "navigate: page.goto: Navigation to \"http://127.0.0.1:39007/tiny?recovery=1\" is interrupted by another navigation to \"chrome-error://chromewebdata/\"\nCall log:\n  - navigating to \"http://127.0.0.1:39007/tiny?recovery=1\", waiting until \"load\"\n\n    at /home/runner/work/bruster/bruster/scripts/bench_competitor_driver.mjs:40:37"
+        },
+        {
+          "round": 2,
+          "name": "recovery_after_navigation_error",
+          "pass": false,
+          "error": "navigate: page.goto: Navigation to \"http://127.0.0.1:39007/tiny?recovery=1\" is interrupted by another navigation to \"chrome-error://chromewebdata/\"\nCall log:\n  - navigating to \"http://127.0.0.1:39007/tiny?recovery=1\", waiting until \"load\"\n\n    at /home/runner/work/bruster/bruster/scripts/bench_competitor_driver.mjs:40:37"
+        },
+        {
+          "round": 3,
+          "name": "recovery_after_navigation_error",
+          "pass": false,
+          "error": "navigate: page.goto: Navigation to \"http://127.0.0.1:39007/tiny?recovery=1\" is interrupted by another navigation to \"chrome-error://chromewebdata/\"\nCall log:\n  - navigating to \"http://127.0.0.1:39007/tiny?recovery=1\", waiting until \"load\"\n\n    at /home/runner/work/bruster/bruster/scripts/bench_competitor_driver.mjs:40:37"
+        },
+        {
+          "round": 4,
+          "name": "recovery_after_navigation_error",
+          "pass": false,
+          "error": "navigate: page.goto: Navigation to \"http://127.0.0.1:39007/tiny?recovery=1\" is interrupted by another navigation to \"chrome-error://chromewebdata/\"\nCall log:\n  - navigating to \"http://127.0.0.1:39007/tiny?recovery=1\", waiting until \"load\"\n\n    at /home/runner/work/bruster/bruster/scripts/bench_competitor_driver.mjs:40:37"
+        },
+        {
+          "round": 5,
+          "name": "recovery_after_navigation_error",
+          "pass": false,
+          "error": "navigate: page.goto: Navigation to \"http://127.0.0.1:39007/tiny?recovery=1\" is interrupted by another navigation to \"chrome-error://chromewebdata/\"\nCall log:\n  - navigating to \"http://127.0.0.1:39007/tiny?recovery=1\", waiting until \"load\"\n\n    at /home/runner/work/bruster/bruster/scripts/bench_competitor_driver.mjs:40:37"
+        },
+        {
+          "round": 6,
+          "name": "recovery_after_navigation_error",
+          "pass": false,
+          "error": "navigate: page.goto: Navigation to \"http://127.0.0.1:39007/tiny?recovery=1\" is interrupted by another navigation to \"chrome-error://chromewebdata/\"\nCall log:\n  - navigating to \"http://127.0.0.1:39007/tiny?recovery=1\", waiting until \"load\"\n\n    at /home/runner/work/bruster/bruster/scripts/bench_competitor_driver.mjs:40:37"
+        },
+        {
+          "round": 7,
+          "name": "recovery_after_navigation_error",
+          "pass": false,
+          "error": "navigate: page.goto: Navigation to \"http://127.0.0.1:39007/tiny?recovery=1\" is interrupted by another navigation to \"chrome-error://chromewebdata/\"\nCall log:\n  - navigating to \"http://127.0.0.1:39007/tiny?recovery=1\", waiting until \"load\"\n\n    at /home/runner/work/bruster/bruster/scripts/bench_competitor_driver.mjs:40:37"
+        },
+        {
+          "round": 8,
+          "name": "recovery_after_navigation_error",
+          "pass": false,
+          "error": "navigate: page.goto: Navigation to \"http://127.0.0.1:39007/tiny?recovery=1\" is interrupted by another navigation to \"chrome-error://chromewebdata/\"\nCall log:\n  - navigating to \"http://127.0.0.1:39007/tiny?recovery=1\", waiting until \"load\"\n\n    at /home/runner/work/bruster/bruster/scripts/bench_competitor_driver.mjs:40:37"
+        },
+        {
+          "round": 9,
+          "name": "recovery_after_navigation_error",
+          "pass": false,
+          "error": "navigate: page.goto: Navigation to \"http://127.0.0.1:39007/tiny?recovery=1\" is interrupted by another navigation to \"chrome-error://chromewebdata/\"\nCall log:\n  - navigating to \"http://127.0.0.1:39007/tiny?recovery=1\", waiting until \"load\"\n\n    at /home/runner/work/bruster/bruster/scripts/bench_competitor_driver.mjs:40:37"
+        },
+        {
+          "round": 10,
+          "name": "recovery_after_navigation_error",
+          "pass": false,
+          "error": "navigate: page.goto: Navigation to \"http://127.0.0.1:39007/tiny?recovery=1\" is interrupted by another navigation to \"chrome-error://chromewebdata/\"\nCall log:\n  - navigating to \"http://127.0.0.1:39007/tiny?recovery=1\", waiting until \"load\"\n\n    at /home/runner/work/bruster/bruster/scripts/bench_competitor_driver.mjs:40:37"
+        }
+      ]
+    },
+    "playwright": {
+      "startup_ms": {
+        "n": 10,
+        "median": 519.2969475,
+        "min": 489.604744,
+        "max": 604.880672
+      },
+      "first_navigation_ms": {
+        "n": 10,
+        "median": 38.9823345,
+        "min": 27.264285,
+        "max": 49.799119
+      },
+      "launch_to_first_page_ms": {
+        "n": 10,
+        "median": 555.325419,
+        "min": 528.933907,
+        "max": 637.671671
+      },
+      "tiny_navigation_ms": {
+        "n": 100,
+        "median": 15.17217,
+        "min": 9.296113,
+        "max": 40.201678
+      },
+      "tiny_extract_ms": {
+        "n": 100,
+        "median": 5.270082,
+        "min": 2.021751,
+        "max": 19.105184
+      },
+      "large_navigation_ms": {
+        "n": 50,
+        "median": 29.950053,
+        "min": 20.205022,
+        "max": 40.39262
+      },
+      "large_extract_ms": {
+        "n": 50,
+        "median": 71.3427295,
+        "min": 47.75298,
+        "max": 123.551362
+      },
+      "large_extract_json_ms": {
+        "n": 50,
+        "median": 11.2525745,
+        "min": 5.536288,
+        "max": 29.090917
+      },
+      "image_navigation_ms": {
+        "n": 30,
+        "median": 117.605996,
+        "min": 114.289631,
+        "max": 130.503624
+      },
+      "screenshot_ms": {
+        "n": 20,
+        "median": 38.7750535,
+        "min": 27.98634,
+        "max": 49.924226
+      },
+      "rss_mib": {
+        "n": 10,
+        "median": 1169.50390625,
+        "min": 1153.6875,
+        "max": 1176.4296875
+      },
+      "pss_mib": {
+        "n": 10,
+        "median": 506.333984375,
+        "min": 504.08984375,
+        "max": 508.58984375
+      },
+      "display_pss_mib": {
+        "n": 10,
+        "median": 0.0,
+        "min": 0.0,
+        "max": 0.0
+      },
+      "total_pss_mib": {
+        "n": 10,
+        "median": 506.333984375,
+        "min": 504.08984375,
+        "max": 508.58984375
+      },
+      "process_count": {
+        "n": 10,
+        "median": 12.0,
+        "min": 12,
+        "max": 12
+      },
+      "sessions_with_failures": 10,
+      "fault_probe_failures": {
+        "recovery_after_navigation_error": 10
+      },
+      "lifecycle_failures": {},
+      "recovery_retry_passes": 10,
+      "failures": [
+        {
+          "round": 1,
+          "name": "recovery_after_navigation_error",
+          "pass": false,
+          "error": "navigate: page.goto: Navigation to \"http://127.0.0.1:39007/tiny?recovery=1\" is interrupted by another navigation to \"chrome-error://chromewebdata/\"\nCall log:\n  - navigating to \"http://127.0.0.1:39007/tiny?recovery=1\", waiting until \"load\"\n\n    at /home/runner/work/bruster/bruster/scripts/bench_competitor_driver.mjs:40:37"
+        },
+        {
+          "round": 2,
+          "name": "recovery_after_navigation_error",
+          "pass": false,
+          "error": "navigate: page.goto: Navigation to \"http://127.0.0.1:39007/tiny?recovery=1\" is interrupted by another navigation to \"chrome-error://chromewebdata/\"\nCall log:\n  - navigating to \"http://127.0.0.1:39007/tiny?recovery=1\", waiting until \"load\"\n\n    at /home/runner/work/bruster/bruster/scripts/bench_competitor_driver.mjs:40:37"
+        },
+        {
+          "round": 3,
+          "name": "recovery_after_navigation_error",
+          "pass": false,
+          "error": "navigate: page.goto: Navigation to \"http://127.0.0.1:39007/tiny?recovery=1\" is interrupted by another navigation to \"chrome-error://chromewebdata/\"\nCall log:\n  - navigating to \"http://127.0.0.1:39007/tiny?recovery=1\", waiting until \"load\"\n\n    at /home/runner/work/bruster/bruster/scripts/bench_competitor_driver.mjs:40:37"
+        },
+        {
+          "round": 4,
+          "name": "recovery_after_navigation_error",
+          "pass": false,
+          "error": "navigate: page.goto: Navigation to \"http://127.0.0.1:39007/tiny?recovery=1\" is interrupted by another navigation to \"chrome-error://chromewebdata/\"\nCall log:\n  - navigating to \"http://127.0.0.1:39007/tiny?recovery=1\", waiting until \"load\"\n\n    at /home/runner/work/bruster/bruster/scripts/bench_competitor_driver.mjs:40:37"
+        },
+        {
+          "round": 5,
+          "name": "recovery_after_navigation_error",
+          "pass": false,
+          "error": "navigate: page.goto: Navigation to \"http://127.0.0.1:39007/tiny?recovery=1\" is interrupted by another navigation to \"chrome-error://chromewebdata/\"\nCall log:\n  - navigating to \"http://127.0.0.1:39007/tiny?recovery=1\", waiting until \"load\"\n\n    at /home/runner/work/bruster/bruster/scripts/bench_competitor_driver.mjs:40:37"
+        },
+        {
+          "round": 6,
+          "name": "recovery_after_navigation_error",
+          "pass": false,
+          "error": "navigate: page.goto: Navigation to \"http://127.0.0.1:39007/tiny?recovery=1\" is interrupted by another navigation to \"chrome-error://chromewebdata/\"\nCall log:\n  - navigating to \"http://127.0.0.1:39007/tiny?recovery=1\", waiting until \"load\"\n\n    at /home/runner/work/bruster/bruster/scripts/bench_competitor_driver.mjs:40:37"
+        },
+        {
+          "round": 7,
+          "name": "recovery_after_navigation_error",
+          "pass": false,
+          "error": "navigate: page.goto: Navigation to \"http://127.0.0.1:39007/tiny?recovery=1\" is interrupted by another navigation to \"chrome-error://chromewebdata/\"\nCall log:\n  - navigating to \"http://127.0.0.1:39007/tiny?recovery=1\", waiting until \"load\"\n\n    at /home/runner/work/bruster/bruster/scripts/bench_competitor_driver.mjs:40:37"
+        },
+        {
+          "round": 8,
+          "name": "recovery_after_navigation_error",
+          "pass": false,
+          "error": "navigate: page.goto: Navigation to \"http://127.0.0.1:39007/tiny?recovery=1\" is interrupted by another navigation to \"chrome-error://chromewebdata/\"\nCall log:\n  - navigating to \"http://127.0.0.1:39007/tiny?recovery=1\", waiting until \"load\"\n\n    at /home/runner/work/bruster/bruster/scripts/bench_competitor_driver.mjs:40:37"
+        },
+        {
+          "round": 9,
+          "name": "recovery_after_navigation_error",
+          "pass": false,
+          "error": "navigate: page.goto: Navigation to \"http://127.0.0.1:39007/tiny?recovery=1\" is interrupted by another navigation to \"chrome-error://chromewebdata/\"\nCall log:\n  - navigating to \"http://127.0.0.1:39007/tiny?recovery=1\", waiting until \"load\"\n\n    at /home/runner/work/bruster/bruster/scripts/bench_competitor_driver.mjs:40:37"
+        },
+        {
+          "round": 10,
+          "name": "recovery_after_navigation_error",
+          "pass": false,
+          "error": "navigate: page.goto: Navigation to \"http://127.0.0.1:39007/tiny?recovery=1\" is interrupted by another navigation to \"chrome-error://chromewebdata/\"\nCall log:\n  - navigating to \"http://127.0.0.1:39007/tiny?recovery=1\", waiting until \"load\"\n\n    at /home/runner/work/bruster/bruster/scripts/bench_competitor_driver.mjs:40:37"
+        }
+      ]
+    },
+    "puppeteer": {
+      "startup_ms": {
+        "n": 10,
+        "median": 380.623307,
+        "min": 373.281913,
+        "max": 396.787479
+      },
+      "first_navigation_ms": {
+        "n": 10,
+        "median": 25.987164,
+        "min": 20.271862,
+        "max": 32.073491
+      },
+      "launch_to_first_page_ms": {
+        "n": 10,
+        "median": 408.360761,
+        "min": 396.600776,
+        "max": 429.398018
+      },
+      "tiny_navigation_ms": {
+        "n": 100,
+        "median": 14.7899445,
+        "min": 10.835507,
+        "max": 44.421328
+      },
+      "tiny_extract_ms": {
+        "n": 100,
+        "median": 4.47166,
+        "min": 1.090538,
+        "max": 7.590957
+      },
+      "large_navigation_ms": {
+        "n": 50,
+        "median": 28.932684000000002,
+        "min": 25.330127,
+        "max": 33.993238
+      },
+      "large_extract_ms": {
+        "n": 50,
+        "median": 21.09753,
+        "min": 13.694395,
+        "max": 38.792411
+      },
+      "large_extract_json_ms": {
+        "n": 50,
+        "median": 13.18712,
+        "min": 5.51338,
+        "max": 28.698194
+      },
+      "image_navigation_ms": {
+        "n": 30,
+        "median": 118.77777850000001,
+        "min": 115.927351,
+        "max": 128.321744
+      },
+      "screenshot_ms": {
+        "n": 20,
+        "median": 65.02927700000001,
+        "min": 39.796401,
+        "max": 88.667907
+      },
+      "rss_mib": {
+        "n": 10,
+        "median": 1058.150390625,
+        "min": 1045.37109375,
+        "max": 1067.5390625
+      },
+      "pss_mib": {
+        "n": 10,
+        "median": 419.79345703125,
+        "min": 418.373046875,
+        "max": 421.2314453125
+      },
+      "display_pss_mib": {
+        "n": 10,
+        "median": 0.0,
+        "min": 0.0,
+        "max": 0.0
+      },
+      "total_pss_mib": {
+        "n": 10,
+        "median": 419.79345703125,
+        "min": 418.373046875,
+        "max": 421.2314453125
+      },
+      "process_count": {
+        "n": 10,
+        "median": 12.0,
+        "min": 12,
+        "max": 12
+      },
+      "sessions_with_failures": 0,
+      "fault_probe_failures": {},
+      "lifecycle_failures": {},
+      "recovery_retry_passes": 0,
+      "failures": []
+    },
+    "agent-browser": {
+      "startup_ms": {
+        "n": 10,
+        "median": 626.2083055,
+        "min": 568.413416,
+        "max": 651.860859
+      },
+      "first_navigation_ms": {
+        "n": 10,
+        "median": 72.8579705,
+        "min": 50.866853,
+        "max": 117.993372
+      },
+      "launch_to_first_page_ms": {
+        "n": 10,
+        "median": 687.46083,
+        "min": 646.478873,
+        "max": 743.51427
+      },
+      "tiny_navigation_ms": {
+        "n": 100,
+        "median": 28.982667499999998,
+        "min": 16.241798,
+        "max": 84.973062
+      },
+      "tiny_extract_ms": {
+        "n": 100,
+        "median": 4.7634815,
+        "min": 2.701424,
+        "max": 20.082133
+      },
+      "large_navigation_ms": {
+        "n": 50,
+        "median": 59.876166,
+        "min": 52.864222,
+        "max": 84.623171
+      },
+      "large_extract_ms": {
+        "n": 50,
+        "median": 24.9095255,
+        "min": 20.415541,
+        "max": 34.830486
+      },
+      "large_extract_json_ms": {
+        "n": 50,
+        "median": 9.113579000000001,
+        "min": 7.39806,
+        "max": 21.340885
+      },
+      "image_navigation_ms": {
+        "n": 30,
+        "median": 123.641189,
+        "min": 119.984513,
+        "max": 134.137754
+      },
+      "screenshot_ms": {
+        "n": 20,
+        "median": 49.29414,
+        "min": 41.334217,
+        "max": 69.880177
+      },
+      "rss_mib": {
+        "n": 10,
+        "median": 1578.83984375,
+        "min": 1570.5859375,
+        "max": 1596.15625
+      },
+      "pss_mib": {
+        "n": 10,
+        "median": 514.359375,
+        "min": 512.8837890625,
+        "max": 517.6162109375
+      },
+      "display_pss_mib": {
+        "n": 10,
+        "median": 0.0,
+        "min": 0.0,
+        "max": 0.0
+      },
+      "total_pss_mib": {
+        "n": 10,
+        "median": 514.359375,
+        "min": 512.8837890625,
+        "max": 517.6162109375
+      },
+      "process_count": {
+        "n": 10,
+        "median": 16.0,
+        "min": 16,
+        "max": 16
+      },
+      "sessions_with_failures": 0,
+      "fault_probe_failures": {},
+      "lifecycle_failures": {},
+      "recovery_retry_passes": 0,
+      "failures": []
+    }
+  },
+  "footprint": {
+    "units": "uncompressed logical bytes, deduplicated by device/inode",
+    "scope": "tool runtime, selected browser bundle, linked libraries, observed mapped files; Bruster includes WebKit helpers and Xvfb; Node included where required",
+    "limitation": "Installed-file lower bound, not download size or complete OS image; unobserved fonts, plugins and other OS resources may add more. Build tools, package caches and optional video tooling are excluded.",
+    "tool_totals": {
+      "bruster": {
+        "bytes": 427893688,
+        "files": 209
+      },
+      "playwright": {
+        "bytes": 630775199,
+        "files": 532
+      },
+      "playwright-shell": {
+        "bytes": 475497702,
+        "files": 475
+      },
+      "puppeteer": {
+        "bytes": 644742947,
+        "files": 2877
+      },
+      "agent-browser": {
+        "bytes": 483232496,
+        "files": 416
+      }
+    }
+  }
+}
