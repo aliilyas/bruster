@@ -36,10 +36,19 @@ jobs:
         run: |
           gh release download "v$VERSION" --repo aliilyas/bruster --dir "$RUNNER_TEMP/release"
           python scripts/package_mcp.py --release-dir "$RUNNER_TEMP/release" --version "$VERSION" --output "$RUNNER_TEMP/mcp"
-          python - "$RUNNER_TEMP/mcp/bruster-$VERSION.mcpb" "$RUNNER_TEMP/bundle" <<'PY'
-          import pathlib, sys, zipfile
+          python - "$RUNNER_TEMP/mcp/bruster-$VERSION.mcpb" "$RUNNER_TEMP/bundle" "$RUNNER_TEMP/release" <<'PY'
+          import hashlib, json, pathlib, sys, zipfile
           root = pathlib.Path(sys.argv[2])
-          with zipfile.ZipFile(sys.argv[1]) as archive:
+          bundle = pathlib.Path(sys.argv[1])
+          release = pathlib.Path(sys.argv[3])
+          published = release / bundle.name
+          if published.exists():
+              metadata = json.loads((release / 'server.json').read_text())
+              expected = next(p['fileSha256'] for p in metadata['packages'] if p['identifier'].endswith('/' + bundle.name))
+              assert hashlib.sha256(published.read_bytes()).hexdigest() == expected
+              bundle = published
+          print('Capturing with:', bundle.name, hashlib.sha256(bundle.read_bytes()).hexdigest())
+          with zipfile.ZipFile(bundle) as archive:
               archive.extractall(root)
               for item in archive.infolist():
                   (root / item.filename).chmod((item.external_attr >> 16) & 0o777)

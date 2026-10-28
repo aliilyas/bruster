@@ -106,7 +106,7 @@ def screenshot(client, path):
         assert image.width >= 800 and image.height >= 600, image.size
 
 
-def demo_frame(page_path, number, heading, command, response, version):
+def demo_frame(page_path, number, heading, command, response, version, response_title='Actual response'):
     image = Image.new('RGB', (1280, 800), BG)
     draw = ImageDraw.Draw(image)
     draw.text((24, 18), 'bruster', font=font(30, bold=True), fill=ACCENT)
@@ -122,7 +122,7 @@ def demo_frame(page_path, number, heading, command, response, version):
     for line in textwrap.wrap(command, 34):
         draw.text((886, y), line, font=font(17, mono=True), fill=FG)
         y += 25
-    draw.text((886, y + 20), 'Actual response', font=font(17, bold=True), fill=ACCENT)
+    draw.text((886, y + 20), response_title, font=font(17, bold=True), fill=ACCENT)
     draw.text((24, 765), 'Scripted MCP client · actual WebKitGTK captures · 5 s per step; not a speed test', font=font(17), fill=MUTED)
     y += 58
     for source in response.splitlines():
@@ -157,10 +157,10 @@ def demo(args):
                 required = {'navigate', 'snapshot', 'fill_form', 'click', 'screenshot', 'text'}
                 assert required <= {tool['name'] for tool in available['tools']}
 
-                def capture(number, heading, command, response):
+                def capture(number, heading, command, response, response_title='Actual response'):
                     page = out / f'page-{number:02}.png'
                     screenshot(client, page)
-                    frame = demo_frame(page, number, heading, command, response, version)
+                    frame = demo_frame(page, number, heading, command, response, version, response_title)
                     frame.save(out / f'frame-{number:02}.png')
                     frames.append(frame)
 
@@ -181,7 +181,7 @@ def demo(args):
                 assert 'Smoke test created for Bruster' in confirmed
                 assert 'Ada Lovelace' in confirmed and 'Screenshots: on' in confirmed
                 capture(5, 'Submit and verify the result', 'click(button); text(#result)', confirmed)
-                capture(6, 'Return a native PNG through MCP', 'screenshot()', 'MCP image content\nimage/png\n\nForm submission verified.\nNo Node.js runtime needed.')
+                capture(6, 'Return a native PNG through MCP', 'screenshot()', 'MCP image content\nimage/png\n\nForm submission verified.\nNo Node.js runtime needed.', 'Verified capture')
             finally:
                 client.stop()
     finally:
