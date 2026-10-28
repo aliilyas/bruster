@@ -1259,6 +1259,38 @@ fn tabs_share_cookies() {
     assert!(names.contains(&"srv".to_owned()), "{names:?}");
 }
 
+#[cfg(target_os = "linux")]
+#[test]
+fn hidden_snapshots_render_updates_without_window_paints() {
+    let mut b = Browser::spawn();
+    let path =
+        std::env::temp_dir().join(format!("bruster-hidden-paint-{}.png", std::process::id()));
+    for url in [None, Some(format!("{}/other", serve()))] {
+        if let Some(url) = &url {
+            b.open(url);
+        }
+        b.ok("eval", json!({ "expression": "document.body.style.margin='0'; document.body.innerHTML='<canvas width=200 height=200></canvas>'" }));
+        for (color, expected) in [("red", 0xff0000), ("blue", 0x0000ff)] {
+            b.ok("eval", json!({ "expression": format!(r#"new Promise(resolve => requestAnimationFrame(() => {{
+                const ctx = document.querySelector('canvas').getContext('2d');
+                ctx.fillStyle = '{color}'; ctx.fillRect(0, 0, 200, 200); resolve(true);
+            }}))"#) }));
+            b.ok("screenshot", json!({ "path": path }));
+            let mut surface =
+                cairo::ImageSurface::create_from_png(&mut std::fs::File::open(&path).unwrap())
+                    .unwrap();
+            let offset = 50 * surface.stride() as usize + 50 * 4;
+            let data = surface.data().unwrap();
+            let pixel = u32::from_ne_bytes(data[offset..offset + 4].try_into().unwrap()) & 0xffffff;
+            assert_eq!(
+                pixel, expected,
+                "stale native snapshot after {color} on {url:?}"
+            );
+        }
+    }
+    std::fs::remove_file(path).unwrap();
+}
+
 /// Width and height from a PNG header.
 fn png_size(bytes: &[u8]) -> (u32, u32) {
     let be = |i: usize| u32::from_be_bytes(bytes[i..i + 4].try_into().unwrap());
@@ -1640,6 +1672,25 @@ fn speaks_mcp() {
         .contains("timed out"));
     let alive = rpc(call(json!("alive"), "eval", json!({ "expression": "42" })));
     assert_eq!(alive["result"]["content"][0]["text"], "42");
+    for value in [
+        json!(true),
+        json!("quote\"\\\r\n雪"),
+        json!({"rows": [1, null, {"a": false}]}),
+    ] {
+        let result = rpc(call(
+            json!("roundtrip"),
+            "eval",
+            json!({ "expression": format!("({value})") }),
+        ));
+        let text = result["result"]["content"][0]["text"].as_str().unwrap();
+        assert_eq!(
+            text,
+            value
+                .as_str()
+                .map(str::to_owned)
+                .unwrap_or_else(|| value.to_string())
+        );
+    }
 
     // tab argument is routed, not passed to the page.
     let t2 = rpc(call(json!(7), "new_tab", json!({})));

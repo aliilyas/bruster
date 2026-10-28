@@ -77,7 +77,7 @@ jobs:
         run: |
           for round in {1..10}; do
             echo "Navigation regression round $round"
-            cargo test --release --locked --target ${{ matrix.target }} --test edge -- --exact duplicate_load_does_not_release_requests_for_the_next_page queued_page_requests_expire_without_running_after_navigation --nocapture --test-threads=1 || exit 1
+            cargo test --release --locked --target ${{ matrix.target }} --test edge -- --exact duplicate_load_does_not_release_requests_for_the_next_page queued_page_requests_expire_without_running_after_navigation same_url_replacement_loads_the_new_document old_document_cannot_finish_the_new_pages_idle_wait --nocapture --test-threads=1 || exit 1
           done
 
       - name: Smoke tests (Windows)

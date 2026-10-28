@@ -49,12 +49,32 @@ define_class!(
             let state = self.ivars();
             let mut p = state.pending.borrow_mut();
             if !p.warming {
+                if let Some((id, _)) = p.navigate {
+                    if state.explicit.borrow().as_ref().is_some_and(|(expected, n)| {
+                        *expected == id && !navigation.is_some_and(|current| std::ptr::eq(current, &**n))
+                    }) {
+                        return;
+                    }
+                }
                 *state.active.borrow_mut() = navigation.map(|n| n.retain());
                 // Also cover page-initiated navigation without an action reply.
-                p.loading = true;
-                p.hinted = None;
+                p.provisional_start();
                 let url = unsafe { webview.URL() }.and_then(|u| u.absoluteString()).map(|u| u.to_string()).unwrap_or_default();
                 trace_navigation("provisional start", state.tab, &p, &url);
+            }
+        }
+
+        #[unsafe(method(webView:didCommitNavigation:))]
+        fn committed(&self, webview: &WKWebView, navigation: Option<&WKNavigation>) {
+            if self.is_current_load(navigation) {
+                unsafe { self.ivars().original.webView_didCommitNavigation(webview, navigation) };
+            }
+        }
+
+        #[unsafe(method(webView:didFinishNavigation:))]
+        fn finished(&self, webview: &WKWebView, navigation: Option<&WKNavigation>) {
+            if self.is_current_load(navigation) {
+                unsafe { self.ivars().original.webView_didFinishNavigation(webview, navigation) };
             }
         }
 
@@ -71,6 +91,23 @@ define_class!(
 );
 
 impl NavigationObserver {
+    fn is_current_load(&self, navigation: Option<&WKNavigation>) -> bool {
+        let p = self.ivars().pending.borrow();
+        // The initial blank still has to finish when a real navigate is queued.
+        if p.warming {
+            return true;
+        }
+        !p.awaiting_start
+            && p.native_generation == p.generation
+            && navigation.is_some_and(|current| {
+                self.ivars()
+                    .active
+                    .borrow()
+                    .as_ref()
+                    .is_some_and(|n| std::ptr::eq(current, &**n))
+            })
+    }
+
     fn is_current_failure(&self, navigation: Option<&WKNavigation>) -> bool {
         let state = self.ivars();
         let p = state.pending.borrow();
@@ -94,7 +131,7 @@ impl NavigationObserver {
                 .explicit
                 .borrow()
                 .as_ref()
-                .is_some_and(|(expected, n)| *expected == id && std::ptr::eq(navigation, &**n));
+                .is_none_or(|(expected, n)| *expected == id && std::ptr::eq(navigation, &**n));
         }
         true
     }
@@ -113,6 +150,7 @@ impl NavigationObserver {
         let mut p = state.pending.borrow_mut();
         *state.active.borrow_mut() = None;
         p.loading = false;
+        p.awaiting_start = false;
         p.hinted = None;
         let why = error.localizedDescription().to_string();
         let url = p.navigate_url.take().unwrap_or_default();
@@ -122,7 +160,7 @@ impl NavigationObserver {
         emit(json!({ "event": "load_failed", "tab": state.tab, "url": url, "error": why }));
         // A cancelled download can leave the old document usable. If another
         // navigation starts before dispatch, its requests must stay queued.
-        let _ = state.proxy.send_event(UserEvent::FlushIfIdle(state.tab));
+        let _ = state.proxy.send_event(p.flush_event(state.tab));
     }
 
     pub fn navigate(

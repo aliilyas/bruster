@@ -81,6 +81,99 @@ fn beforeunload_does_not_block() {
     }
 }
 
+#[cfg(target_os = "linux")]
+#[test]
+fn completed_navigations_do_not_retain_timer_threads() {
+    let mut b = Browser::spawn();
+    let base = serve();
+    b.open(&format!("{base}/other"));
+    let threads = |pid| {
+        std::fs::read_to_string(format!("/proc/{pid}/status"))
+            .unwrap()
+            .lines()
+            .find_map(|line| {
+                line.strip_prefix("Threads:")
+                    .map(|n| n.trim().parse::<u32>().unwrap())
+            })
+            .unwrap()
+    };
+    let before = threads(b.child.id());
+    // Finish well before these deadlines. A sleeping worker per navigation
+    // would still be alive at the measurement, even though every call replied.
+    for i in 0..48 {
+        b.ok(
+            "navigate",
+            json!({ "url": format!("{base}/other?{i}"), "timeout": 120_000 }),
+        );
+        if i % 12 == 0 {
+            b.ok("reload", json!({ "timeout": 120_000 }));
+            let tab = b.ok(
+                "new_tab",
+                json!({ "url": format!("{base}/form"), "timeout": 120_000 }),
+            )["tab"]
+                .clone();
+            b.ok("close_tab", json!({ "tab": tab }));
+        }
+    }
+    let after = threads(b.child.id());
+    assert!(
+        after <= before + 8,
+        "completed calls retained threads: {before} -> {after}"
+    );
+    // The same worker must still wake a genuinely stalled navigation.
+    let start = Instant::now();
+    assert!(b
+        .call(
+            "navigate",
+            json!({ "url": format!("{base}/hang"), "timeout": 200 })
+        )
+        .unwrap_err()
+        .contains("timed out"));
+    assert!(start.elapsed() < Duration::from_secs(5));
+    b.open(&format!("{base}/other"));
+}
+
+#[test]
+fn page_replies_preserve_json_and_reject_stale_attempts() {
+    let mut b = Browser::spawn();
+    // A page request before the first navigate also exercises blank warm-up.
+    assert_eq!(b.ok("eval", json!({ "expression": "40 + 2" })), 42);
+    b.open(&format!("{}/other", serve()));
+    for value in [
+        Value::Null,
+        json!(true),
+        json!(-1.25),
+        json!("quote\"\\\r\n雪🚀"),
+        json!({"rows": [null, 1, false, {"text": "a\nb"}]}),
+        json!("x".repeat(120_000)),
+    ] {
+        let id = b.send("eval", json!({ "expression": format!("({value})") }));
+        let reply = b.take("eval reply", |v| v["id"] == id);
+        assert_eq!(reply, json!({ "id": id, "result": value }));
+    }
+    b.ok("eval", json!({ "expression": r#"
+        const original = __bruster.run;
+        __bruster.run = (id, method, params, attempt) => {
+            if (method !== 'title') return original(id, method, params, attempt);
+            const reply = { id, result: { text: 'escaped\n雪' }, attempt,
+                document: __bruster.document, generation: __bruster.generation };
+            window.ipc.postMessage(JSON.stringify({...reply, attempt: attempt - 1,
+                result: 'stale', navigating: true}));
+            window.ipc.postMessage(JSON.stringify({...reply, document: 'old-document', result: 'stale'}));
+            // Custom IPC with literal newlines must be normalized to one line.
+            window.ipc.postMessage(JSON.stringify(reply, null, 2));
+        };
+    "# }));
+    assert_eq!(b.ok("title", json!({})), json!({ "text": "escaped\n雪" }));
+    assert_eq!(
+        b.ok(
+            "eval",
+            json!({ "expression": "6 * 7", "request_timeout": 1000 })
+        ),
+        42
+    );
+}
+
 #[test]
 fn duplicate_load_does_not_release_requests_for_the_next_page() {
     let mut b = Browser::spawn_env(&[], &[("BRUSTER_TRACE_NAV", "1")]);
@@ -95,10 +188,11 @@ fn duplicate_load_does_not_release_requests_for_the_next_page() {
         json!({ "expression": r#"
         document.getElementById('away').href = '/hang';
         const run = __bruster.run;
-        __bruster.run = async (id, method, params) => {
-            await run(id, method, params);
+        __bruster.run = async (id, method, params, attempt) => {
+            await run(id, method, params, attempt);
             if (method === 'click') {
-                window.ipc.postMessage(JSON.stringify({ loaded: location.href }));
+                window.ipc.postMessage(JSON.stringify({ loaded: location.href,
+                    document: __bruster.document, generation: __bruster.generation }));
                 window.ipc.postMessage(JSON.stringify({ event: 'duplicate_load_sent' }));
             }
         };
@@ -161,11 +255,11 @@ fn navigate_times_out_and_is_superseded() {
     assert!(b.recv(first).unwrap_err().contains("superseded"));
     assert_eq!(b.ok("title", json!({})), "form");
 
-    #[cfg(target_os = "macos")]
-    {
-        // Identical URLs still represent different WKNavigation objects.
-        // Cancelling the older load must not fail its replacement.
+    for delay in [0, 30] {
+        // Cover both queued and already-started loads. GTK used to attribute
+        // the older cancellation to its replacement when their URLs matched.
         let first = b.send("navigate", json!({ "url": format!("{base}/hang") }));
+        std::thread::sleep(Duration::from_millis(delay));
         let next = b.send(
             "navigate",
             json!({ "url": format!("{base}/hang"), "timeout": 1000 }),
@@ -179,6 +273,43 @@ fn navigate_times_out_and_is_superseded() {
         b.open(&format!("{base}/other"));
         assert_eq!(b.ok("title", json!({})), "other");
     }
+}
+
+#[test]
+fn same_url_replacement_loads_the_new_document() {
+    let mut b = Browser::spawn();
+    let base = serve();
+    b.open(&format!("{base}/form"));
+    for delay in [0, 30] {
+        let url = format!("{base}/slow");
+        let first = b.send("navigate", json!({ "url": url }));
+        std::thread::sleep(Duration::from_millis(delay));
+        let next = b.send("navigate", json!({ "url": url }));
+        assert!(b.recv(first).unwrap_err().contains("superseded"));
+        assert_eq!(b.recv(next).unwrap()["url"], url);
+        assert_eq!(b.ok("title", json!({})), "other");
+    }
+}
+
+#[test]
+fn old_document_cannot_finish_the_new_pages_idle_wait() {
+    let mut b = Browser::spawn();
+    let url = format!("{}/other", serve());
+    b.open(&url);
+    let old = b.ok("eval", json!({ "expression": "({document: __bruster.document, generation: __bruster.generation})" }));
+    let start = Instant::now();
+    let nav = b.send("navigate", json!({ "url": url, "until": "idle" }));
+    // Load releases page requests even while navigate is waiting for idle.
+    b.ok(
+        "eval",
+        json!({ "expression": format!(
+        "window.ipc.postMessage(JSON.stringify({{...{old},idle:location.href}}))") }),
+    );
+    assert_eq!(b.recv(nav).unwrap()["url"], url);
+    assert!(
+        start.elapsed() >= Duration::from_millis(450),
+        "old idle answered the new navigation"
+    );
 }
 
 #[test]
