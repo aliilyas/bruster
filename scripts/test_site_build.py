@@ -98,6 +98,9 @@ class SiteBuild(unittest.TestCase):
                 self.assertEqual(document.meta['og:image'], base_url + 'assets/social.png')
                 self.assertTrue(document.meta['description'])
                 self.assertTrue(document.schemas)
+                webpage = next(node for node in document.schemas[0]['@graph'] if node['@type']=='WebPage')
+                self.assertEqual(webpage['url'],base_url + path)
+                self.assertEqual(webpage['isPartOf'],{'@id':base_url + '#website'})
                 self.assertNotIn('{{', (output / name).read_text())
                 for link in document.links:
                     target = urlsplit(urljoin(base_url + path, link))
@@ -154,19 +157,36 @@ class SiteBuild(unittest.TestCase):
         self.assertNotIn('https://example.test/bruster/benchmarks/', (output / 'sitemap.xml').read_text())
 
     def test_test_lab_assembly_preserves_product_pages_and_benchmark_evidence(self):
-        output, published = self.root / 'product', self.root / 'combined'
-        base_url = 'https://example.test/bruster/'
-        self.build(output, base_url, self.measurements)
-        manifest = assemble(output, published)
-        self.assertGreaterEqual(len(manifest['cases']), 300)
-        home = (published / 'index.html').read_text()
-        self.assertEqual(home.count('data-bruster-test-lab'), 1)
-        self.assertIn('Browser automation.<br>', home)
-        self.assertEqual(Document(home).canonical, [base_url])
-        for name in ('sitemap.xml', 'docs/index.html', 'benchmarks/latest.json', 'benchmarks/history.json'):
-            self.assertEqual((published / name).read_bytes(), (output / name).read_bytes())
-        self.assertTrue((published / 'test-lab/index.html').is_file())
-        self.assertTrue((published / 'test-lab/manifest.json').is_file())
+        for index, base_url in enumerate(('https://example.test/bruster/', 'https://docs.example.test/')):
+            with self.subTest(base_url=base_url):
+                output, published = self.root / f'product-{index}', self.root / f'combined-{index}'
+                self.build(output, base_url, self.measurements)
+                manifest = assemble(output, published, base_url=base_url)
+                self.assertGreaterEqual(len(manifest['cases']), 300)
+                home = (published / 'index.html').read_text()
+                self.assertEqual(home.count('data-bruster-test-lab'), 1)
+                self.assertIn('Browser automation.<br>', home)
+                self.assertEqual(Document(home).canonical, [base_url])
+                for name in ('docs/index.html', 'benchmarks/latest.json', 'benchmarks/history.json'):
+                    self.assertEqual((published / name).read_bytes(), (output / name).read_bytes())
+                original = [item.text for item in ET.parse(output / 'sitemap.xml').findall('.//{*}loc')]
+                locations = [item.text for item in ET.parse(published / 'sitemap.xml').findall('.//{*}loc')]
+                self.assertEqual(locations, original + [base_url + 'test-lab/'])
+                lab = published / 'test-lab'
+                catalog = Document((lab / 'index.html').read_text())
+                self.assertEqual(catalog.canonical, [base_url + 'test-lab/'])
+                self.assertEqual(catalog.meta['og:url'], base_url + 'test-lab/')
+                self.assertEqual(catalog.meta['og:image'], base_url + 'assets/social.png')
+                self.assertEqual(catalog.headings, 1)
+                collection = next(node for node in catalog.schemas[0]['@graph'] if node['@type']=='CollectionPage')
+                self.assertEqual(collection['url'], catalog.canonical[0])
+                # Every case is discoverable in the initial HTML, without fetching JS or the manifest.
+                for case in manifest['cases']:
+                    self.assertIn(case['url'], catalog.links)
+                    self.assertTrue((lab / case['url']).is_file())
+                for file in lab.rglob('*.html'):
+                    document = Document(file.read_text())
+                    self.assertEqual('noindex' in document.meta['robots'], file != lab / 'index.html', str(file))
 
     def test_rejects_output_over_source_and_missing_measurement_input(self):
         for path in (ROOT, SITE, SITE / 'generated'):

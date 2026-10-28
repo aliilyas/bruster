@@ -173,6 +173,14 @@ node scripts/test_lab_check.mjs target/published/test-lab
 Assembly requires a fresh output directory. Never point it at the existing
 documentation checkout.
 
+Pass `--base-url https://your-domain.example/` to use a custom public product
+site URL in the catalog's canonical, social metadata, and sitemap entry. The
+Pages workflow supplies this URL automatically. The catalog includes fixture
+links and coverage counts in its initial HTML; JavaScript adds filters and
+imported results. Only the catalog is included in the sitemap. Generated case
+pages and support HTML use `noindex, follow` to keep synthetic test content out
+of search results.
+
 ## Research notes
 
 The test design was informed by the

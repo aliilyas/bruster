@@ -13,7 +13,7 @@
     if (!response.ok) throw new Error(`Manifest HTTP ${response.status}`);
     manifest = await response.json();
   } catch (error) {
-    $('cases').textContent = `Unable to load the fixture catalog: ${error.message}`;
+    $('cases').prepend(make('p', `Interactive catalog unavailable: ${error.message}. The fixture links below still work.`));
     return;
   }
   const cases = manifest.cases;

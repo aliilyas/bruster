@@ -16,10 +16,12 @@ The input checkout is read-only; the build copies its `benchmarks/` directory an
 refreshes report HTML in the output. Without data, the preview explicitly says
 measurements are unavailable. Use a fresh output directory when changing datasets.
 
-`scripts/site_layout.py` and `_layout.html` provide the shared navigation, metadata,
-and footer. `scripts/bench_report.py` renders the current and archived reports with
-the same shell. `assets/site.js` progressively adds menu, copy, and client-tab
-interactions; the content and navigation also work without JavaScript.
+`scripts/site_layout.py`, `_metadata.html`, and `_layout.html` provide shared
+metadata, navigation, and the footer. The Test Lab catalog reuses the metadata
+renderer. `scripts/bench_report.py` renders the current and archived reports with
+the same shell. A small head script selects the mobile menu layout before first
+paint; `assets/site.js` adds menu, copy, and client-tab interactions. The content
+and navigation also work without JavaScript.
 
 Check the publishing and site contracts with:
 
@@ -86,6 +88,13 @@ structured data, and breadcrumbs. Historical run pages use `noindex, follow` and
 are excluded from the sitemap; their raw data and links remain available. The
 current benchmark page is indexable once measurements exist.
 
+The assembled sitemap also includes the Test Lab catalog, which has its own
+canonical, social metadata, and `CollectionPage` structured data. Its fixture
+links and coverage counts are rendered at build time so the catalog is useful
+without JavaScript. Individual test cases and support documents use
+`noindex, follow` and stay out of the sitemap. They remain crawlable so search
+engines can see those directives.
+
 The sitemap is at `https://aliilyas.github.io/bruster/sitemap.xml`. Submit it in a
 verified Google Search Console URL-prefix property and Bing Webmaster Tools after
 deployment. Verification requires the site owner's account. Search performance
@@ -98,3 +107,31 @@ root-domain build generates `robots.txt` with its sitemap URL automatically.
 
 OpenSERP is a research-time integration configured locally in OpenCode. The
 published website and CI build require no search API credentials.
+
+### Follow-up audit — 28 October 2026
+
+The deployed homepage scored 100 for SEO, accessibility, and best practices in
+mobile Lighthouse; performance was 96. A delayed-script check reproduced a
+0.114 layout shift when the mobile navigation collapsed after first paint.
+The early menu-layout script addresses that shift. The audit also identified
+the Test Lab metadata, static-content, and indexing gaps described above.
+
+The corrected local artifact scored 100 in all four homepage Lighthouse
+categories with zero layout shift; the Test Lab scored 100 for SEO. All 26
+publication tests passed, including project-path and custom-domain builds.
+Validation covered 305 lab HTML pages, with the bodies and scripts of all 304
+fixture/support pages matching the pre-audit build.
+
+Live HTTP checks confirmed HTTPS and trailing-slash 301 redirects, a real 404
+for nonexistent paths, canonical consolidation of `index.html`/tracking-query
+variants, and `noindex` on archived benchmarks. Origin-level `robots.txt` returned
+404, which does not block crawling.
+The live internal-link audit checked 35 targets and found no broken links or
+fragment destinations.
+
+OpenSERP's Google `site:aliilyas.github.io/bruster/` query returned no results,
+and Bruster was absent from the first five results for `bruster browser
+automation`. Bing returned unrelated results and was not usable evidence.
+These spot checks do not establish indexing status: use Search Console URL
+Inspection and submit the sitemap from the verified URL-prefix property.
+Technical audit scores are not measurements of rankings or search traffic.

@@ -109,8 +109,10 @@ jobs:
           SITE_URL: ${{ steps.pages.outputs.base_url }}
         run: python3 scripts/site_build.py --measurements _measurements --output _site --base-url "$SITE_URL"
       - name: Assemble website, benchmarks, and test lab
+        env:
+          SITE_URL: ${{ steps.pages.outputs.base_url }}
         run: |
-          python3 scripts/test_lab.py assemble --existing _site --output published --frameworks "$RUNNER_TEMP/lab-frameworks"
+          python3 scripts/test_lab.py assemble --existing _site --output published --frameworks "$RUNNER_TEMP/lab-frameworks" --base-url "$SITE_URL"
           node scripts/test_lab_check.mjs published/test-lab
       - uses: actions/upload-pages-artifact@v3
         with:

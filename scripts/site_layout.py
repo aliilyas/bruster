@@ -23,17 +23,22 @@ def substitute(template, values):
     return re.sub(r'\{\{(\w+)\}\}', lambda match: str(values[match[1]]), template)
 
 
-def render_page(title, description, path, content, *, base_url=SITE_URL, section='',
-                body_class='', extra_head='', noindex=False, application=False):
+def render_metadata(title, description, path, *, base_url=SITE_URL, section='',
+                    noindex=False, application=False, page_type='WebPage'):
     base_url = site_url(base_url)
     e = lambda value: html.escape(str(value), quote=True)
-    base = urlsplit(base_url).path
     canonical = base_url + path
+    webpage = {
+        '@type': page_type, '@id': canonical + '#webpage', 'url': canonical,
+        'name': title, 'description': description, 'inLanguage': 'en',
+        'isPartOf': {'@id': base_url + '#website'},
+    }
     graph = [{
         '@type': 'WebSite', '@id': base_url + '#website', 'name': 'bruster',
         'url': base_url, 'inLanguage': 'en',
-    }]
+    }, webpage]
     if application:
+        webpage['mainEntity'] = {'@id': base_url + '#software'}
         graph.append({
             '@type': 'SoftwareApplication', '@id': base_url + '#software', 'name': 'bruster',
             'url': base_url, 'description': description, 'applicationCategory': 'DeveloperApplication',
@@ -43,21 +48,34 @@ def render_page(title, description, path, content, *, base_url=SITE_URL, section
             'offers': {'@type': 'Offer', 'price': '0', 'priceCurrency': 'USD'},
         })
     if path and not noindex:
+        webpage['breadcrumb'] = {'@id': canonical + '#breadcrumb'}
         graph.append({
-            '@type': 'BreadcrumbList', 'itemListElement': [
+            '@type': 'BreadcrumbList', '@id': canonical + '#breadcrumb', 'itemListElement': [
                 {'@type': 'ListItem', 'position': 1, 'name': 'bruster', 'item': base_url},
                 {'@type': 'ListItem', 'position': 2, 'name': section, 'item': canonical},
             ],
         })
     structured = json.dumps({'@context': 'https://schema.org', '@graph': graph}, ensure_ascii=False).replace('<', '\\u003c')
+    return substitute((SITE / '_metadata.html').read_text(), {
+        'title': e(title), 'description': e(description), 'canonical': e(canonical),
+        'image': e(base_url + 'assets/social.png'), 'structured': structured,
+        'robots': 'noindex, follow' if noindex else 'index, follow, max-image-preview:large',
+    })
+
+
+def render_page(title, description, path, content, *, base_url=SITE_URL, section='',
+                body_class='', extra_head='', noindex=False, application=False):
+    base_url = site_url(base_url)
+    e = lambda value: html.escape(str(value), quote=True)
+    base = urlsplit(base_url).path
     nav = []
     for name, target in (('Docs', 'docs/'), ('Benchmarks', 'benchmarks/'), ('Compare', 'compare/')):
         current = ' aria-current="page"' if section == name else ''
         nav.append(f'<a href="{e(base + target)}"{current}>{name}</a>')
     values = {
-        'title': e(title), 'description': e(description), 'canonical': e(canonical),
-        'base': e(base), 'image': e(base_url + 'assets/social.png'), 'structured': structured,
-        'robots': 'noindex, follow' if noindex else 'index, follow, max-image-preview:large',
+        'metadata': render_metadata(title, description, path, base_url=base_url,
+                                    section=section, noindex=noindex, application=application),
+        'base': e(base),
         'body_class': e(body_class), 'extra_head': extra_head, 'content': content,
         'nav': '\n'.join(nav), 'repository': REPOSITORY,
     }

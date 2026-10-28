@@ -1,7 +1,6 @@
 (() => {
   'use strict';
 
-  document.documentElement.classList.add('js');
   const toggle = document.querySelector('.nav-toggle');
   const nav = document.querySelector('#site-nav');
   if (toggle && nav) {
