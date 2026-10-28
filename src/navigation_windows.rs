@@ -23,7 +23,14 @@ pub struct Navigation {
 
 impl Navigation {
     fn start(self, wv: &wry::WebView, pending: &Shared) -> wry::Result<()> {
-        pending.borrow_mut().native_start = Some(self.generation);
+        {
+            let mut p = pending.borrow_mut();
+            p.native_start = Some(self.generation);
+            p.native_history = matches!(self.method.as_str(), "back" | "forward");
+            // These belong to the native call, not a newer queued command.
+            p.history_changed = false;
+            p.history_reply = None;
+        }
         let result = match self.method.as_str() {
             "navigate" => wv.load_url(self.url.as_deref().unwrap()),
             "reload" => wv.reload(),
@@ -76,6 +83,10 @@ pub fn resume(wv: &wry::WebView, tab: TabId, pending: &Shared, proxy: &EventLoop
 }
 
 impl Pending {
+    pub fn windows_history_completed(&mut self) -> bool {
+        self.native_start.take() == Some(self.generation) && self.awaiting_start
+    }
+
     fn windows_next(&mut self) -> Option<Navigation> {
         if self.native_start.is_some() {
             return None;
@@ -150,8 +161,9 @@ pub fn observe(
         )
     }?;
 
-    // Same-document history/fragment changes have no NavigationStarting.
-    // Release their API-call slot here, before the next queued navigation.
+    // Same-document fragment changes have no NavigationStarting. History
+    // waits for HistoryChanged + popstate, including same-URL pushState entries
+    // which have no SourceChanged at all.
     let source_pending = pending.clone();
     let source_proxy = proxy.clone();
     unsafe {
@@ -161,8 +173,11 @@ pub fn observe(
                     let mut new_document = BOOL::default();
                     args.IsNewDocument(&mut new_document)?;
                     if !new_document.as_bool() {
-                        source_pending.borrow_mut().native_start = None;
-                        let _ = source_proxy.send_event(UserEvent::StartNavigation(tab));
+                        let mut p = source_pending.borrow_mut();
+                        if !p.native_history {
+                            p.native_start = None;
+                            let _ = source_proxy.send_event(UserEvent::StartNavigation(tab));
+                        }
                     }
                 }
                 Ok(())
@@ -242,6 +257,28 @@ pub fn observe(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn same_url_history_acknowledges_its_native_call_before_the_next_one() {
+        let mut p = Pending::default();
+        p.begin_navigation();
+        p.native_start = Some(p.generation);
+        p.native_history = true;
+        assert!(p.windows_history_completed());
+        assert!(p.native_start.is_none());
+        // A superseded history operation still releases the dispatch slot,
+        // without completing the replacement waiting under the same URL/ID.
+        p.begin_navigation();
+        p.native_start = Some(p.generation);
+        p.begin_navigation();
+        p.native_next = Some(Navigation {
+            generation: p.generation,
+            method: "forward".into(),
+            url: None,
+        });
+        assert!(!p.windows_history_completed());
+        assert!(p.windows_next().is_some());
+    }
 
     #[test]
     fn queued_start_keeps_its_original_command_generation() {

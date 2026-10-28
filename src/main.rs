@@ -271,6 +271,8 @@ struct Pending {
     #[cfg(target_os = "windows")]
     native_start: Option<u64>,
     #[cfg(target_os = "windows")]
+    native_history: bool,
+    #[cfg(target_os = "windows")]
     native_next: Option<navigation_windows::Navigation>,
     awaiting_start: bool,
     committed: bool,
@@ -436,6 +438,20 @@ fn page_loaded(p: &mut Pending, tab: TabId, url: &str, proxy: &EventLoopProxy<Us
 }
 
 fn history_traversed(p: &mut Pending, tab: TabId, url: &str, proxy: &EventLoopProxy<UserEvent>) {
+    #[cfg(target_os = "windows")]
+    if p.native_start.is_some() && p.native_history {
+        if !p.history_changed {
+            p.history_reply = Some(url.to_owned());
+            return;
+        }
+        // Same-URL pushState traversal has neither NavigationStarting nor
+        // SourceChanged. Both native flags and popstate acknowledge this call.
+        let current = p.windows_history_completed();
+        let _ = proxy.send_event(UserEvent::StartNavigation(tab));
+        if !current {
+            return;
+        }
+    }
     if p.history_url.is_none() {
         return;
     }
@@ -2029,11 +2045,6 @@ fn tab_dispatch(tab: &Tab, t: TabId, id: u64, request: Queued, proxy: &EventLoop
             .history_url
             .as_ref()
             .map(|_| std::time::Instant::now() + HISTORY_START_TIMEOUT);
-        #[cfg(target_os = "windows")]
-        {
-            p.history_changed = false;
-            p.history_reply = None;
-        }
         drop(p);
         go().map(|_| None)
     };
