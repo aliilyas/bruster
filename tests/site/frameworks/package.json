@@ -1,0 +1,13 @@
+{
+  "name": "bruster-test-lab-frameworks",
+  "private": true,
+  "type": "module",
+  "scripts": { "build": "node build.mjs" },
+  "dependencies": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "svelte": "5.19.8",
+    "vue": "3.5.13"
+  },
+  "devDependencies": { "esbuild": "0.25.0" }
+}

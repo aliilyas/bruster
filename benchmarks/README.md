@@ -78,10 +78,15 @@ the latest branch and regenerating history. Results are immutable per run
 attempt; “latest” is chosen by workflow invocation number, not completion order.
 
 [`benchmark-pages.yml`](../.github/workflows/benchmark-pages.yml) explicitly
-deploys the accumulated `gh-pages` tree after a successful benchmark workflow.
+deploys the accumulated `gh-pages` tree after a successful benchmark workflow,
+with the [Test Lab](../tests/site/README.md) generated from the latest `main`.
+Relevant test-lab source changes on `main` also trigger the combined deployment.
 A `GITHUB_TOKEN` push alone does not trigger another push workflow or a Pages
 build. Only deployments are coalesced; every measurement has already been
-persisted. Each deployment reads the latest branch after taking the Pages lock.
+persisted. Each deployment reads both latest branches after taking the Pages lock,
+builds the pinned framework fixtures, validates the lab, and assembles one artifact
+containing documentation, benchmarks, and `test-lab/`. Benchmark history and
+custom-domain configuration are preserved.
 After manual `gh-pages` updates, use **Run workflow → main** on **benchmark pages**
 to deploy the site. If a deployment fails, rerun **benchmark pages**; no
 measurement rerun is necessary.
