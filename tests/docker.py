@@ -144,6 +144,7 @@ def exercise(image, url, https):
         "image_size_mib": round(metadata["Size"] / 1024 ** 2, 1),
         "memory_limit_mib": 512,
     }
+    print(json.dumps(results), flush=True)
     with Server(image) as server:
         results["initialize_seconds"] = server.initialize()
         assert docker("exec", server.name, "id", "-u") == "10001"
@@ -164,6 +165,12 @@ def exercise(image, url, https):
         assert server.text("eval", expression="6 * 7") == "42"
 
         server.tool("resize", width=640, height=480)
+        # resize acknowledges the request before GTK/WebKit apply the new size.
+        deadline = time.monotonic() + 5
+        while server.text("eval", expression="innerWidth + 'x' + innerHeight") != "640x480":
+            if time.monotonic() >= deadline:
+                raise TimeoutError("WebKit did not apply the requested viewport size")
+            time.sleep(0.05)
         screenshot = server.tool("screenshot")["content"]
         image_content = next(item for item in screenshot if item["type"] == "image")
         assert image_content["mimeType"] == "image/png"

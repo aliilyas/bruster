@@ -4,7 +4,7 @@ ARG RUST_VERSION=1.90.0
 FROM rust:${RUST_VERSION}-slim-bookworm AS build
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev pkg-config \
+    && apt-get install -y --no-install-recommends dbus-x11 libwebkit2gtk-4.1-dev pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
@@ -27,9 +27,11 @@ LABEL org.opencontainers.image.title="Bruster" \
 
 # Xvfb supplies the display WebKitGTK needs, including in hidden/MCP mode.
 # --no-install-recommends avoids desktop applications and development tools.
+# dbus-x11 satisfies the session-bus dependency without pulling in systemd.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         ca-certificates \
+        dbus-x11 \
         fonts-dejavu-core \
         fonts-liberation \
         libwebkit2gtk-4.1-0 \
