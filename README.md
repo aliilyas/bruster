@@ -10,6 +10,7 @@
   <p>
     <a href="https://github.com/aliilyas/bruster/actions/workflows/ci.yml"><img src="https://github.com/aliilyas/bruster/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
     <a href="https://github.com/aliilyas/bruster/releases/latest"><img src="https://img.shields.io/github/v/release/aliilyas/bruster?label=release&color=6ee7f7" alt="Release"></a>
+    <a href="https://hub.docker.com/r/ilyastmn/bruster"><img src="https://img.shields.io/badge/Docker_Hub-ilyastmn%2Fbruster-2496ED?logo=docker&amp;logoColor=white" alt="Docker Hub: ilyastmn/bruster"></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
     <img src="https://img.shields.io/badge/macOS-arm64%20%7C%20x86__64-lightgrey.svg" alt="macOS">
     <img src="https://img.shields.io/badge/Linux-x86__64%20%7C%20arm64-FCC624.svg" alt="Linux">
@@ -19,6 +20,7 @@
   <p>
     <a href="#demo">Demo</a> ·
     <a href="#install">Install</a> ·
+    <a href="#docker-hub">Docker</a> ·
     <a href="#quickstart">Quickstart</a> ·
     <a href="#mcp">MCP</a> ·
     <a href="#protocol">Protocol</a> ·
@@ -92,23 +94,22 @@ cargo build --release
 > [!NOTE]
 > **Linux requirements.** WebKitGTK 4.1 is necessary at run time. Install it with one of these commands: `apt install libwebkit2gtk-4.1-0`, `apk add webkit2gtk-4.1`, or `dnf install webkit2gtk4.1`. If the system has no desktop session, bruster starts again under `xvfb-run -a` when `DISPLAY` is not set.
 
-### Docker / Glama
+### Docker Hub
 
-The [Dockerfile](Dockerfile) builds the locked Rust source and includes WebKitGTK,
-Xvfb, fonts, and HTTPS certificates. The runtime image runs as a non-root user;
-the compiler and development packages stay in the build stage. Linux amd64 and
-arm64 images are built and exercised in [Docker CI](.github/workflows/docker.yml).
-Both base images are pinned to multi-platform SHA-256 digests. Refresh those
-digests when updating the base images, then rerun both architecture checks.
+The published [`ilyastmn/bruster`](https://hub.docker.com/r/ilyastmn/bruster) image
+bundles Bruster, WebKitGTK, Xvfb, fonts, and HTTPS certificates for **linux/amd64**
+and **linux/arm64**. Docker automatically selects the matching architecture.
 
 ```sh
+docker pull ilyastmn/bruster:latest
 docker run --rm -i ilyastmn/bruster:latest
 ```
 
-The [Docker Hub image](https://hub.docker.com/r/ilyastmn/bruster) includes both
-architectures. `latest` tracks tested `main` builds; `sha-<full-git-commit>` selects
-a particular source revision. CI publishes the exact tested images and updates
-the multi-platform tags only after both architecture checks pass.
+`latest` tracks tested `main` builds; `sha-<full-git-commit>` selects a particular
+source revision. [Docker CI](.github/workflows/docker.yml) publishes the exact
+tested images and updates the multi-platform tags only after both architecture
+checks pass. Available tags are listed on
+[Docker Hub](https://hub.docker.com/r/ilyastmn/bruster/tags).
 
 The default command serves MCP on stdin/stdout. Keep `-i` and omit `-t` for MCP
 clients; no port mapping or host display is needed. For example:
@@ -119,14 +120,20 @@ clients; no port mapping or host display is needed. For example:
 
 To pass additional options, include `--mcp` again, for example
 `docker run --rm -i ilyastmn/bruster:latest --mcp --viewport 1920x1080`.
-The image uses software rendering and disables WebKit's nested sandbox because
-Docker's default seccomp profile blocks its user namespaces. It needs no
-`--privileged` or extra capabilities. Tini forwards shutdown signals and reaps
-browser helper processes. Diagnostics remain on stderr.
+The image runs as a non-root user, uses software rendering, and disables WebKit's
+nested sandbox because Docker's default seccomp profile blocks its user
+namespaces. It needs no `--privileged` or extra capabilities. Tini forwards
+shutdown signals and reaps browser helper processes. Diagnostics remain on stderr.
 
-For Glama, submit the Dockerfile in the listing's **Admin → Docker builds**
-configuration, using this repository as the build context, then run its evaluation.
+For [Glama](https://glama.ai/mcp/servers/aliilyas/bruster), submit the Dockerfile in
+the listing's **Admin → Docker builds** configuration, using this repository as
+the build context, then run its evaluation.
 The default command answers `initialize` and `tools/list` without credentials.
+
+The [Dockerfile](Dockerfile) uses a multi-stage build of the locked Rust source;
+the compiler and development packages stay in the build stage. Both base images
+are pinned to multi-platform SHA-256 digests. Refresh those digests when updating
+the base images, then rerun both architecture checks.
 
 To build the current checkout and test it on a Linux Docker host (Python standard
 library only):
