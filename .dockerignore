@@ -1,0 +1,8 @@
+# Only the locked source build and license belong in the image build context.
+**
+!Dockerfile
+!Cargo.toml
+!Cargo.lock
+!LICENSE
+!src/
+!src/**

@@ -1,0 +1,68 @@
+name: Docker
+
+on:
+  push:
+    paths:
+      - Dockerfile
+      - .dockerignore
+      - Cargo.toml
+      - Cargo.lock
+      - src/**
+      - tests/docker.py
+      - .github/workflows/docker.yml
+  pull_request:
+    paths:
+      - Dockerfile
+      - .dockerignore
+      - Cargo.toml
+      - Cargo.lock
+      - src/**
+      - tests/docker.py
+      - .github/workflows/docker.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docker-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  image:
+    name: Build and exercise (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-24.04, arch: amd64 }
+          - { os: ubuntu-24.04-arm, arch: arm64 }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build runtime image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: bruster:docker-test
+          cache-from: type=gha,scope=bruster-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=bruster-${{ matrix.arch }}
+      - name: MCP, browser, HTTPS, and shutdown checks
+        run: python3 tests/docker.py --image bruster:docker-test --https --output target/docker-results.json
+      - name: Image and runtime measurements
+        if: always()
+        run: |
+          if [ -f target/docker-results.json ]; then
+            echo '```json' >> "$GITHUB_STEP_SUMMARY"
+            cat target/docker-results.json >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: docker-${{ matrix.arch }}
+          path: target/docker-results.json
+          if-no-files-found: ignore

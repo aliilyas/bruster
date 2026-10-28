@@ -70,6 +70,47 @@ cargo build --release
 > [!NOTE]
 > **Linux requirements.** WebKitGTK 4.1 is necessary at run time. Install it with one of these commands: `apt install libwebkit2gtk-4.1-0`, `apk add webkit2gtk-4.1`, or `dnf install webkit2gtk4.1`. If the system has no desktop session, bruster starts again under `xvfb-run -a` when `DISPLAY` is not set.
 
+### Docker / Glama
+
+The [Dockerfile](Dockerfile) builds the locked Rust source and includes WebKitGTK,
+Xvfb, fonts, and HTTPS certificates. The runtime image runs as a non-root user;
+the compiler and development packages stay in the build stage. Linux amd64 and
+arm64 images are built and exercised in [Docker CI](.github/workflows/docker.yml).
+
+```sh
+docker build -t bruster:local .
+docker run --rm -i bruster:local
+```
+
+The default command serves MCP on stdin/stdout. Keep `-i` and omit `-t` for MCP
+clients; no port mapping or host display is needed. For example:
+
+```json
+{ "mcpServers": { "bruster": { "command": "docker", "args": ["run", "--rm", "-i", "bruster:local"] } } }
+```
+
+To pass additional options, include `--mcp` again, for example
+`docker run --rm -i bruster:local --mcp --viewport 1920x1080`.
+The image uses software rendering and disables WebKit's nested sandbox because
+Docker's default seccomp profile blocks its user namespaces. It needs no
+`--privileged` or extra capabilities. Tini forwards shutdown signals and reaps
+browser helper processes. Diagnostics remain on stderr.
+
+For Glama, submit the Dockerfile in the listing's **Admin → Docker builds**
+configuration, using this repository as the build context, then run its evaluation.
+The default command answers `initialize` and `tools/list` without credentials.
+
+To test the image on a Linux Docker host (Python standard library only):
+
+```sh
+python3 tests/docker.py --image bruster:local --https
+```
+
+This checks MCP discovery, navigation, form interactions, JavaScript, screenshots,
+tabs, HTTPS certificates, and shutdown via MCP, stdin EOF, and SIGTERM. Containers
+run with a 512 MiB memory limit, all capabilities dropped, and no new privileges;
+the report includes image size, initialization time, and memory use.
+
 ## Quickstart
 
 Run bruster in its native protocol mode:
