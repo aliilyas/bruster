@@ -11,7 +11,6 @@
 //! `notifications/message` at level info once the client has initialized.
 
 use std::collections::HashMap;
-use std::io::Write;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::Mutex;
 
@@ -52,15 +51,12 @@ pub fn enable(on: bool) {
     }
 }
 
-fn enabled() -> bool {
+pub fn enabled() -> bool {
     ENABLED.load(Ordering::Relaxed)
 }
 
 fn write(v: Value) {
-    let mut out = std::io::stdout().lock();
-    let _ = serde_json::to_writer(&mut out, &v);
-    let _ = out.write_all(b"\n");
-    let _ = out.flush();
+    crate::write_json(&v);
 }
 
 fn rpc_result(id: Value, result: Value) {

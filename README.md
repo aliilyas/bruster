@@ -164,7 +164,15 @@ platform state directory; legacy window-only state files are still accepted.
 | `--insecure` | ignore TLS errors (Linux only) |
 | `--no-images` | do not load images. Pages load about 30% faster (Linux only) |
 
-Under Xvfb, Linux uses software rendering only, which halves memory. Set `BRUSTER_NO_XVFB=1` to prevent the automatic `xvfb-run -a`.
+Linux uses software rendering. Hidden views skip off-screen GTK painting while
+remaining mapped for layout, animation, and native screenshots. Set
+`BRUSTER_PAINT_HIDDEN=1` to enable those window paints. Hidden mode also defaults
+`WEBKIT_DISABLE_DMABUF_RENDERER=1` to avoid an unnecessary graphics transport
+probe; an explicitly supplied value (including `0`) takes precedence.
+
+Automatic Xvfb launches disable GLX. `BRUSTER_XVFB_ARGS` overrides the server
+arguments (default: `-screen 0 1280x1024x24 -nolisten tcp -extension GLX`). Set
+`BRUSTER_NO_XVFB=1` to prevent automatic Xvfb startup.
 
 ## Tests
 

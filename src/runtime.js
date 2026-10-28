@@ -50,7 +50,9 @@
 
   // Pages can replace JSON.stringify after injection; IPC must still work.
   const stringify = JSON.stringify.bind(JSON);
-  const post = (msg) => window.ipc.postMessage(stringify(msg));
+  const documentId = `${performance.timeOrigin}:${Math.random()}`;
+  let generation = 0;
+  const post = (msg) => window.ipc.postMessage(stringify({ ...msg, document: documentId, generation }));
   const trunc = (s, n) => (s = (s || '').replace(/\s+/g, ' ').trim()).length > n ? s.slice(0, n) + '…' : s;
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const fmt = (v) => {
@@ -182,20 +184,34 @@
   // added after load, so the page's own load event is reported here.
   // idle: no fetch/xhr in flight and no resource finished for IDLE_MS.
   let lastResource = 0;
+  let domReached = false, loadReached = false, idleReached = false;
+  const bind = (next) => {
+    generation = next;
+    post({ bound: true });
+    // Native commit and page IPC use different callback queues. Re-send any
+    // milestone reached before Rust bound this document to its navigation.
+    if (domReached) post({ dom: location.href });
+    if (loadReached) post({ loaded: location.href });
+    if (idleReached) post({ idle: location.href });
+  };
   const resourceDone = () => { lastResource = Date.now(); };
   if (window.top === window) {
     // pushState history can change only state, not the URL. Native load
     // callbacks do not fire for these traversals, so acknowledge popstate.
     window.addEventListener('popstate', () => post({ history: location.href }));
     new PerformanceObserver(() => { lastResource = Date.now(); }).observe({ type: 'resource' });
-    document.addEventListener('DOMContentLoaded', () => post({ dom: location.href }));
+    document.addEventListener('DOMContentLoaded', () => { domReached = true; post({ dom: location.href }); });
     window.addEventListener('load', () => {
+      loadReached = true;
       post({ loaded: location.href });
       const start = Date.now();
       lastResource = start;
       const tick = () => {
         const quiet = !inflight && Date.now() - lastResource >= IDLE_MS;
-        if (quiet || Date.now() - start >= NAV_IDLE_CAP_MS) return post({ idle: location.href });
+        if (quiet || Date.now() - start >= NAV_IDLE_CAP_MS) {
+          idleReached = true;
+          return post({ idle: location.href });
+        }
         setTimeout(tick, POLL_MS);
       };
       tick();
@@ -754,27 +770,28 @@
     },
   };
 
-  async function run(id, method, params) {
+  async function run(id, method, params, attempt) {
     navExpected = false;
     try {
       const fn = methods[method];
       if (!fn) throw new Error(`unknown method '${method}'`);
       let result = await fn(params || {});
       if (result === undefined) result = null;
-      const reply = navExpected ? { id, result, navigating: true } : { id, result };
+      const reply = navExpected ? { id, attempt, result, navigating: true } : { id, attempt, result };
       try {
         post(reply);
       } catch {
         post({ ...reply, result: String(result) }); // not JSON-safe (DOM node, cycle)
       }
     } catch (e) {
-      post({ id, error: String((e && e.message) || e) });
+      post({ id, attempt, error: String((e && e.message) || e) });
     }
   }
 
   // Rust wraps the agent's expression in an async function and passes it
   // here, so the source is compiled as script, not through eval().
-  const evalFn = (id, fn) => run(id, '__fn', fn);
+  const evalFn = (id, fn, attempt) => run(id, '__fn', fn, attempt);
 
-  window.__bruster = { run, evalFn };
+  window.__bruster = { run, evalFn, bind, document: documentId, get generation() { return generation; } };
+  if (window.top === window) bind(0);
 })();
