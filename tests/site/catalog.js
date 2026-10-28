@@ -1,5 +1,6 @@
 /* Catalog content is rendered with textContent, including imported test reports. */
 (async () => {
+  document.documentElement.dataset.catalogState = 'loading';
   const $ = id => document.getElementById(id);
   const make = (tag, text, className) => {
     const node = document.createElement(tag);
@@ -14,6 +15,7 @@
     manifest = await response.json();
   } catch (error) {
     $('cases').prepend(make('p', `Interactive catalog unavailable: ${error.message}. The fixture links below still work.`));
+    document.documentElement.dataset.catalogState = 'error';
     return;
   }
   const cases = manifest.cases;
@@ -114,4 +116,5 @@
     } catch (error) { $('report-status').textContent = `Import failed: ${error.message}`; }
   });
   render(); detail();
+  document.documentElement.dataset.catalogState = 'ready';
 })();

@@ -21,22 +21,31 @@ cargo test --release --test test_lab -- --exact form_state_and_atomic_failures
 
 On headless Linux, prefix these commands with `xvfb-run -a`. The default target
 needs no Node installation or network access during execution. Its eight groups
-cover **39 fixtures × two transports = 78 observations**:
+cover **52 fixtures × two transports = 104 observations**:
 
 | Cargo test | Coverage |
 | --- | --- |
 | `references_and_snapshots` | Duplicate names, replaced nodes, refreshed references, labels, Unicode |
 | `form_state_and_atomic_failures` | Number inputs, emoji, disabled fieldsets, submit, atomic multiselect, checkboxes |
-| `css_actionability_and_events` | Grid, hidden/covered targets, coordinates, propagation, canceled keys |
-| `shadow_frames_and_uploads` | Open shadow roots, slots, same-origin frames, binary file contents |
-| `javascript_waits_and_deadlines` | Microtasks, visibility waits, timeouts, late replies, zero deadlines |
+| `css_actionability_and_events` | Grid, hidden/covered targets, closed details, composed hits, coordinates, propagation, canceled keys |
+| `shadow_frames_and_uploads` | Open shadow roots, slots, same-origin frames, stale frame references, binary file contents |
+| `javascript_waits_and_deadlines` | Microtasks, animation frames, rejection diagnostics, visibility waits, timeouts, late replies, zero deadlines |
 | `navigation_and_tabs` | History, redirects, DOM milestones, closing tabs with pending requests |
 | `http_and_storage` | Headers, network-idle gates, CORS rejection, cookies, origin isolation |
-| `rendering_and_application_workflows` | Screenshot pixels, canvas updates, login decoys, modal cancellation |
+| `rendering_and_application_workflows` | Screenshot pixels, canvas updates, responsive/container layouts, login decoys, modal cancellation |
 
 Groups run sequentially to bound native-engine resource use. Cargo requires
 every selected case to pass exactly once per transport; a missing, duplicate,
 or skipped observation fails the test.
+
+Animation-frame fixtures explicitly launch with `--visible`: macOS WKWebView
+suspends animation callbacks in off-screen windows. The macOS catalog check also
+uses a visible window for its responsive screenshots. On headless Linux these
+windows run inside Xvfb. The catalog check gates its manifest response to verify
+that early search input survives initialization before exercising the controls.
+Linux lab launches disable desktop-bus integration by default, including visible
+fixtures; `BRUSTER_USE_SESSION_BUS=1` explicitly enables it. The software renderer
+also defaults `WEBKIT_DISABLE_DMABUF_RENDERER=1` while respecting an explicit value.
 
 The **complete core suite** is opt-in locally and runs in CI. Build the pinned
 framework bundles first:
@@ -66,6 +75,9 @@ both lab runs. `--rounds N` repeats smoke/edge tests; each lab selection runs on
 Cargo retains reports, fixture pages, transcripts, and `runner.log` in unique
 `target/test-lab-results/cargo/<test>-<pid>-<timestamp>/` directories. Failed
 tests print the evidence path; `--nocapture` also prints it on success.
+CI overrides these paths to use the runner's temporary directory: Rust-cache
+cleanup removes non-Cargo files under `target`, including the generated site's
+ownership marker. CI retains the temporary reports as workflow artifacts.
 
 | Environment variable | Default / purpose |
 | --- | --- |

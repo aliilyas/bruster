@@ -42,6 +42,12 @@ class Client:
         self.sequence = 0
         self.started = time.monotonic()
         env = os.environ.copy()
+        if sys.platform.startswith('linux'):
+            # Visible rendering fixtures still run as isolated automation under
+            # Xvfb, without a desktop portal or an accelerated graphics device.
+            env.setdefault('WEBKIT_DISABLE_DMABUF_RENDERER','1')
+            if env.get('BRUSTER_USE_SESSION_BUS') != '1':
+                env['DBUS_SESSION_BUS_ADDRESS'] = 'disabled:'
         for key in ('XDG_CONFIG_HOME', 'XDG_CACHE_HOME', 'XDG_DATA_HOME', 'XDG_STATE_HOME'):
             env[key] = str(directory / key.lower())
         if sys.platform == 'darwin':

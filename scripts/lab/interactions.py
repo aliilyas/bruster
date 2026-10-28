@@ -66,7 +66,16 @@ def hit_testing():
     case('hit-details', 'Opening details reveals its control', 'Hit testing',
          '<details><summary id="summary">Expand</summary>'+target+'</details>',
          [command('click', {'selector':'#target','timeout':150}, error=''), command('click', {'selector':'#summary'}),
-          command('click', {'selector':'#target'}), check('__lab.state.clicks', 1)], setup=setup)
+           command('click', {'selector':'#target'}), check('__lab.state.clicks', 1)], setup=setup)
+    case('hit-visibility-override', 'A descendant can override inherited hidden visibility', 'Hit testing',
+         '<section>'+target+'</section>',
+         [command('snapshot',{'format':'json'},verify="result.elements.some(e=>e.name==='Target') && !result.elements.some(e=>e.name==='Neighbor')"),
+          command('click',{'selector':'#target'}),check('[__lab.state.clicks,__lab.state.neighbor]',[1,0])],
+         css='section{visibility:hidden}#target{visibility:visible}',setup=setup)
+    case('hit-shadow-descendant', 'A shadow descendant receives hits inside its button', 'Hit testing',
+         '<button id="target" onclick="__lab.state.clicks++"><span id="host"></span></button>',
+         [command('click',{'selector':'#target'}),check('__lab.state.clicks',1)],
+         setup=setup+"host.attachShadow({mode:'open'}).innerHTML='<span style=display:block;padding:30px>Inside</span>'")
     case('hit-inert', 'Inert background rejects interactive actions', 'Hit testing', '<section inert>'+target+'</section>',
          [command('click', {'selector':'#target','timeout':150}, error=''), check('__lab.state.clicks', 0)], setup=setup, contract='probe')
     case('hit-coordinate', 'A coordinate click on an icon bubbles to its button once', 'Hit testing',
@@ -172,7 +181,16 @@ def composed_trees():
     case('frame-replaced-ref', 'Frame replacement invalidates child references', 'Composed trees',frame,
          [ready,command('snapshot',{'format':'json'},capture={'ref':"result.elements.find(e=>e.name==='Frame button').ref"}),
           evaluate("await new Promise(resolve=>{frame.onload=resolve;frame.src='../support/frame.html?second'})"),
-          command('click',{'ref':'{{ref}}','timeout':150},error='stale or unknown ref'),check('frame.contentWindow.clicks',0)])
+           command('click',{'ref':'{{ref}}','timeout':150},error='stale or unknown ref'),
+           command('text',{'ref':'{{ref}}'},error='stale or unknown ref'),
+           command('wait_for',{'ref':'{{ref}}','state':'hidden','timeout':150}),
+           command('wait_for',{'ref':'{{ref}}','state':'attached','timeout':150},error='wait_for timed out'),
+           check('frame.contentWindow.clicks',0),command('click',{'selector':'#inside'}),check('frame.contentWindow.clicks',1)])
+    case('frame-removed-ref', 'Removing a frame invalidates references inside its document', 'Composed trees',frame,
+         [ready,command('snapshot',{'format':'json'},capture={'ref':"result.elements.find(e=>e.name==='Frame button').ref"}),
+          evaluate('frame.remove()'),command('click',{'ref':'{{ref}}','timeout':150},error='stale or unknown ref'),
+          command('text',{'ref':'{{ref}}'},error='stale or unknown ref'),
+          command('wait_for',{'ref':'{{ref}}','state':'hidden','timeout':150}),check("document.querySelectorAll('iframe').length",0)])
     case('frame-offset-rect', 'Frame descendant rectangles use the top-level viewport', 'Composed trees',frame,
          [ready,command('rect',{'selector':'#inside'},verify="Math.abs(result.x-(frame.getBoundingClientRect().x+frame.clientLeft+frame.contentDocument.getElementById('inside').getBoundingClientRect().x))<=1")],
          css='#frame{margin:120px;border:4px solid;width:400px;height:250px}', contract='probe')
@@ -190,12 +208,12 @@ def rendering():
              [command('resize',{'width':width,'height':640}),
               evaluate("await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))"),
               check('innerWidth',width),check('getComputedStyle(box).color','rgb(255, 0, 0)' if width<600 else 'rgb(0, 0, 255)')],
-             css='#box{color:blue}@media(max-width:599px){#box{color:red}}')
+              css='#box{color:blue}@media(max-width:599px){#box{color:red}}',launch=['--visible'])
     case('container-query', 'Container queries respond to their container width', 'Rendering', '<section id="container"><span id="child">Content</span></section>',
          [check('getComputedStyle(child).color','rgb(255, 0, 0)'),evaluate("container.style.width='400px';await new Promise(r=>requestAnimationFrame(r))"),
           check('getComputedStyle(child).color','rgb(0, 0, 255)')],
          css='#container{container-type:inline-size;width:200px}#child{color:blue}@container(max-width:250px){#child{color:red}}',
-         requires=[{'expression':"CSS.supports('container-type','inline-size')",'reason':'Container queries unsupported'}])
+          requires=[{'expression':"CSS.supports('container-type','inline-size')",'reason':'Container queries unsupported'}],launch=['--visible'])
     case('screenshot-quadrants', 'Screenshot pixels contain the current viewport content', 'Screenshots','<div id="red"></div><div id="green"></div><div id="blue"></div><div id="white"></div>',
          [command('screenshot', image={'samples':[[50,50,[255,0,0]],[250,50,[0,128,0]],[50,250,[0,0,255]],[250,250,[255,255,255]]],'minWidth':400,'minHeight':400})],
          css='body{margin:0;display:grid;grid-template-columns:200px 200px}body>div{width:200px;height:200px}#red{background:red}#green{background:green}#blue{background:blue}#white{background:white}')
@@ -203,7 +221,7 @@ def rendering():
          [evaluate("canvas.getContext('2d').fillStyle='red';canvas.getContext('2d').fillRect(0,0,300,300);await new Promise(r=>requestAnimationFrame(r))"),
           command('screenshot', image={'samples':[[80,80,[255,0,0]]]}),
           evaluate("canvas.getContext('2d').fillStyle='blue';canvas.getContext('2d').fillRect(0,0,300,300);await new Promise(r=>requestAnimationFrame(r))"),
-          command('screenshot', image={'samples':[[80,80,[0,0,255]]]})], css='body{margin:0}')
+           command('screenshot', image={'samples':[[80,80,[0,0,255]]]})], css='body{margin:0}',launch=['--visible'])
     case('screenshot-clip', 'A clip contains the intended element pixels', 'Screenshots','<div id="box"></div>',
          [command('rect',{'selector':'#box'},capture={'clip':'result'}),command('screenshot',{'clip':'{{clip}}'},image={'cssWidth':100,'cssHeight':80,'samples':[[30,30,[255,0,0]]]})],
          css='#box{width:100px;height:80px;background:red}',requires=['clip'])

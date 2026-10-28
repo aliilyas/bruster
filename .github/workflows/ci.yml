@@ -22,9 +22,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { os: macos-14,         target: aarch64-apple-darwin,       test: full }
-          # Intel runners are scarce; the arm64 runner cross-compiles and runs the tests under Rosetta.
-          - { os: macos-14,         target: x86_64-apple-darwin,        test: full }
+          # Use supported native pools instead of the capacity-constrained macOS 14 pool.
+          - { os: macos-15,         target: aarch64-apple-darwin,       test: full }
+          - { os: macos-15-intel,   target: x86_64-apple-darwin,        test: full }
           - { os: ubuntu-24.04,     target: x86_64-unknown-linux-gnu,   test: full }
           - { os: ubuntu-24.04-arm, target: aarch64-unknown-linux-gnu,  test: full }
           - { os: windows-2022,     target: x86_64-pc-windows-msvc,     test: unit }
@@ -44,6 +44,7 @@ jobs:
           sudo apt-get install -y -qq libwebkit2gtk-4.1-dev libgtk-3-dev xvfb fonts-dejavu-core dbus python3-dbus python3-gi
 
       - name: Build
+        id: bruster_build
         run: cargo build --release --locked --target ${{ matrix.target }}
 
       - name: Unit tests
@@ -116,28 +117,35 @@ jobs:
           sh tests/mcp_launch.sh "$@" --hidden --mcp --quiet
 
       - uses: actions/setup-python@v5
+        if: ${{ !cancelled() && steps.bruster_build.outcome == 'success' }}
         with:
           python-version: '3.12'
       - uses: actions/setup-node@v4
+        if: ${{ !cancelled() && steps.bruster_build.outcome == 'success' }}
         with:
           node-version: '24'
           cache: npm
           cache-dependency-path: tests/site/frameworks/package-lock.json
       - name: Build and validate test lab
         id: lab_fixtures
+        if: ${{ !cancelled() && steps.bruster_build.outcome == 'success' }}
         shell: bash
+        # rust-cache prunes non-Cargo files in target, including the lab's
+        # ownership marker. Keep generated sites and reports outside its tree.
         run: |
           npm ci --prefix tests/site/frameworks --ignore-scripts --no-audit --no-fund
-          node tests/site/frameworks/build.mjs target/test-lab-frameworks
+          node tests/site/frameworks/build.mjs "$RUNNER_TEMP/bruster-test-lab/frameworks"
           python -m unittest discover -s scripts -p 'test_test_lab.py'
-          python scripts/test_lab.py build --frameworks target/test-lab-frameworks
-          node scripts/test_lab_check.mjs target/test-lab
+          python scripts/test_lab.py build --site-dir "$RUNNER_TEMP/bruster-test-lab/site" --frameworks "$RUNNER_TEMP/bruster-test-lab/frameworks"
+          node scripts/test_lab_check.mjs "$RUNNER_TEMP/bruster-test-lab/site"
       - name: Test lab (native JSONL and MCP)
+        if: ${{ !cancelled() && steps.lab_fixtures.outcome == 'success' }}
         shell: bash
         env:
           PYTHONUTF8: '1'
           BRUSTER_TEST_PYTHON: python
-          BRUSTER_TEST_LAB_OUTPUT: target/test-lab-results/cargo
+          BRUSTER_TEST_LAB_FRAMEWORKS: ${{ runner.temp }}/bruster-test-lab/frameworks
+          BRUSTER_TEST_LAB_OUTPUT: ${{ runner.temp }}/bruster-test-lab/results/cargo
         run: |
           if [ "$RUNNER_OS" = Linux ]; then set -- xvfb-run -a; else set --; fi
           "$@" cargo test --release --locked --target ${{ matrix.target }} --test test_lab -- --ignored --exact full_test_lab --nocapture
@@ -150,13 +158,13 @@ jobs:
           BIN=target/${{ matrix.target }}/release/bruster
           if [ "$RUNNER_OS" = Windows ]; then BIN="$BIN.exe"; fi
           if [ "$RUNNER_OS" = Linux ]; then set -- xvfb-run -a; else set --; fi
-          "$@" python scripts/test_lab_ui.py --binary "$BIN" --frameworks target/test-lab-frameworks --output target/test-lab-results/catalog
+          "$@" python scripts/test_lab_ui.py --binary "$BIN" --frameworks "$RUNNER_TEMP/bruster-test-lab/frameworks" --site-dir "$RUNNER_TEMP/bruster-test-lab/catalog-site" --output "$RUNNER_TEMP/bruster-test-lab/results/catalog"
       - name: Retain test lab evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-lab-${{ matrix.target }}
-          path: target/test-lab-results/
+          path: ${{ runner.temp }}/bruster-test-lab/results/
           if-no-files-found: warn
           retention-days: 30
 
@@ -219,7 +227,7 @@ jobs:
         shell: bash
         env:
           BRUSTER_TEST_PYTHON: python
-          BRUSTER_TEST_LAB_OUTPUT: target/test-lab-live-results
+          BRUSTER_TEST_LAB_OUTPUT: ${{ runner.temp }}/bruster-test-lab-live-results
         run: |
           if [ "$RUNNER_OS" = Linux ]; then set -- xvfb-run -a; else set --; fi
           "$@" cargo test --release --locked --test test_lab -- --ignored --exact published_test_lab --nocapture
@@ -228,7 +236,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: test-lab-live-${{ matrix.os }}
-          path: target/test-lab-live-results/
+          path: ${{ runner.temp }}/bruster-test-lab-live-results/
           if-no-files-found: warn
           retention-days: 30
 

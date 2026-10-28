@@ -5,6 +5,7 @@ import base64
 import contextlib
 import copy
 import json
+import sys
 import tempfile
 from pathlib import Path
 
@@ -20,15 +21,28 @@ def verify(client, expression):
         raise AssertionError(f'Catalog assertion was {result!r}: {expression}')
 
 
-def check_catalog(binary, site, manifest, output, report_file, transport):
+def check_catalog(binary, site, manifest, output, report_file, transport, server):
     folder = output/transport
     folder.mkdir(parents=True,exist_ok=True)
     temporary_root = '/tmp/opencode' if Path('/tmp/opencode').is_dir() else None
     with tempfile.TemporaryDirectory(prefix='lab-catalog-',dir=temporary_root) as temp:
-        client = Client(binary,transport,Path(temp),viewport=(1280,900))
+        # WKWebView suspends animation frames for off-screen windows. This test
+        # exercises actual rendered frames after resizing the catalog.
+        client = Client(binary,transport,Path(temp),viewport=(1280,900),
+                        launch=('--visible',) if sys.platform=='darwin' else ())
         try:
             client.call('navigate',{'url':site,'timeout':20000},timeout=25)
             client.call('wait_for',{'selector':'.case'})
+            verify(client,f"document.querySelectorAll('.case').length==={len(manifest['cases'])}")
+            # Static cards exist before the manifest fetch and event handlers.
+            # Gate that fetch to reproduce early typing deterministically.
+            server.control('wait','catalog-manifest')
+            verify(client,"document.documentElement.dataset.catalogState==='loading'")
+            client.call('fill',{'selector':'#search','value':'ref-duplicate'})
+            server.control('release','catalog-manifest')
+            client.call('wait_for',{'selector':'html[data-catalog-state="ready"]'})
+            verify(client,"document.querySelectorAll('.case').length===1")
+            client.call('fill',{'selector':'#search','value':''})
             verify(client,f"document.querySelectorAll('.case').length==={len(manifest['cases'])}")
             verify(client,'document.documentElement.scrollWidth<=innerWidth')
             client.call('fill',{'selector':'#search','value':'ref-duplicate'})
@@ -119,15 +133,16 @@ def main():
     parser.add_argument('--output',type=Path,default=ROOT/'target/test-lab-ui-results')
     args = parser.parse_args()
     manifest = build(args.site_dir,args.frameworks)
-    with FixtureServer(args.site_dir) as server:
+    with FixtureServer(args.site_dir,static_gates={'manifest.json':'catalog-manifest'}) as server:
         # Import actual Bruster observations of one fixture through both transports.
         status = run(args.binary.resolve(),server.url,manifest,args.output/'fixture-checks',
                      patterns=['ref-duplicate'],server=server)
         if status:
             return status
         for transport in ('native','mcp'):
+            server.reset()
             check_catalog(args.binary.resolve(),server.url,manifest,args.output,
-                          (args.output/'fixture-checks/results.json').resolve(),transport)
+                          (args.output/'fixture-checks/results.json').resolve(),transport,server)
     return 0
 
 

@@ -228,6 +228,11 @@ lab_cases!(
     css_actionability_and_events,
     "layout-grid",
     "hit-display-none",
+    "hit-hidden",
+    "hit-pointer-none",
+    "hit-details",
+    "hit-visibility-override",
+    "hit-shadow-descendant",
     "hit-overlay",
     "hit-coordinate",
     "event-propagation",
@@ -238,11 +243,16 @@ lab_cases!(
     "shadow-open",
     "shadow-slots",
     "frame-same-origin",
+    "frame-replaced-ref",
+    "frame-removed-ref",
     "upload-binary"
 );
 lab_cases!(
     javascript_waits_and_deadlines,
     "async-microtask",
+    "async-animation",
+    "console-unhandled",
+    "console-error-stack",
     "wait-insert-visible",
     "wait-timeout",
     "request-late-reply",
@@ -267,6 +277,9 @@ lab_cases!(
     rendering_and_application_workflows,
     "screenshot-quadrants",
     "screenshot-canvas-update",
+    "responsive-480",
+    "responsive-960",
+    "container-query",
     "workflow-decoy-login",
     "workflow-modal-cancel"
 );

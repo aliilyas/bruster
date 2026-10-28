@@ -240,7 +240,7 @@ arguments (default: `-screen 0 1280x1024x24 -nolisten tcp -extension GLX`). Set
 
 The [Test Lab](https://aliilyas.github.io/bruster/test-lab/) provides individual
 HTML/CSS/JavaScript fixtures with executable assertions. Cargo builds Bruster
-and runs 39 focused fixtures through both native JSONL and MCP (Python 3.10+
+and runs 52 focused fixtures through both native JSONL and MCP (Python 3.10+
 required; prefix with `xvfb-run -a` on headless Linux):
 
 ```sh
@@ -346,7 +346,7 @@ Calls routed through the page runtime (`eval`, `url`, `title`, `snapshot`, inter
 - Full-page screenshots are capped at 16000 px. On macOS, very tall pages can be cut when they are higher than the screen.
 - WebKitGTK screenshots capture page content without non-overlay scrollbars, so their width can be narrower than the window viewport.
 - On Windows (WebView2), `screenshot` has no `clip`. `--quiet` does nothing. The Linux-only flags have no effect.
-- With `--hidden`, WebKit timer throttling can make `setTimeout`-driven pages slow.
+- With `--hidden`, WebKit timer throttling can make `setTimeout`-driven pages slow. macOS WKWebView suspends animation frames in off-screen windows; use `--visible` for animation-driven workflows.
 
 ## Development
 
