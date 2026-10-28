@@ -9,6 +9,7 @@ import math
 import os
 import re
 import statistics
+from datetime import datetime, timezone
 from pathlib import Path
 
 from bench_audit import summary
@@ -39,26 +40,32 @@ METRICS = (
     ('total_pss_mib', 'Idle total PSS, including display (MiB)'),
     ('rss_mib', 'Idle process RSS, excluding display (MiB)'),
 )
-METHOD = (
+METHOD_SECTIONS = (
+    ('Sampling',
     'Ten sessions per configuration by default, with rotating order and fresh browser profiles. '
     'Values are medians [observed minimum–maximum], not confidence intervals. '
     'Startup and first navigation have one sample per session; repeated-operation timings pool all '
-    'iterations; memory uses the median of three idle readings per session. '
+    'iterations; memory uses the median of three idle readings per session.'),
+    ('Startup and workloads',
     'Startup ends at the adapter ready event, or after blank-page/viewport setup for agent-browser. '
     'The combined launch-to-first-page measurement includes both setup and the first navigation. '
     'Xvfb is already running: its startup time is excluded, but its memory is included. '
     '1280×800 viewport; localhost fixtures; no-store HTTP responses; navigation waits for load. '
     'OS filesystem caches are not flushed. Identical extraction JavaScript and cross-tool result hashes. '
-    'Timings include controller round trips; agent-browser includes its per-command native CLI. '
+    'Timings include controller round trips; agent-browser includes its per-command native CLI.'),
+    ('Memory and scope',
     'Memory covers the complete owned process forest (including detached daemons and helpers), '
     'plus Xvfb for Bruster. PSS apportions shared pages; summed RSS double-counts them. '
     'Memory is small-page idle usage, not peak usage. Native snapshots have different semantics '
     'and are retained in the raw artifacts rather than ranked as equal work. '
-    'MB = 1,000,000 bytes; MiB = 1,048,576 bytes. Installed-file inventories are lower bounds '
+    'MB = 1,000,000 bytes; MiB = 1,048,576 bytes.'),
+    ('Footprint and comparability',
+    'Installed-file inventories are lower bounds '
     'including browser/engine, linked libraries, observed mapped files and Node where required; '
     'unobserved OS resources may add more. GitHub-hosted runner hardware and OS packages can change: '
-    'compare the configurations within a run and inspect provenance before interpreting trends.'
+    'compare the configurations within a run and inspect provenance before interpreting trends.')
 )
+METHOD = ' '.join(text for _, text in METHOD_SECTIONS)
 PUBLIC_FILES = ('measurement.json', 'summary.json', 'samples.json', 'footprint.json', 'report.md',
                 'package.json', 'package-lock.json')
 
@@ -220,43 +227,161 @@ def page(record, history=None):
     e = lambda value: html.escape(str(value), quote=True)
     c, m = record['context'], record['metadata']
     prefix = f"runs/{record_id(record)}/" if history is not None else ''
-    parts = ['<!doctype html><html lang="en"><meta charset="utf-8">',
+    home = '../' if history is not None else '../../../'
+    repo = f'https://github.com/{c["repository"]}'
+    stats = record['summary']
+
+    def time_label(value):
+        return datetime.fromisoformat(value.replace('Z', '+00:00')).astimezone(timezone.utc).strftime('%d %b %Y · %H:%M UTC')
+
+    def metric_row(key, label):
+        cells = [f'<tr><th scope="row">{e(label)}</th>']
+        for tool in LABELS:
+            if key == 'footprint':
+                value = record['footprint']['tool_totals'][tool]['bytes'] / 1e6
+                content = f'<span class="number">{value:,.1f}</span>'
+            elif key == 'failures':
+                value = stats[tool]['sessions_with_failures']
+                color = 'warn' if value else 'neutral'
+                content = f'<span class="badge badge-{color}">{value}/{m["rounds"]}</span>'
+            else:
+                value = stats[tool][key]
+                content = (f'<span class="number">{value["median"]:,.1f}</span>'
+                           f'<span class="range">[{value["min"]:,.1f}–{value["max"]:,.1f}]</span>')
+            cells.append(f'<td>{content}</td>')
+        return ''.join(cells) + '</tr>'
+
+    def details(items):
+        return '<dl class="detail-list">' + ''.join(
+            f'<div><dt>{e(label)}</dt><dd>{e(value)}</dd></div>' for label, value in items) + '</dl>'
+
+    def failures(counts):
+        if not counts:
+            return '<span class="badge badge-neutral">None</span>'
+        return '<ul class="probe-list">' + ''.join(
+            f'<li>{e(name.replace("_", " "))}: <strong>{count}</strong></li>'
+            for name, count in counts.items()) + '</ul>'
+
+    parts = ['<!doctype html><html lang="en"><head><meta charset="utf-8">',
              '<meta name="viewport" content="width=device-width, initial-scale=1">',
+             '<meta name="description" content="Browser benchmark results, runtime footprint, reliability checks, and reproducible measurements for Bruster, Playwright, Puppeteer, and agent-browser.">',
              '<title>Bruster browser benchmarks</title><style>',
-             'body{font:16px/1.6 system-ui,sans-serif;margin:2rem auto;padding:0 1rem;max-width:1200px;color:#202938;overflow-wrap:anywhere}',
-             'a{color:#075ab4}.scroll{overflow:auto}table{border-collapse:collapse;width:100%;min-width:1000px}',
-             'th,td{padding:.6rem;border:1px solid #ccd3dc;text-align:right}th:first-child,td:first-child{text-align:left}',
-             'th{background:#edf2f7}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f5f7fa;padding:1rem}',
-             '</style><body><h1>Browser benchmarks</h1>',
-             f'<p>Commit <code>{e(c["sha"])}</code> · <a href="{e(c["run_url"])}">Workflow and raw artifacts</a></p>',
-             f'<p>Measured {e(m["finished_utc"])} · {e(m["rounds"])} sessions per configuration. Values are medians [min–max].</p>',
-             f'<p>{e(versions(m))}</p>',
-             f'<p>{e(environment(m))}</p>',
-             '<div class="scroll"><table><thead><tr><th>Metric</th>' + ''.join(f'<th>{e(v)}</th>' for v in LABELS.values()) + '</tr></thead><tbody>']
-    parts.extend('<tr>' + ''.join(f'<td>{e(cell)}</td>' for cell in row) + '</tr>' for row in table_rows(record))
-    parts.extend(['</tbody></table></div><h2>Method</h2>', f'<p>{e(METHOD)}</p>',
-                  '<p>' + ' · '.join(f'<a href="{e(prefix + name)}">{e(name)}</a>' for name in PUBLIC_FILES) + '</p>',
-                  '<h2>Fault probes and cleanup</h2><p>Failures remain visible even when a later retry succeeds. '
-                  'These probes run after the timed workloads.</p><ul>'])
+             Path(__file__).with_suffix('.css').read_text(),
+             '</style></head><body><a class="skip-link" href="#main">Skip to results</a>',
+             '<header class="topbar"><div class="container topbar-inner">',
+             f'<a class="brand" href="{home}"><img src="{home}assets/logo.svg" alt="" width="34" height="34">bruster</a>',
+             f'<nav class="top-links" aria-label="Site"><a href="{home}">Documentation</a><a href="{e(repo)}">GitHub ↗</a></nav>',
+             '</div></header><main class="container" id="main">',
+             '<p class="eyebrow">Performance / Browser comparison</p><h1>Browser benchmarks</h1>',
+             '<p class="lead">Compare timing, memory, runtime footprint, and reliability across five browser configurations.</p>',
+             '<div class="run-meta">',
+             f'<span class="badge badge-blue">{"Latest measurement" if history is not None else "Archived measurement"}</span>',
+             f'<time datetime="{e(m["finished_utc"])}">{e(time_label(m["finished_utc"]))}</time>',
+             f'<a href="{e(repo)}/commit/{e(c["sha"])}" title="{e(c["sha"])}">Commit <code>{e(c["sha"][:12])}</code></a>',
+             f'<a href="{e(c["run_url"])}">Workflow #{c["run_number"]} ↗</a></div>',
+             '<dl class="facts">',
+             f'<div><dt>Configurations</dt><dd>{len(LABELS)}</dd></div>',
+             f'<div><dt>Sessions / configuration</dt><dd>{m["rounds"]}</dd></div>',
+             f'<div><dt>Tiny iterations / session</dt><dd>{m["iterations"]}</dd></div>',
+             '<div><dt>Viewport (px)</dt><dd>1280 × 800</dd></div></dl>',
+             '<nav class="section-nav" aria-label="Benchmark sections">',
+             '<a href="#results">Results</a><a href="#environment">Environment</a><a href="#method">Method</a>',
+             '<a href="#reliability">Reliability</a><a href="#downloads">Downloads</a>',
+             '<a href="#history">History</a>' if history is not None else '<a href="../../#history">All measurements</a>',
+             '</nav><section id="results" aria-labelledby="results-title">',
+             '<div class="section-head"><div><h2 id="results-title">Performance results</h2>',
+             '<p>Timings include controller round trips. Lower values mean less time, memory, or disk space.</p></div>',
+             '<div class="legend"><strong>Median</strong><br>[observed min–max]</div></div>',
+             '<p class="scroll-hint">Scroll the table horizontally to compare all five configurations.</p>',
+             '<div class="panel"><div class="table-scroll" role="region" aria-labelledby="results-title" tabindex="0">',
+             '<table class="results-table"><caption class="sr-only">Performance comparison. Values are medians with observed minimum and maximum beneath, except runtime footprint and failure counts.</caption>',
+             '<colgroup><col>' + '<col>' * len(LABELS) + '</colgroup><thead><tr><th scope="col">Metric / unit</th>']
+    for label in LABELS.values():
+        tool, engine = label.split(' / ')
+        parts.append(f'<th scope="col"><span>{e(tool)}</span><span class="engine">{e(engine)}</span></th>')
+    parts.append('</tr></thead>')
+    labels = dict(METRICS)
+    labels.update(footprint='Installed runtime files, lower bound (MB)', failures='Sessions with failures (including cleanup)')
+    for group, keys in (
+        ('Startup', ('launch_to_first_page_ms', 'startup_ms', 'first_navigation_ms')),
+        ('Navigation', ('tiny_navigation_ms', 'large_navigation_ms', 'image_navigation_ms')),
+        ('Extraction and screenshots', ('tiny_extract_ms', 'large_extract_ms', 'large_extract_json_ms', 'screenshot_ms')),
+        ('Memory and runtime footprint', ('total_pss_mib', 'rss_mib', 'footprint')),
+        ('Reliability', ('failures',)),
+    ):
+        parts.append(f'<tbody><tr class="group-row"><th scope="rowgroup" colspan="6">{e(group)}</th></tr>')
+        parts.extend(metric_row(key, labels[key]) for key in keys)
+        parts.append('</tbody>')
+    parts.extend(['</table></div><p class="table-note">Ranges show observed variation, not confidence intervals. '
+                  'Memory is idle usage; installed runtime sizes are lower bounds. <a href="#method">Read the measurement method</a>.</p></div></section>',
+                  '<section class="section" id="environment" aria-labelledby="environment-title">',
+                  '<div class="section-head"><div><h2 id="environment-title">Environment &amp; versions</h2>',
+                  '<p>The machine and exact runtime versions behind this measurement.</p></div></div>',
+                  '<div class="environment-grid"><div class="panel environment-card"><h3>Runner</h3>'])
+    memory = m.get('mem_total_kib')
+    parts.extend([details((
+        ('Operating system', m.get('os', {}).get('PRETTY_NAME', 'Unrecorded')),
+        ('Processor', m.get('cpu_model', 'Unrecorded')),
+        ('Visible CPUs', m.get('cpu_count', 'Unrecorded')),
+        ('System memory', f'{memory / 1024**2:.1f} GiB' if memory else 'Unrecorded'),
+        ('Runner image', m.get('runner_image', {}).get('ImageVersion') or 'Unrecorded'),
+    )), '</div><div class="panel environment-card"><h3>Browser runtimes &amp; tools</h3>', details((
+        ('WebKitGTK', m.get('webkitgtk', 'Unrecorded')),
+        ('Playwright', m['packages']['playwright-core']),
+        ('Puppeteer', m['packages']['puppeteer-core']),
+        ('agent-browser', m['packages']['agent-browser']),
+        ('Chrome', m['chrome']),
+        ('Headless Shell', m.get('headless_shell', 'Unrecorded')),
+        ('Node.js', m['node']),
+    )), '</div></div></section>',
+        '<section class="section" id="method" aria-labelledby="method-title">',
+        '<div class="section-head"><div><h2 id="method-title">How to read these results</h2>',
+        '<p>Measurement conditions, accounting boundaries, and comparison guidance.</p></div></div><div class="method-grid">'])
+    for title, text in METHOD_SECTIONS:
+        parts.append(f'<article class="panel method-card"><h3>{e(title)}</h3><p>{e(text)}</p></article>')
+    parts.extend(['</div></section><section class="section" id="reliability" aria-labelledby="reliability-title">',
+                  '<div class="section-head"><div><h2 id="reliability-title">Fault probes &amp; cleanup</h2>',
+                  '<p>These probes run after the timed workloads. Failed attempts remain counted even when a later retry succeeds.</p></div></div>',
+                  '<p class="scroll-hint">Scroll horizontally for fault, cleanup, and recovery details.</p>',
+                  '<div class="panel table-scroll" role="region" aria-labelledby="reliability-title" tabindex="0">',
+                  '<table class="reliability-table"><caption class="sr-only">Post-workload fault probes and cleanup outcomes for each configuration.</caption>',
+                  '<thead><tr><th scope="col">Configuration</th><th scope="col">Sessions with failures</th>',
+                  '<th scope="col">Fault-probe failures</th><th scope="col">Shutdown / cleanup failures</th><th scope="col">Successful 100 ms retries</th></tr></thead><tbody>'])
     for tool, label in LABELS.items():
-        s = record['summary'][tool]
-        counts = ', '.join(f'{name}: {count}' for name, count in s['fault_probe_failures'].items()) or 'none'
-        lifecycle = ', '.join(f'{name}: {count}' for name, count in s.get('lifecycle_failures', {}).items()) or 'none'
-        parts.append(f'<li>{e(label)} — fault probes: {e(counts)}; shutdown/cleanup: {e(lifecycle)}; '
-                     f'successful 100 ms recovery retries: {s["recovery_retry_passes"]}</li>')
-    parts.extend(['</ul><details><summary>Environment, versions and hashes</summary>',
-                  '<pre>' + e(json.dumps(m, indent=2)) + '</pre></details>'])
+        s = stats[tool]
+        tool_name, engine = label.split(' / ')
+        color = 'warn' if s['sessions_with_failures'] else 'neutral'
+        parts.append(f'<tr><th scope="row">{e(tool_name)}<span class="engine">{e(engine)}</span></th>'
+                     f'<td><span class="badge badge-{color}">{s["sessions_with_failures"]}/{m["rounds"]}</span></td>'
+                     f'<td>{failures(s["fault_probe_failures"])}</td><td>{failures(s.get("lifecycle_failures", {}))}</td>'
+                     f'<td>{s["recovery_retry_passes"]}</td></tr>')
+    parts.extend(['</tbody></table></div></section>',
+                  '<section class="section" id="downloads" aria-labelledby="downloads-title"><div class="section-head"><div>',
+                  '<h2 id="downloads-title">Raw data &amp; reproducibility</h2>',
+                  '<p>Download the measurements, runtime inventory, and resolved dependency files for this run.</p></div>',
+                  f'<a href="{e(c["run_url"])}">Workflow and raw artifacts ↗</a></div><ul class="files">'])
+    for name in PUBLIC_FILES:
+        parts.append(f'<li><a href="{e(prefix + name)}"><code>{e(name)}</code><span>{"Markdown" if name.endswith(".md") else "JSON"} ↓</span></a></li>')
+    parts.extend(['</ul><details class="panel provenance"><summary>Full environment, versions and hashes</summary>',
+                  '<pre tabindex="0" aria-label="Measurement provenance">' + e(json.dumps(m, indent=2)) + '</pre></details></section>'])
     if history is not None:
-        parts.append('<h2>History</h2><p>Newest workflow invocation first; late-finishing older runs never replace latest.</p><ul>')
+        parts.extend(['<section class="section" id="history" aria-labelledby="history-title"><div class="section-head"><div>',
+                      '<h2 id="history-title">Measurement history</h2>',
+                      '<p>Newest workflow invocation first. Each run retains its own data and environment.</p></div></div>',
+                      '<ol class="panel history-list">'])
         for item in history:
             ctx = item['context']
-            parts.append(f'<li><a href="runs/{e(record_id(item))}/">{e(ctx["sha"][:12])} · run {ctx["run_number"]}, '
-                          f'attempt {ctx["run_attempt"]}</a> · {e(item["metadata"]["finished_utc"])} '
-                          f'· {e(environment(item["metadata"]))}</li>')
-        parts.append('</ul>')
+            latest = '<span class="badge badge-blue">Latest</span>' if record_id(item) == record_id(record) else ''
+            date = item['metadata']['finished_utc']
+            parts.append(f'<li class="history-entry"><div><a href="runs/{e(record_id(item))}/">Run #{ctx["run_number"]} · attempt {ctx["run_attempt"]}</a>'
+                         f'{latest}<code>{e(ctx["sha"][:12])}</code></div><div><time datetime="{e(date)}">{e(time_label(date))}</time>'
+                         f'<p>{e(environment(item["metadata"]))}</p></div></li>')
+        parts.append('</ol></section>')
     else:
-        parts.append('<p><a href="../../">All measurements</a></p>')
-    parts.append('</body></html>\n')
+        parts.append('<p class="back-link"><a href="../../">← All measurements</a></p>')
+    parts.extend(['</main><footer><div class="container footer-inner"><span>bruster · Browser performance, measured.</span>',
+                  f'<a href="{e(repo)}/blob/{e(c["sha"])}/benchmarks/README.md">Benchmark source &amp; methodology ↗</a>',
+                  '</div></footer></body></html>\n'])
     return '\n'.join(parts)
 
 
@@ -270,9 +395,10 @@ def install(results, site):
         content = (results / name).read_bytes()
         require(not target.exists() or target.read_bytes() == content, f'Refusing to overwrite immutable result: {target}')
         target.write_bytes(content)
-    (destination / 'index.html').write_text(page(record))
     history = [json.loads(p.read_text()) for p in (root / 'runs').glob('*/measurement.json')]
     history.sort(key=lambda r: (r['context']['run_number'], r['context']['run_attempt'], r['context']['run_id']), reverse=True)
+    for item in history:
+        (root / 'runs' / record_id(item) / 'index.html').write_text(page(item))
     write_json(root / 'latest.json', history[0])
     write_json(root / 'history.json', [dict(r['context'], path=f'runs/{record_id(r)}/') for r in history])
     (root / 'index.html').write_text(page(history[0], history))
