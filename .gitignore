@@ -6,3 +6,4 @@ __MACOSX/
 benchmarks/node_modules/
 benchmarks/results/
 __pycache__/
+tests/site/frameworks/node_modules/

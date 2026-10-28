@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Bruster Test Lab · Browser verification fixtures</title>
+  <meta name="description" content="Granular, reproducible HTML, CSS, and JavaScript fixtures for testing Bruster across native browser engines.">
+  <link rel="icon" href="assets/icon.svg"><link rel="stylesheet" href="styles.css">
+  <script defer src="catalog.js"></script>
+</head>
+<body>
+  <header class="topbar"><a class="brand" href="./"><img src="assets/icon.svg" width="30" height="30" alt="">bruster <span>test lab</span></a><nav aria-label="Project"><a href="../">Documentation</a><a href="../benchmarks/">Benchmarks</a><a href="https://github.com/aliilyas/bruster">GitHub ↗</a></nav></header>
+  <main>
+    <section class="hero"><div><p class="eyebrow">NATIVE ENGINES. OBSERVABLE BEHAVIOR.</p><h1>Small fixtures.<br>Precise answers.</h1><p class="lede">A browser verification workbench. Every case has a clean page, executable commands, explicit assertions, and a reproducible identity.</p><div class="engine-tags"><span>WebKitGTK</span><span>WKWebView</span><span>WebView2</span></div></div><aside class="run-card"><p class="eyebrow">RUN THE SAME FIXTURES LOCALLY</p><pre><code>python3 scripts/test_lab.py serve
+python3 scripts/test_lab.py run \
+  --binary target/release/bruster \
+  --transport both</code></pre><p>Tests drive the real Bruster process. Opening a fixture here does not grade Bruster.</p><label class="import-button">Import results.json<input id="report-file" type="file" accept="application/json,.json"></label><p id="report-status" role="status"></p></aside></section>
+    <section class="stats" aria-label="Coverage"><div><strong id="case-count">—</strong><span>executable cases</span></div><div><strong id="category-count">—</strong><span>coverage areas</span></div><div><strong id="probe-count">—</strong><span>compatibility probes</span></div><div><strong id="revision">—</strong><span>fixture source</span></div></section>
+    <section class="toolbar" aria-label="Filter cases"><label class="search"><span>Search fixtures</span><input id="search" type="search" placeholder="Try: shadow, stale reference, multiselect…"></label><label>Contract<select id="contract"><option value="">All contracts</option><option value="required">Required behavior</option><option value="probe">Compatibility probes</option></select></label><label>Environment<select id="environment"><option value="">All environments</option><option value="static">GitHub Pages</option><option value="server">Local HTTP server</option></select></label><label>Suite<select id="tier"><option value="">All suites</option><option value="core">Core</option><option value="stress">Stress</option></select></label></section>
+    <section id="detail" class="detail" hidden aria-labelledby="detail-title"></section>
+    <div class="workspace"><aside class="sidebar"><h2>Coverage</h2><nav id="categories" aria-label="Case categories"></nav></aside><section class="inventory"><div class="inventory-heading"><h2 id="inventory-title">All fixtures</h2><span id="showing" role="status"></span></div><div id="cases" class="cases"><p>Loading fixture manifest…</p></div></section></div>
+    <footer><p>Required cases assert Bruster's supported behavior. Probes measure explicit capability questions and retain failures. Server-dependent cases use controlled local endpoints.</p><p id="provenance"></p><a href="manifest.json">Download executable manifest</a></footer>
+  </main>
+</body></html>

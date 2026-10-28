@@ -115,6 +115,51 @@ jobs:
           if [ "$RUNNER_OS" = Linux ]; then set -- xvfb-run -a "$BIN"; else set -- "$BIN"; fi
           sh tests/mcp_launch.sh "$@" --hidden --mcp --quiet
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: tests/site/frameworks/package-lock.json
+      - name: Build and validate test lab
+        id: lab_fixtures
+        shell: bash
+        run: |
+          npm ci --prefix tests/site/frameworks --ignore-scripts --no-audit --no-fund
+          node tests/site/frameworks/build.mjs target/test-lab-frameworks
+          python -m unittest discover -s scripts -p 'test_test_lab.py'
+          python scripts/test_lab.py build --frameworks target/test-lab-frameworks
+          node scripts/test_lab_check.mjs target/test-lab
+      - name: Test lab (native JSONL and MCP)
+        shell: bash
+        env:
+          PYTHONUTF8: '1'
+        run: |
+          BIN=target/${{ matrix.target }}/release/bruster
+          if [ "$RUNNER_OS" = Windows ]; then BIN="$BIN.exe"; fi
+          if [ "$RUNNER_OS" = Linux ]; then set -- xvfb-run -a; else set --; fi
+          "$@" python scripts/test_lab.py run --binary "$BIN" --frameworks target/test-lab-frameworks --transport both --output target/test-lab-results
+      - name: Check test lab catalog in Bruster
+        if: ${{ !cancelled() && steps.lab_fixtures.outcome == 'success' }}
+        shell: bash
+        env:
+          PYTHONUTF8: '1'
+        run: |
+          BIN=target/${{ matrix.target }}/release/bruster
+          if [ "$RUNNER_OS" = Windows ]; then BIN="$BIN.exe"; fi
+          if [ "$RUNNER_OS" = Linux ]; then set -- xvfb-run -a; else set --; fi
+          "$@" python scripts/test_lab_ui.py --binary "$BIN" --frameworks target/test-lab-frameworks --output target/test-lab-results/catalog
+      - name: Retain test lab evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-lab-${{ matrix.target }}
+          path: target/test-lab-results/
+          if-no-files-found: warn
+          retention-days: 30
+
       - name: Package
         shell: bash
         run: |
@@ -194,6 +239,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
+          pattern: bruster-*
           path: dist
           merge-multiple: true
       - run: ls -la dist && (cd dist && sha256sum * > SHA256SUMS)

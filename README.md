@@ -22,7 +22,8 @@
     <a href="#mcp">MCP</a> ·
     <a href="#protocol">Protocol</a> ·
     <a href="#api">API</a> ·
-    <a href="https://aliilyas.github.io/bruster/benchmarks/">Performance</a>
+    <a href="https://aliilyas.github.io/bruster/benchmarks/">Performance</a> ·
+    <a href="https://aliilyas.github.io/bruster/test-lab/">Test Lab</a>
   </p>
 </div>
 
@@ -190,6 +191,18 @@ arguments (default: `-screen 0 1280x1024x24 -nolisten tcp -extension GLX`). Set
 
 ## Tests
 
+The [Test Lab](https://aliilyas.github.io/bruster/test-lab/) provides individual
+HTML/CSS/JavaScript fixtures with executable assertions. Run the same cases
+through Bruster's native JSONL and MCP transports:
+
+```sh
+python3 scripts/test_lab.py run --binary target/release/bruster --transport both
+```
+
+Use `--case 'ref-*'` for a focused run and `--suite stress` for larger workloads.
+See [test-lab setup and coverage](tests/site/README.md) for the local server,
+pinned React/Vue/Svelte bundles, reports, and GitHub Pages publication.
+
 `tests/run_all.sh [--rounds N] [--no-e2e]` runs the full suite. The suite does a build, unit tests, smoke tests, edge tests, a leftover-process check, an MCP launch check, and end-to-end tests. On Linux, run the script under `xvfb-run -a`. CI builds and tests every platform. CI also publishes release archives on `v*` tags.
 
 The Linux desktop-portal startup regression requires D-Bus, `python3-dbus`, and
@@ -281,6 +294,7 @@ Calls routed through the page runtime (`eval`, `url`, `title`, `snapshot`, inter
 - `tests/run_all.sh` runs the build, unit tests, smoke tests, edge tests, the MCP launch check, and end-to-end tests.
 - CI (`.github/workflows/ci.yml`) builds all platforms, runs the tests, and publishes release archives on `v*` tags.
 - Benchmarks: `scripts/bench_compare.py` compares five configurations; `scripts/bench_footprint.py` inventories runtime files and `scripts/bench_report.py` validates and publishes results. See [setup and methodology](benchmarks/README.md).
+- Test Lab: `scripts/test_lab.py` builds, serves, and runs the published fixtures. See [case authoring and verification](tests/site/README.md).
 
 ## License
 

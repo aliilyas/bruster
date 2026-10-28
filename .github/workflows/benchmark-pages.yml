@@ -1,6 +1,15 @@
 name: benchmark pages
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'tests/site/**'
+      - 'scripts/lab/**'
+      - 'scripts/test_lab.py'
+      - 'scripts/test_lab_check.mjs'
+      - 'scripts/test_test_lab.py'
+      - '.github/workflows/benchmark-pages.yml'
   # GITHUB_TOKEN pushes do not start another push workflow. workflow_run does.
   workflow_run:
     workflows: [benchmarks]
@@ -31,12 +40,35 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: main
+          path: source
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
           ref: gh-pages
           path: site
           persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: source/tests/site/frameworks/package-lock.json
+      - name: Build pinned framework fixtures
+        run: |
+          npm ci --prefix source/tests/site/frameworks --ignore-scripts --no-audit --no-fund
+          node source/tests/site/frameworks/build.mjs "$RUNNER_TEMP/lab-frameworks"
+      - name: Check publication and fixture contracts
+        run: python3 -m unittest discover -s source/scripts -p 'test_test_lab.py'
+      - name: Assemble documentation, benchmarks, and test lab
+        run: |
+          python3 source/scripts/test_lab.py assemble --existing site --output published --frameworks "$RUNNER_TEMP/lab-frameworks"
+          node source/scripts/test_lab_check.mjs published/test-lab
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: site
+          path: published
       - uses: actions/deploy-pages@v4
         id: deployment
