@@ -38,9 +38,12 @@ def parent_status(before, binary):
 def measure(args, server, label, round_):
     binary = getattr(args, label)
     before = compare.process_table()
-    row = {'build': label, 'round': round_, 'competing_before': compare.background_work()}
+    row = {'build': label, 'round': round_, 'started_utc': datetime.now(timezone.utc).isoformat(),
+           'competing_before': compare.background_work()}
     client = None
     try:
+        if row['competing_before']:
+            raise RuntimeError(f"Concurrent browser/build workload: {row['competing_before']}")
         client = compare.ProcessClient([str(binary), '--hidden'], False)
         base = f'http://127.0.0.1:{server.server_port}'
         row['ready_ms'] = client.startup_ms
@@ -89,6 +92,8 @@ def measure(args, server, label, round_):
                     client.navigate(f'{base}/tiny?timer={i}')
             assert all(sample['memory']['complete'] for sample in row['timers'])
         row['competing_after'] = compare.background_work(compare.owned_processes(before))
+        if row['competing_after']:
+            raise RuntimeError(f"Concurrent browser/build workload: {row['competing_after']}")
     except Exception as exc:
         row['error'] = repr(exc)
     finally:
@@ -97,6 +102,7 @@ def measure(args, server, label, round_):
             client.close()
             row['stderr'], row['close_error'] = client.stderr, client.close_error
         row['forced_cleanup'] = compare.cleanup(owned)
+        row['finished_utc'] = datetime.now(timezone.utc).isoformat()
     return row
 
 

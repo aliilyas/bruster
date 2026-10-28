@@ -173,6 +173,7 @@ def owned_processes(before):
 
 
 def background_work(exclude=()):
+    exclude = set(exclude) | {os.getpid()}
     rows = []
     for path in Path('/proc').glob('[0-9]*/comm'):
         pid = int(path.parent.name)
@@ -180,9 +181,22 @@ def background_work(exclude=()):
             continue
         try:
             name = path.read_text().strip()
-            if name in ('cargo', 'rustc', 'bruster') or name.startswith(('smoke-', 'edge-', 'e2e-')):
+            # /proc/comm truncates names to 15 bytes, including frozen builds
+            # and engine helpers. Other browser benchmarks can share library
+            # pages (changing PSS) even when their controller is mostly idle.
+            competing = name in ('cargo', 'rustc', 'node') or name.startswith((
+                    'bruster', 'baseline-brust', 'candidate-brust', 'WebKit',
+                    'chrome', 'headless_shell', 'agent-browser', 'smoke-', 'edge-', 'e2e-'))
+            if name.startswith('python'):
+                # Controllers remain competitors between their browser sessions.
+                argv = (path.parent / 'cmdline').read_bytes().decode(errors='replace').split('\0')
+                competing = any(Path(arg).name in (
+                    'site_compare.py', 'site_campaign.py', 'bench_compare.py', 'bench_performance.py', 'bench_audit.py'
+                ) for arg in argv)
+            state = (path.parent / 'stat').read_text().rsplit(')', 1)[1].split()[0]
+            if competing and state != 'Z':
                 rows.append({'pid': pid, 'name': name})
-        except OSError:
+        except (OSError, IndexError):
             pass
     return rows
 
@@ -302,8 +316,11 @@ def validate_extract(result, expected, title):
 
 
 def measure(args, server, tool, round_):
+    started_utc = datetime.now(timezone.utc).isoformat()
     before = set(process_table())
     competing_before = background_work()
+    if competing_before:
+        raise RuntimeError(f'Concurrent browser/build workload: {competing_before}')
     if tool == 'bruster':
         client = ProcessClient([str(args.bruster), '--hidden'], False)
     elif tool == 'agent-browser':
@@ -313,6 +330,7 @@ def measure(args, server, tool, round_):
                                 tool, str(args.shell if tool == 'playwright-shell' else args.chrome), str(args.deps)], True)
     base = f'http://127.0.0.1:{server.server_port}'
     row = {'tool': tool, 'round': round_, 'startup_ms': client.startup_ms,
+           'started_utc': started_utc,
            'load_before': os.getloadavg(), 'failures': [], 'competing_before': competing_before}
     try:
         row['first_navigation_ms'] = client.navigate(f'{base}/tiny?first={tool}-{round_}')
@@ -373,6 +391,9 @@ def measure(args, server, tool, round_):
             row['screenshot_ms'].append(elapsed)
         row['load_after'] = os.getloadavg()
         row['competing_after'] = background_work(owned_processes(before))
+        if row['competing_at_memory'] or row['competing_after']:
+            row['failures'].append({'name': 'concurrent_workload', 'pass': False,
+                                    'at_memory': row['competing_at_memory'], 'after': row['competing_after']})
         row['failure_checks'] = failure_checks(client, base)
         row['failures'].extend(c for c in row['failure_checks'] if not c['pass'])
     finally:
@@ -387,6 +408,7 @@ def measure(args, server, tool, round_):
                 row['failures'].append({'name': 'process_cleanup', 'pass': False,
                                         'remaining_pids': [p['pid'] for p in row['cleanup_forced_processes']]})
         row['stderr'] = client.stderr
+        row['finished_utc'] = datetime.now(timezone.utc).isoformat()
     return row
 
 
