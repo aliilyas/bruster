@@ -38,7 +38,8 @@ def waits():
                              ('observer',"new MutationObserver(change).observe(marker,{attributes:true});marker.dataset.trigger='yes'")]:
         case('async-' + name, 'Wait for a ' + name + ' DOM update', 'Async JavaScript','<button id="start">Start</button><div id="marker"></div><p id="out"></p>',
              [command('click',{'selector':'#start'}),command('wait_for',{'text':'Finished','timeout':5000}),check('out.textContent','Finished')],
-             setup="const change=()=>out.textContent='Finished';start.onclick=()=>{"+scheduling+'}')
+              setup="const change=()=>out.textContent='Finished';start.onclick=()=>{"+scheduling+'}',
+              launch=['--visible'] if name=='animation' else [])
     case('request-late-reply', 'Expired running promise produces only one reply', 'Timeouts','<p>Promise fixture</p>',
          [command('eval',{'expression':'new Promise(resolve=>window.release=resolve)','request_timeout':150},error='timed out'),
           evaluate('release(42)'),check('21*2',42),{'assertNoDuplicateReplies':True}])
@@ -192,7 +193,10 @@ def diagnostics():
     case('console-unhandled', 'Unhandled promise rejection reaches console diagnostics', 'Console','<button id="start">Reject</button>',
          [command('console',{'clear':True}),command('click',{'selector':'#start'}),
           evaluate("await __lab.until(()=>__lab.state.rejected===true)"),command('console',verify="result.some(e=>e.level==='error'&&e.text.includes('fixture rejection'))")],
-         setup="window.addEventListener('unhandledrejection',()=>__lab.state.rejected=true);start.onclick=()=>{Promise.reject(new Error('fixture rejection'))}")
+          setup="window.addEventListener('unhandledrejection',()=>__lab.state.rejected=true);start.onclick=()=>{Promise.reject(new Error('fixture rejection'))}")
+    case('console-error-stack', 'Error diagnostics retain the message when the stack only contains frames', 'Console','<p>Error formatting</p>',
+         [command('console',{'clear':True}),evaluate("const error=new TypeError('fixture failure');error.stack='fixture@source.js:1:2';console.error(error)"),
+          command('console',verify="result.some(e=>e.level==='error'&&e.text.includes('TypeError: fixture failure')&&e.text.includes('fixture@source.js:1:2'))")])
     for accept in (True,False):
         case('dialog-confirm-' + str(accept).lower(), 'Confirm returns ' + str(accept).lower(), 'Dialogs','<button id="start">Confirm</button>',
              [command('dialog',{'accept':accept,'clear':True}),command('click',{'selector':'#start'}),check('__lab.state.answer',accept),

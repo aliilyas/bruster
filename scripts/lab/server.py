@@ -12,8 +12,9 @@ PREFIX = '/bruster/test-lab/'
 
 
 class FixtureServer:
-    def __init__(self, directory, port=0):
+    def __init__(self, directory, port=0, *, static_gates=None):
         self.directory = Path(directory).resolve()
+        self.static_gates = dict(static_gates or {})
         self.gates, self.arrivals = {}, {}
         self.lock = threading.Lock()
         self.requests, self.responses = [], []
@@ -68,6 +69,10 @@ class FixtureServer:
                 file = (owner.directory/relative).resolve()
                 if not file.is_relative_to(owner.directory) or not file.is_file():
                     return self.respond(404,b'Not found',head=head)
+                if relative in owner.static_gates:
+                    arrival, gate = owner.gate(owner.static_gates[relative])
+                    arrival.set()
+                    gate.wait(15)
                 content_type = {'js':'text/javascript','svg':'image/svg+xml'}.get(file.suffix[1:]) or mimetypes.guess_type(file.name)[0] or 'application/octet-stream'
                 return self.respond(200,file.read_bytes(),{'Content-Type':content_type,'Cache-Control':'no-store'},head)
 

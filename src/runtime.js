@@ -57,7 +57,11 @@
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const fmt = (v) => {
     if (typeof v === 'string') return v;
-    if (v instanceof Error) return v.stack || v.message;
+    if (v instanceof Error) {
+      // WebKit stacks contain frames without the error's name/message.
+      const message = String(v), stack = typeof v.stack === 'string' ? v.stack : '';
+      return stack.includes(message) ? stack : message + (stack ? '\n' + stack : '');
+    }
     try { return stringify(v); } catch { return String(v); }
   };
 
@@ -218,8 +222,36 @@
     });
   }
 
-  const visible = (el) => (el.checkVisibility ? el.checkVisibility() : el.getClientRects().length > 0);
+  const composedParent = (el) => el.assignedSlot || el.parentElement || el.getRootNode().host;
+  function visible(el) {
+    // Opacity-zero targets still receive pointer events. visibility:hidden does
+    // not, unless a descendant explicitly overrides the inherited visibility.
+    if (getComputedStyle(el).visibility !== 'visible') return false;
+    if (el.checkVisibility && !el.checkVisibility({ checkVisibilityCSS: true })) return false;
+    // Older WKWebView versions report layout boxes for closed details content.
+    // Only the first summary (and its composed descendants) is rendered there.
+    for (let child = el, parent = composedParent(child); parent; child = parent, parent = composedParent(child)) {
+      if (parent.tagName === 'DETAILS' && !parent.open
+          && child !== [...parent.children].find(node => node.tagName === 'SUMMARY')) return false;
+    }
+    return el.getClientRects().length > 0;
+  }
   const describe = (el) => `<${el.tagName.toLowerCase()}${el.id ? '#' + el.id : ''}>`;
+
+  function connected(el) {
+    if (!el || !el.isConnected) return false;
+    // A node in a navigated-away frame can remain connected to its old Document.
+    // Verify every frame in the chain still hosts that document in this page.
+    let owner = el.ownerDocument;
+    try {
+      while (owner !== document) {
+        const frame = owner.defaultView?.frameElement;
+        if (!frame?.isConnected || frame.contentDocument !== owner) return false;
+        owner = frame.ownerDocument;
+      }
+    } catch { return false; } // A frame may have navigated cross-origin.
+    return true;
+  }
 
   // querySelector stops at shadow roots and iframes. These walk through open
   // shadow roots and same-origin frames, in document order.
@@ -258,7 +290,7 @@
   function lookup(p) {
     if (p.ref) {
       const el = refs.get(p.ref);
-      if (!el || !el.isConnected) throw new Error(`stale or unknown ref '${p.ref}', take a new snapshot`);
+      if (!connected(el)) throw new Error(`stale or unknown ref '${p.ref}', take a new snapshot`);
       return el;
     }
     if (!p.selector) throw new Error('need params.selector or params.ref');
@@ -273,17 +305,26 @@
 
   // Why an element cannot be acted on right now, or null.
   function blocker(el, needEnabled) {
-    if (!el.isConnected) return 'detached';
+    if (!connected(el)) return 'detached';
     if (!visible(el)) return 'not visible';
     if (needEnabled && el.matches(':disabled')) return 'disabled';
     el.scrollIntoView({ block: 'center', inline: 'center' });
     const r = el.getBoundingClientRect();
     // No box, nothing can cover it (empty contenteditable, text without fonts).
     if (!r.width || !r.height) return null;
-    const hit = el.getRootNode().elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+    const x = r.x + r.width / 2, y = r.y + r.height / 2;
+    let hit = el.getRootNode().elementFromPoint(x, y);
+    // Document hit testing retargets shadow descendants to their host. Descend
+    // open roots before deciding whether a slotted control is covered.
+    while (hit?.shadowRoot) {
+      const inner = hit.shadowRoot.elementFromPoint(x, y);
+      if (!inner || inner === hit) break;
+      hit = inner;
+    }
     if (!hit) return 'outside the viewport';
-    if (hit !== el && !el.contains(hit) && !hit.contains(el)) return `covered by ${describe(hit)}`;
-    return null;
+    for (let node = hit; node; node = composedParent(node)) if (node === el) return null;
+    // An ancestor hit is not enough: pointer-events:none falls through to it.
+    return `covered by ${describe(hit)}`;
   }
 
   // Waits until the target exists, is visible, enabled, in view and not
@@ -742,9 +783,10 @@
           return Date.now() - idleSince >= IDLE_MS;
         }
         const el = p.ref ? refs.get(p.ref) : query(document, p.selector);
-        if (state === 'attached') return !!el;
-        if (state === 'hidden') return !el || !visible(el);
-        return !!el && visible(el);
+        const attached = connected(el);
+        if (state === 'attached') return attached;
+        if (state === 'hidden') return !attached || !visible(el);
+        return attached && visible(el);
       };
 
       while (!check()) {

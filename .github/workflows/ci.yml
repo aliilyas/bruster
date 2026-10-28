@@ -22,9 +22,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { os: macos-14,         target: aarch64-apple-darwin,       test: full }
-          # Intel runners are scarce; the arm64 runner cross-compiles and runs the tests under Rosetta.
-          - { os: macos-14,         target: x86_64-apple-darwin,        test: full }
+          # Use supported native pools instead of the capacity-constrained macOS 14 pool.
+          - { os: macos-15,         target: aarch64-apple-darwin,       test: full }
+          - { os: macos-15-intel,   target: x86_64-apple-darwin,        test: full }
           - { os: ubuntu-24.04,     target: x86_64-unknown-linux-gnu,   test: full }
           - { os: ubuntu-24.04-arm, target: aarch64-unknown-linux-gnu,  test: full }
           - { os: windows-2022,     target: x86_64-pc-windows-msvc,     test: unit }
