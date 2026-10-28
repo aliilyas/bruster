@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bruster browser lab</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #0d1422; color: #edf4ff; font: 17px system-ui, sans-serif; }
+    main { max-width: 720px; margin: 32px auto; padding: 0 28px; }
+    header { display: flex; justify-content: space-between; align-items: center; color: #77e7da; font-weight: 700; }
+    header span { color: #97aac7; font-size: 13px; font-weight: 400; }
+    h1 { margin: 30px 0 8px; font-size: 34px; letter-spacing: -1px; }
+    p { color: #aebed5; margin: 0 0 24px; }
+    form { background: #182338; border: 1px solid #2c3b55; border-radius: 16px; padding: 24px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    label { display: block; font-size: 14px; color: #c6d5e9; }
+    input[type=text], select { width: 100%; margin: 8px 0 18px; padding: 12px; border-radius: 8px; border: 1px solid #47566e; background: #101a2a; color: white; font: inherit; }
+    .check { display: flex; gap: 9px; align-items: center; margin: 0 0 20px; }
+    button { width: 100%; background: #77e7da; color: #0d1422; font: 700 17px system-ui; border: 0; border-radius: 8px; padding: 14px; cursor: pointer; }
+    #result { border: 1px solid #77e7da; background: #14312e; padding: 20px; border-radius: 12px; margin-top: 18px; }
+    #result h2 { margin: 0 0 9px; font-size: 22px; }
+    #result p { margin: 0; color: #c7eee7; font-size: 15px; }
+    footer { margin-top: 20px; color: #8a9ab4; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <main>
+    <header>bruster / browser lab <span>LOCAL DEMO · NO ACCOUNT</span></header>
+    <h1>Create a browser smoke test</h1>
+    <p>A small form for trying navigation, snapshots, inputs, and screenshots.</p>
+    <form id="test-form">
+      <div class="row">
+        <label>Your name<input id="name" name="name" type="text" placeholder="Name" required></label>
+        <label>Project<input id="project" name="project" type="text" placeholder="Project name" required></label>
+      </div>
+      <label>Workflow
+        <select id="workflow" name="workflow">
+          <option value="navigation">Navigation check</option>
+          <option value="forms">Form submission</option>
+          <option value="screenshots">Screenshot review</option>
+        </select>
+      </label>
+      <label class="check"><input id="screenshots" name="screenshots" type="checkbox"> Include screenshots</label>
+      <button type="submit">Create smoke test</button>
+    </form>
+    <section id="result" role="status" hidden><h2></h2><p></p></section>
+    <footer>This fixture runs entirely in your browser. Nothing is sent to a service.</footer>
+  </main>
+  <script>
+    document.querySelector('#test-form').addEventListener('submit', event => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const result = document.querySelector('#result');
+      result.querySelector('h2').textContent = `Smoke test created for ${form.elements.project.value}`;
+      result.querySelector('p').textContent = `${form.elements.name.value} · ${form.elements.workflow.selectedOptions[0].textContent} · Screenshots: ${form.elements.screenshots.checked ? 'on' : 'off'}`;
+      result.hidden = false;
+    });
+  </script>
+</body>
+</html>

@@ -35,7 +35,7 @@ also uses browser helper processes. This design is good for agents, scripts, and
 
 ## Why bruster?
 
-- **No Chromium.** bruster uses WKWebView on macOS, WebKitGTK on Linux, and WebView2 on Windows. It uses [wry](https://github.com/tauri-apps/wry) to control them.
+- **Native webviews, no Node.js required.** bruster uses WKWebView on macOS, WebKitGTK on Linux, and WebView2 on Windows through [wry](https://github.com/tauri-apps/wry). WebView2 is Chromium-based; browser runtimes are installed separately where required.
 - **Small controller.** One small release executable, with a separately installed native browser runtime. The complete runtime footprint includes its libraries and helper processes.
 - **Agent support.** [MCP](#mcp) support with `--mcp`. Screenshots return as image content, and page events return as notifications.
 - **Cross-platform.** Prebuilt for macOS (arm64, x86_64), Linux (x86_64, arm64), and Windows (x86_64).

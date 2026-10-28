@@ -1,0 +1,56 @@
+name: launch assets
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Published release version (without v)
+        default: '0.3.2'
+        required: true
+  pull_request:
+    paths:
+      - '.github/workflows/launch-assets.yml'
+      - 'scripts/launch_media.py'
+      - 'scripts/package_mcp.py'
+      - 'examples/launch-demo/**'
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install capture dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libwebkit2gtk-4.1-0 xvfb fonts-dejavu-core ffmpeg
+          python -m pip install Pillow==12.0.0
+      - name: Download and verify the release; build the MCP bundle
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version || '0.3.2' }}
+        run: |
+          gh release download "v$VERSION" --repo aliilyas/bruster --dir "$RUNNER_TEMP/release"
+          python scripts/package_mcp.py --release-dir "$RUNNER_TEMP/release" --version "$VERSION" --output "$RUNNER_TEMP/mcp"
+          python - "$RUNNER_TEMP/mcp/bruster-$VERSION.mcpb" "$RUNNER_TEMP/bundle" <<'PY'
+          import pathlib, sys, zipfile
+          root = pathlib.Path(sys.argv[2])
+          with zipfile.ZipFile(sys.argv[1]) as archive:
+              archive.extractall(root)
+              for item in archive.infolist():
+                  (root / item.filename).chmod((item.external_attr >> 16) & 0o777)
+          PY
+      - name: Exercise the packaged MCP server and capture the demo
+        run: |
+          xvfb-run -a python scripts/launch_media.py demo --output "$RUNNER_TEMP/demo" "$RUNNER_TEMP/bundle/server/bruster"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: launch-assets
+          path: |
+            ${{ runner.temp }}/demo/
+            ${{ runner.temp }}/mcp/
+          if-no-files-found: error
