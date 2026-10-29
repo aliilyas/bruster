@@ -1,5 +1,14 @@
 # bruster
 
+[![CI](https://github.com/aliilyas/bruster/actions/workflows/ci.yml/badge.svg)](https://github.com/aliilyas/bruster/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/aliilyas/bruster?label=release&color=6ee7f7)](https://github.com/aliilyas/bruster/releases/latest)
+[![Docker Hub](https://img.shields.io/badge/Docker_Hub-ilyastmn%2Fbruster-2496ED?logo=docker&logoColor=white)](https://hub.docker.com/r/ilyastmn/bruster)
+[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![macOS](https://img.shields.io/badge/macOS-arm64%20%7C%20x86__64-lightgrey.svg)
+![Linux](https://img.shields.io/badge/Linux-x86__64%20%7C%20arm64-FCC624.svg)
+![Windows](https://img.shields.io/badge/Windows-x86__64-0078D4.svg)
+[![Documentation](https://img.shields.io/badge/docs-%E2%9C%93-6ee7f7.svg)](https://aliilyas.github.io/bruster/)
+
 Native-webview browser automation for agents and scripts. Built in Rust, with
 MCP and JSON-lines interfaces. No Node.js required.
 
