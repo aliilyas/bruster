@@ -1,0 +1,10 @@
+{
+  "name": "bruster-competitor-review",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "agent-browser": "0.41.0",
+    "playwright-core": "1.64.1",
+    "puppeteer-core": "25.16.0"
+  }
+}
