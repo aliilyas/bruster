@@ -1,8 +1,9 @@
 # Bruster website
 
 The product pages live here on `main`. Python 3.11+ builds static HTML with no
-third-party build dependencies. The API and CLI tables come from `README.md`,
-and the displayed controller version comes from `Cargo.toml`.
+third-party build dependencies. The API and CLI tables come from
+[`docs/reference.md`](../docs/reference.md), and the displayed controller version
+comes from `Cargo.toml`.
 
 ## Local preview
 

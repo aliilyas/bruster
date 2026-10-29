@@ -30,13 +30,13 @@ PAGES = (
 )
 
 
-def readme_table(heading, caption):
+def reference_table(heading, caption):
     """Render the two simple reference tables directly from their maintained source."""
-    section = (ROOT / 'README.md').read_text().split(f'\n## {heading}\n', 1)[1].split('\n## ', 1)[0]
+    section = (ROOT / 'docs/reference.md').read_text().split(f'\n## {heading}\n', 1)[1].split('\n## ', 1)[0]
     lines = [line for line in section.splitlines() if line.startswith('|')]
     rows = [re.split(r'(?<!\\)\|', line.strip().strip('|')) for line in lines]
     if len(rows) < 3 or any(len(row) != len(rows[0]) for row in rows):
-        raise ValueError(f'Invalid {heading} table in README.md')
+        raise ValueError(f'Invalid {heading} table in docs/reference.md')
 
     def inline(text):
         escaped = html.escape(text.strip().replace('\\|', '|'))
@@ -104,8 +104,8 @@ def build(output, measurements=None, base_url=SITE_URL):
     version = tomllib.loads((ROOT / 'Cargo.toml').read_text())['package']['version']
     values = {
         'base': base, 'version': 'v' + html.escape(version),
-        'api_table': readme_table('API', 'Browser methods, parameters, and results'),
-        'flags_table': readme_table('Run', 'Command-line flags and their effects'),
+        'api_table': reference_table('API', 'Browser methods, parameters, and results'),
+        'flags_table': reference_table('Run', 'Command-line flags and their effects'),
         'benchmark_preview': benchmark_preview(history),
     }
     for path, title, description, section in PAGES:
