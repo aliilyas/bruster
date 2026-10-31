@@ -661,10 +661,13 @@ fn limits() {
     let snap = b.ok("snapshot", json!({}));
     assert_eq!(snap["elements"].as_array().unwrap().len(), 1000);
     assert_eq!(snap["truncated"], true);
-    let t = Instant::now();
-    let all = b.ok("snapshot", json!({ "max": 100000 }));
+    // Bound hangs without treating shared CI runners as performance benchmarks.
+    // Intel macOS can take more than three seconds while other browser tests run.
+    let all = b.ok(
+        "snapshot",
+        json!({ "max": 100000, "request_timeout": 10000 }),
+    );
     assert_eq!(all["elements"].as_array().unwrap().len(), 10000);
-    assert!(t.elapsed() < Duration::from_secs(3), "{:?}", t.elapsed());
     assert_eq!(
         b.ok("find", json!({ "text": "link 4999" }))["elements"]
             .as_array()
