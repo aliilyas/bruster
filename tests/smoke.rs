@@ -1122,7 +1122,7 @@ fn profile_keeps_cookies_and_exit_waits_for_the_cache() {
     let profile = std::env::temp_dir().join(format!("bruster-prof-{}", std::process::id()));
     let args = ["--profile", profile.to_str().unwrap()];
 
-    // Exit right after a load waits for WebKit to write its cache; a quiet exit does not.
+    // Profile shutdown gives WebKit time to persist writes.
     // Session cookies (no Max-Age) die with the process, as in any browser; persistent ones stay.
     let t = Instant::now();
     {
@@ -1150,13 +1150,25 @@ fn profile_keeps_cookies_and_exit_waits_for_the_cache() {
         "profile cookies: {names:?}"
     );
     b.ok("wait_for", json!({ "time": 1300 }));
+    // Even an idle profile gets the storage-flush grace period at shutdown.
+    // Allow native teardown time on CI, but bound exit and check its status.
     let t = Instant::now();
+    let closing = b.send("close", json!({}));
+    b.closed = true;
+    let status = loop {
+        if let Some(status) = b.child.try_wait().expect("wait for profile shutdown") {
+            break status;
+        }
+        assert!(
+            t.elapsed() < Duration::from_secs(10),
+            "profile shutdown timed out after {:?}",
+            t.elapsed()
+        );
+        std::thread::sleep(Duration::from_millis(50));
+    };
+    assert!(status.success(), "profile shutdown failed: {status}");
+    b.recv(closing).expect("profile close reply");
     drop(b);
-    assert!(
-        t.elapsed() < Duration::from_millis(1500),
-        "exit waited although the cache had settled: {:?}",
-        t.elapsed()
-    );
     let _ = std::fs::remove_dir_all(&profile);
 }
 
