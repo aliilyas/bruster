@@ -36,7 +36,7 @@ sys.stdin.read()
     def test_live_helpers_and_truncated_build_names_are_detected_and_excludable(self):
         names = ('baseline-bruster', 'candidate-bruster', 'WebKitWebProcess',
                   'WebKitNetworkProcess', 'chrome', 'headless_shell', 'agent-browser', 'node', 'rustc',
-                  'bilobad', 'rustwright-mcp')
+                  'node-MainThread', 'bilobad', 'rustwright-mcp')
         children = [self.process(name) for name in names]
         pids = {p.pid for p in children}
         found = {row['pid'] for row in compare.background_work()}
@@ -47,6 +47,31 @@ sys.stdin.read()
             child.stdin.close()
             os.waitid(os.P_PID, child.pid, os.WEXITED | os.WNOWAIT)
         self.assertFalse(pids & {row['pid'] for row in compare.background_work()})
+
+    def test_renderer_born_during_scan_is_not_mistaken_for_competition(self):
+        competitor = self.process('node-MainThread')
+        before = set(compare.process_table())
+        browser = self.process('chrome')
+        owned_processes = compare.owned_processes
+        renderers = []
+
+        def spawn_after_ownership(*args, **kwargs):
+            owned = owned_processes(*args, **kwargs)
+            renderers.append(self.process('chrome'))
+            return owned
+
+        with patch.object(compare, 'owned_processes', side_effect=spawn_after_ownership):
+            found = {row['pid'] for row in compare.background_work(before=before)}
+        self.assertIn(competitor.pid, found)
+        self.assertNotIn(browser.pid, found)
+        self.assertTrue(renderers)
+        self.assertFalse({child.pid for child in renderers} & found)
+        # The next scan sees the new renderer and attributes it to this session.
+        owned = compare.owned_processes(before)
+        self.assertTrue({browser.pid, *(child.pid for child in renderers)} <= owned.keys())
+        found = {row['pid'] for row in compare.background_work(before=before)}
+        self.assertIn(competitor.pid, found)
+        self.assertFalse(owned.keys() & found)
 
     def test_controller_is_detected_between_browser_sessions(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -219,9 +219,10 @@ def process_table():
     return table
 
 
-def owned_processes(before):
+def owned_processes(before, table=None):
     # Subreaping captures detached daemons and orphaned Chrome crashpad helpers.
-    table = process_table()
+    if table is None:
+        table = process_table()
     owned = {pid for pid, row in table.items() if row['parent'] == os.getpid() and pid not in before}
     while True:
         more = {pid for pid, row in table.items() if row['parent'] in owned} - owned
@@ -230,30 +231,35 @@ def owned_processes(before):
         owned.update(more)
 
 
-def background_work(exclude=()):
+def background_work(exclude=(), *, before=None):
+    # Ownership and competing-work detection must use the same process snapshot:
+    # a renderer born between separate scans otherwise looks like a competitor.
+    table = process_table()
     exclude = set(exclude) | {os.getpid()}
+    if before is not None:
+        exclude.update(owned_processes(before, table))
     rows = []
-    for path in Path('/proc').glob('[0-9]*/comm'):
-        pid = int(path.parent.name)
+    for pid, process in table.items():
         if pid in exclude:
             continue
+        path = Path('/proc') / str(pid)
         try:
-            name = path.read_text().strip()
+            name = (path / 'comm').read_text().strip()
             # /proc/comm truncates names to 15 bytes, including frozen builds
             # and engine helpers. Other browser benchmarks can share library
             # pages (changing PSS) even when their controller is mostly idle.
-            competing = name in ('cargo', 'rustc', 'node', 'bilobad', 'rustwright-mcp') or name.startswith((
+            competing = name in ('cargo', 'rustc', 'node', 'node-MainThread', 'bilobad', 'rustwright-mcp') or name.startswith((
                     'bruster', 'baseline-brust', 'candidate-brust', 'WebKit',
                     'chrome', 'headless_shell', 'agent-browser', 'smoke-', 'edge-', 'e2e-'))
             if name.startswith('python'):
                 # Controllers remain competitors between their browser sessions.
-                argv = (path.parent / 'cmdline').read_bytes().decode(errors='replace').split('\0')
+                argv = (path / 'cmdline').read_bytes().decode(errors='replace').split('\0')
                 competing = any(Path(arg).name in (
                     'site_compare.py', 'site_campaign.py', 'bench_compare.py', 'bench_performance.py', 'bench_audit.py'
                 ) for arg in argv)
-            state = (path.parent / 'stat').read_text().rsplit(')', 1)[1].split()[0]
-            if competing and state != 'Z':
-                rows.append({'pid': pid, 'name': name})
+            fields = (path / 'stat').read_text().rsplit(')', 1)[1].split()
+            if competing and fields[0] != 'Z' and fields[19] == process['start']:
+                rows.append({'pid': pid, 'name': name, 'parent': process['parent'], 'start': process['start']})
         except (OSError, IndexError):
             pass
     return rows
@@ -452,7 +458,7 @@ def measure(args, server, tool, round_):
             row['tiny_extract_ms'].append(elapsed)
         time.sleep(2)
         row['idle_memory'] = []
-        row['competing_at_memory'] = background_work(owned_processes(before))
+        row['competing_at_memory'] = background_work(before=before)
         for _ in range(3):
             sample = memory_forest(before, tool == 'bruster')
             assert sample['complete'], sample
@@ -493,7 +499,7 @@ def measure(args, server, tool, round_):
             assert len(data) > 1000
             row['screenshot_ms'].append(elapsed)
         row['load_after'] = os.getloadavg()
-        row['competing_after'] = background_work(owned_processes(before))
+        row['competing_after'] = background_work(before=before)
         if row['competing_at_memory'] or row['competing_after']:
             row['failures'].append({'name': 'concurrent_workload', 'pass': False,
                                     'at_memory': row['competing_at_memory'], 'after': row['competing_after']})

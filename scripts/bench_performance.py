@@ -91,7 +91,7 @@ def measure(args, server, label, round_):
                 if i < 200:
                     client.navigate(f'{base}/tiny?timer={i}')
             assert all(sample['memory']['complete'] for sample in row['timers'])
-        row['competing_after'] = compare.background_work(compare.owned_processes(before))
+        row['competing_after'] = compare.background_work(before=before)
         if row['competing_after']:
             raise RuntimeError(f"Concurrent browser/build workload: {row['competing_after']}")
     except Exception as exc:
