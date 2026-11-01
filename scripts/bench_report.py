@@ -283,13 +283,39 @@ def page(record, history=None, base_url=SITE_URL):
                      else f'<a href="{e(c["run_url"])}">Workflow and raw artifacts ↗</a>')
     stats = record['summary']
     tool_labels = recorded_labels(record)
+    metric_titles = {
+        'launch_to_first_page_ms': ('Launch → page', 'ms'),
+        'startup_ms': ('Startup / setup', 'ms'),
+        'first_navigation_ms': ('First navigation', 'ms'),
+        'tiny_navigation_ms': ('Tiny page · warm', 'ms'),
+        'tiny_extract_ms': ('Tiny DOM', 'ms'),
+        'large_navigation_ms': ('Large page', 'ms'),
+        'large_extract_ms': ('Large DOM · object', 'ms'),
+        'large_extract_json_ms': ('Large DOM · JSON', 'ms'),
+        'image_navigation_ms': ('Image page', 'ms'),
+        'screenshot_ms': ('PNG screenshot', 'ms'),
+        'total_pss_mib': ('Idle PSS + display', 'MiB'),
+        'rss_mib': ('Idle RSS − display', 'MiB'),
+        'footprint': ('Runtime · lower bound', 'MB'),
+        'failures': ('Sessions with failures', 'incl. cleanup'),
+    }
+
+    def tool_heading(label):
+        tool, engine = label.split(' / ')
+        engine = {'full Chrome': 'Chrome', 'Headless Shell': 'Shell',
+                  'Chrome test runner': 'Chrome runner', 'browser extension': 'Extension'}.get(engine, engine)
+        tool = e(tool).replace('wright', '<wbr>wright').replace('Puppeteer', 'Puppe<wbr>teer')
+        tool = tool.replace('Stagehand', 'Stage<wbr>hand').replace('browse.sh', 'browse.<wbr>sh')
+        return f'<span>{tool}</span><span class="engine">{e(engine)}</span>'
 
     def time_label(value):
         return datetime.fromisoformat(value.replace('Z', '+00:00')).astimezone(timezone.utc).strftime('%d %b %Y · %H:%M UTC')
 
     def metric_row(key, label):
-        cells = [f'<tr><th scope="row">{e(label)}</th>']
-        for tool in tool_labels:
+        title, unit = metric_titles[key]
+        cells = [f'<tr role="row"><th scope="row" role="rowheader" id="metric-{key}" title="{e(label)}" aria-label="{e(label)}">'
+                 f'{e(title)}<span class="metric-unit">{e(unit)}</span></th>']
+        for tool, tool_label in tool_labels.items():
             if key == 'footprint':
                 value = record['footprint']['tool_totals'][tool]['bytes'] / 1e6
                 content = f'<span class="number">{value:,.1f}</span>'
@@ -300,8 +326,10 @@ def page(record, history=None, base_url=SITE_URL):
             else:
                 value = stats[tool][key]
                 content = (f'<span class="number">{value["median"]:,.1f}</span>'
-                           f'<span class="range">[{value["min"]:,.1f}–{value["max"]:,.1f}]</span>')
-            cells.append(f'<td>{content}</td>')
+                           f'<span class="range"><span>[{value["min"]:,.1f}–</span><wbr>'
+                           f'<span>{value["max"]:,.1f}]</span></span>')
+            cells.append(f'<td role="cell" headers="metric-{key} tool-{e(tool)}">'
+                         f'<span class="cell-tool" aria-hidden="true">{tool_heading(tool_label)}</span>{content}</td>')
         return ''.join(cells) + '</tr>'
 
     def details(items):
@@ -337,13 +365,11 @@ def page(record, history=None, base_url=SITE_URL):
              '<div class="section-head"><div><h2 id="results-title">Performance results</h2>',
              '<p>Timings include controller round trips. Lower values mean less time, memory, or disk space.</p></div>',
              '<div class="legend"><strong>Median</strong><br>[observed min–max]</div></div>',
-             '<p class="scroll-hint">Scroll the table horizontally to compare all configurations.</p>',
-             '<div class="panel"><div class="table-scroll" role="region" aria-labelledby="results-title" tabindex="0">',
-             f'<table class="results-table" style="--tool-count:{len(tool_labels)}"><caption class="sr-only">Performance comparison. Values are medians with observed minimum and maximum beneath, except runtime footprint and failure counts.</caption>',
-             '<colgroup><col>' + '<col>' * len(tool_labels) + '</colgroup><thead><tr><th scope="col">Metric / unit</th>']
-    for label in tool_labels.values():
-        tool, engine = label.split(' / ')
-        parts.append(f'<th scope="col"><span>{e(tool)}</span><span class="engine">{e(engine)}</span></th>')
+             '<div class="panel">',
+             '<table class="results-table" role="table"><caption class="sr-only">Performance comparison. Values are medians with observed minimum and maximum beneath, except runtime footprint and failure counts.</caption>',
+             '<colgroup><col>' + '<col>' * len(tool_labels) + '</colgroup><thead role="rowgroup"><tr role="row"><th scope="col" role="columnheader">Metric / unit</th>']
+    for tool, label in tool_labels.items():
+        parts.append(f'<th scope="col" role="columnheader" id="tool-{e(tool)}" title="{e(label)}" aria-label="{e(label)}">{tool_heading(label)}</th>')
     parts.append('</tr></thead>')
     labels = dict(METRICS)
     labels.update(footprint='Installed runtime files, lower bound (MB)', failures='Sessions with failures (including cleanup)')
@@ -354,10 +380,10 @@ def page(record, history=None, base_url=SITE_URL):
         ('Memory and runtime footprint', ('total_pss_mib', 'rss_mib', 'footprint')),
         ('Reliability', ('failures',)),
     ):
-        parts.append(f'<tbody><tr class="group-row"><th scope="rowgroup" colspan="{len(tool_labels) + 1}">{e(group)}</th></tr>')
+        parts.append(f'<tbody role="rowgroup"><tr class="group-row" role="row"><th scope="rowgroup" role="rowheader" colspan="{len(tool_labels) + 1}">{e(group)}</th></tr>')
         parts.extend(metric_row(key, labels[key]) for key in keys)
         parts.append('</tbody>')
-    parts.extend(['</table></div><p class="table-note">Ranges show observed variation, not confidence intervals. '
+    parts.extend(['</table><p class="table-note">Ranges show observed variation, not confidence intervals. '
                   'Memory is idle usage; installed runtime sizes are lower bounds. <a href="#method">Read the measurement method</a>.</p></div></section>',
                   '<section class="section" id="environment" aria-labelledby="environment-title">',
                   '<div class="section-head"><div><h2 id="environment-title">Environment &amp; versions</h2>',
