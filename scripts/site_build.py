@@ -69,7 +69,8 @@ def benchmark_preview(history):
         parts.append(f'<div class="metric-card"><dt>{name}</dt><dd>{value:,.1f} <span>{unit}</span></dd><dd class="metric-note">{note}</dd></div>')
     parts.append('</dl>')
     date = datetime.fromisoformat(record['metadata']['finished_utc'].replace('Z', '+00:00')).strftime('%d %b %Y')
-    parts.append(f'<p class="benchmark-caption">Bruster / WebKitGTK · Linux · {date} · '
+    origin = 'Local validation · ' if record['context'].get('local_validation') else ''
+    parts.append(f'<p class="benchmark-caption">{origin}Bruster / WebKitGTK · Linux · {date} · '
                  f'{record["metadata"]["rounds"]} sessions. Memory includes Xvfb; installed size is a lower bound. '
                  'See all configurations, ranges, versions, and conditions in the full report.</p>')
     return '\n'.join(parts)

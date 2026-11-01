@@ -3,8 +3,17 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@browserbasehq/stagehand": "latest",
+    "@modelcontextprotocol/sdk": "latest",
+    "@playwright/mcp": "latest",
     "agent-browser": "latest",
+    "biloba": "latest",
+    "browse": "latest",
+    "cypress": "latest",
     "playwright-core": "latest",
-    "puppeteer-core": "latest"
+    "puppeteer-core": "latest",
+    "rustwright": "latest",
+    "rustwright-mcp": "latest",
+    "uivision-mcp-bridge": "latest"
   }
 }

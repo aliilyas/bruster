@@ -12,9 +12,10 @@ from unittest.mock import patch
 import bench_publish
 import bench_report as report
 from bench_compare import ProcessClient
+from bench_tools import CATALOG, LINUX_TOOLS
 
 
-def fixture(root, run=1, attempt=1):
+def fixture(root, run=1, attempt=1, tools=None):
     root.mkdir(parents=True, exist_ok=True)
     lock = '{"lockfileVersion":3}\n'
     (root / 'package.json').write_text('{"private":true}\n')
@@ -24,7 +25,10 @@ def fixture(root, run=1, attempt=1):
                 'chrome': 'Chrome test', 'node': 'test',
                 'package_lock_sha256': hashlib.sha256(lock.encode()).hexdigest()}
     rows = []
-    for tool in report.LABELS:
+    if tools is not None:
+        metadata.update(tools=tools, competitors=copy.deepcopy(CATALOG))
+    selected = list(report.LABELS) if tools is None else tools
+    for tool in selected:
         display = [{'pss_kib': 1024, 'rss_kib': 2048}] if tool == 'bruster' else []
         sample = {'complete': True, 'processes': [{'pss_kib': 2048, 'rss_kib': 4096}], 'display': display,
                   'pss_mib': 2, 'rss_mib': 4, 'display_pss_mib': len(display),
@@ -43,8 +47,8 @@ def fixture(root, run=1, attempt=1):
         row.update({key: [10] * 5 for key in ('large_navigation_ms', 'large_extract_ms', 'large_extract_json_ms')})
         row['image_navigation_ms'] = [10] * 3
         rows.append(row)
-    footprint = {'tool_totals': {t: {'bytes': 2_000_000, 'files': 1} for t in report.LABELS},
-                 'file_inventory': {t: [{'path': '/test/runtime', 'bytes': 2_000_000}] for t in report.LABELS}}
+    footprint = {'tool_totals': {t: {'bytes': 2_000_000, 'files': 1} for t in selected},
+                 'file_inventory': {t: [{'path': '/test/runtime', 'bytes': 2_000_000}] for t in selected}}
     for name, data in (('summary.json', {'metadata': metadata}), ('samples.json', rows), ('footprint.json', footprint)):
         report.write_json(root / name, data)
     context = {'repository': 'owner/project', 'sha': f'{run:040x}', 'run_id': run, 'run_number': run,
@@ -144,12 +148,88 @@ class Reports(unittest.TestCase):
         self.assertEqual((site / 'CNAME').read_text(), 'example.test')
         self.assertTrue((site / '.nojekyll').is_file())
 
+    def test_local_publication_is_labeled_and_future_workflows_supersede_it(self):
+        local, site = self.root / 'local', self.root / 'site'
+        fixture(local, tools=LINUX_TOOLS)
+        evidence = b'local raw evidence'
+        (local / 'evidence.tar.gz').write_bytes(evidence)
+        context = {'repository': 'owner/project', 'sha': 'a' * 40, 'harness_sha': 'b' * 40,
+                   'local_validation': True, 'local_id': '20261101T180138Z',
+                   'published_utc': '2026-11-01T19:00:00+00:00', 'after_workflow_run_number': 1,
+                   'evidence_sha256': hashlib.sha256(evidence).hexdigest()}
+        record = report.prepare(local, context)
+        report.install(self.results, site)
+        report.install(local, site)
+        root = site / 'benchmarks'
+        latest = json.loads((root / 'latest.json').read_text())
+        self.assertTrue(latest['context']['local_validation'])
+        page = (root / 'index.html').read_text()
+        self.assertIn('Local validation · 1 session(s) per configuration', page)
+        self.assertIn('evidence.tar.gz', page)
+        self.assertNotIn('Workflow #', page)
+        self.assertIn(f'/blob/{context["harness_sha"]}/benchmarks/README.md', page)
+        archive = root / 'runs' / report.record_id(record)
+        self.assertEqual((archive / 'evidence.tar.gz').read_bytes(), evidence)
+        self.assertIn('Local validation', (local / 'report.md').read_text())
+        self.assertNotIn('[workflow run]', (local / 'report.md').read_text())
+        newer = self.root / 'next-workflow'
+        fixture(newer, run=2, tools=LINUX_TOOLS)
+        report.install(newer, site)
+        report.install(self.results, site)  # An older workflow finishing late cannot win.
+        latest = json.loads((root / 'latest.json').read_text())
+        self.assertEqual(latest['context']['run_number'], 2)
+        history = json.loads((root / 'history.json').read_text())
+        self.assertTrue(history[1]['local_validation'])
+        (local / 'evidence.tar.gz').write_bytes(b'changed evidence')
+        with self.assertRaisesRegex(ValueError, 'evidence archive changed'):
+            report.prepare(local, context)
+        with self.assertRaisesRegex(ValueError, 'immutable'):
+            report.install(local, site)
+
     def test_html_escapes_provenance(self):
         record = json.loads((self.results / 'measurement.json').read_text())
         record['metadata']['chrome'] = '<script>alert(1)</script>'
         page = report.page(record)
         self.assertNotIn(record['metadata']['chrome'], page)
         self.assertIn('&lt;script&gt;alert(1)&lt;/script&gt;', page)
+
+    def test_new_competitors_and_old_history_keep_their_own_columns(self):
+        newer, site = self.root / 'expanded', self.root / 'site'
+        fixture(newer, run=2, tools=LINUX_TOOLS)
+        report.install(self.results, site)
+        report.install(newer, site)
+        root = site / 'benchmarks'
+        old = (root / 'runs' / report.record_id({'context': self.context}) / 'index.html').read_text()
+        latest = (root / 'index.html').read_text()
+        self.assertIn('colspan="6"', old)
+        self.assertNotIn('Stagehand', old)
+        self.assertIn(f'colspan="{len(LINUX_TOOLS) + 1}"', latest)
+        self.assertIn('Playwright MCP', latest)
+        self.assertIn('https://github.com/bensyverson/sleepyhollow', latest)
+        self.assertIn('macos-timing', latest)
+        self.assertIn('Rustwright MCP', latest)
+        self.assertIn('https://news.ycombinator.com/item?id=49699819', latest)
+        self.assertIn('HN story', latest)
+        record = json.loads((newer / 'measurement.json').read_text())
+        self.assertEqual(set(record['summary']), set(LINUX_TOOLS))
+        self.assertNotIn('sleepyhollow', record['summary'])
+        self.assertEqual(len(next(report.table_rows(record))), len(LINUX_TOOLS) + 1)
+
+    def test_subset_is_explicit_and_missing_or_unknown_tools_are_rejected(self):
+        subset = self.root / 'subset'
+        tools = ['stagehand', 'playwright-mcp']
+        metadata, rows, footprint, _ = fixture(subset, tools=tools)
+        record = json.loads((subset / 'measurement.json').read_text())
+        self.assertEqual(set(record['summary']), set(tools))
+        self.assertIn('colspan="3"', report.page(record))
+        for invalid in ([], tools + ['stagehand'], tools + ['sleepyhollow'], ['invented-tool']):
+            with self.subTest(tools=invalid), self.assertRaises(ValueError):
+                report.validate(dict(metadata, tools=invalid), rows, footprint)
+        with self.assertRaisesRegex(ValueError, 'Missing'):
+            report.validate(metadata, rows[:-1], footprint)
+        del footprint['tool_totals']['stagehand']
+        with self.assertRaisesRegex(ValueError, 'inventories'):
+            report.validate(metadata, rows, footprint)
 
 
 class ProcessLifecycle(unittest.TestCase):

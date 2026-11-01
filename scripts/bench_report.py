@@ -14,15 +14,11 @@ from pathlib import Path
 
 from bench_audit import summary
 from site_layout import SITE_URL, render_page
+from bench_tools import LABELS as ALL_LABELS, LEGACY_TOOLS, LINUX_TOOLS, recorded_labels, recorded_tools
 
 
-LABELS = {
-    'bruster': 'Bruster / WebKitGTK',
-    'playwright-shell': 'Playwright / Headless Shell',
-    'playwright': 'Playwright / full Chrome',
-    'puppeteer': 'Puppeteer / full Chrome',
-    'agent-browser': 'agent-browser / full Chrome',
-}
+# Retained for callers constructing legacy records. New records declare tools.
+LABELS = {tool: ALL_LABELS[tool] for tool in LEGACY_TOOLS}
 SCALARS = ('startup_ms', 'first_navigation_ms', 'launch_to_first_page_ms')
 VECTORS = ('tiny_navigation_ms', 'tiny_extract_ms', 'large_navigation_ms', 'large_extract_ms',
            'large_extract_json_ms', 'image_navigation_ms', 'screenshot_ms')
@@ -48,12 +44,13 @@ METHOD_SECTIONS = (
     'Startup and first navigation have one sample per session; repeated-operation timings pool all '
     'iterations; memory uses the median of three idle readings per session.'),
     ('Startup and workloads',
-    'Startup ends at the adapter ready event, or after blank-page/viewport setup for agent-browser. '
+    'Startup includes adapter/daemon/server initialization and blank-page/viewport setup. '
     'The combined launch-to-first-page measurement includes both setup and the first navigation. '
     'Xvfb is already running: its startup time is excluded, but its memory is included. '
     '1280×800 viewport; localhost fixtures; no-store HTTP responses; navigation waits for load. '
     'OS filesystem caches are not flushed. Identical extraction JavaScript and cross-tool result hashes. '
-    'Timings include controller round trips; agent-browser includes its per-command native CLI.'),
+    'Timings include controller round trips and per-command CLI launches. '
+    'These deterministic workloads do not measure LLM inference or token efficiency.'),
     ('Memory and scope',
     'Memory covers the complete owned process forest (including detached daemons and helpers), '
     'plus Xvfb for Bruster. PSS apportions shared pages; summed RSS double-counts them. '
@@ -90,7 +87,10 @@ def validate(metadata, rows, footprint):
     rounds, iterations = metadata['rounds'], metadata['iterations']
     require(type(rounds) is int and rounds > 0 and type(iterations) is int and iterations > 0,
             'Invalid rounds/iterations')
-    expected = {(tool, round_) for tool in LABELS for round_ in range(1, rounds + 1)}
+    tools = recorded_tools(metadata)
+    require(isinstance(tools, list) and tools and all(isinstance(t, str) for t in tools), 'Invalid tools')
+    require(len(tools) == len(set(tools)) and set(tools) <= set(LINUX_TOOLS), 'Unknown or duplicate tools')
+    expected = {(tool, round_) for tool in tools for round_ in range(1, rounds + 1)}
     require(len(rows) == len(expected) and {(r['tool'], r['round']) for r in rows} == expected,
             'Missing, duplicate or unexpected sessions')
     hashes = {r['large_extract_sha256'] for r in rows}
@@ -125,7 +125,7 @@ def validate(metadata, rows, footprint):
         checks = {c['name'] for c in row['failure_checks']}
         require(checks >= {'javascript_exception', 'javascript_syntax_error', 'recovery_after_javascript_errors',
                            'connection_refused', 'recovery_after_navigation_error'}, 'Missing fault probes')
-    require(set(footprint['tool_totals']) == set(LABELS), 'Missing runtime inventories')
+    require(set(footprint['tool_totals']) == set(tools), 'Missing runtime inventories')
     for tool, total in footprint['tool_totals'].items():
         require(number(total['bytes']) > 0 and total['files'] > 0, 'Empty runtime inventory')
         files = footprint['file_inventory'][tool]
@@ -135,7 +135,7 @@ def validate(metadata, rows, footprint):
 
 def aggregate(rows):
     stats = {}
-    for tool in LABELS:
+    for tool in dict.fromkeys(r['tool'] for r in rows):
         subset = [r for r in rows if r['tool'] == tool]
         result = {key: summary([r[key] for r in subset]) for key in SCALARS}
         result.update({key: summary([v for r in subset for v in r[key]]) for key in VECTORS})
@@ -165,32 +165,69 @@ def context_from_env():
 
 def record_id(record):
     c = record['context']
+    if c.get('local_validation'):
+        require(re.fullmatch(r'\d{8}T\d{6}Z', c['local_id']), 'Invalid local measurement ID')
+        return f"{c['sha']}-local-{c['local_id']}"
     return f"{c['sha']}-{c['run_id']}-{c['run_attempt']}"
+
+
+def history_order(record):
+    c = record['context']
+    if c.get('local_validation'):
+        # A local publication follows its recorded published-workflow boundary.
+        # Results from a later workflow invocation supersede it normally.
+        return (c['after_workflow_run_number'], 1, c['published_utc'], c['local_id'])
+    return (c['run_number'], 0, c['run_attempt'], c['run_id'])
+
+
+def run_label(context):
+    if context.get('local_validation'):
+        return f"Local validation · {context['local_id']}"
+    return f"Run #{context['run_number']} · attempt {context['run_attempt']}"
+
+
+def public_files(record):
+    return PUBLIC_FILES + (('evidence.tar.gz',) if record['context'].get('local_validation') else ())
 
 
 def table_rows(record):
     stats = record['summary']
+    tools = recorded_tools(record['metadata'])
     for key, label in METRICS:
-        yield [label, *(f"{stats[t][key]['median']:.1f} [{stats[t][key]['min']:.1f}–{stats[t][key]['max']:.1f}]" for t in LABELS)]
+        yield [label, *(f"{stats[t][key]['median']:.1f} [{stats[t][key]['min']:.1f}–{stats[t][key]['max']:.1f}]" for t in tools)]
     yield ['Installed runtime files, lower bound (MB)',
-           *(f"{record['footprint']['tool_totals'][t]['bytes'] / 1e6:.1f}" for t in LABELS)]
+           *(f"{record['footprint']['tool_totals'][t]['bytes'] / 1e6:.1f}" for t in tools)]
     yield ['Sessions with failures (including cleanup)',
-           *(f"{stats[t]['sessions_with_failures']}/{record['metadata']['rounds']}" for t in LABELS)]
+           *(f"{stats[t]['sessions_with_failures']}/{record['metadata']['rounds']}" for t in tools)]
 
 
 def markdown(record):
     c, m = record['context'], record['metadata']
-    lines = ['# Browser comparison', '', f"Commit `{c['sha']}` · [workflow run]({c['run_url']})",
+    labels = recorded_labels(record)
+    source = (f"Local validation · Bruster commit `{c['sha']}`" if c.get('local_validation')
+              else f"Commit `{c['sha']}` · [workflow run]({c['run_url']})")
+    lines = ['# Browser comparison', '', source,
              f"Measured {m['finished_utc']}; {m['rounds']} sessions per configuration. Values are medians [min–max].",
              versions(m), '', environment(m), '',
-             '| Metric | ' + ' | '.join(LABELS.values()) + ' |', '|---|' + '---:|' * len(LABELS)]
+             '| Metric | ' + ' | '.join(labels.values()) + ' |', '|---|' + '---:|' * len(labels)]
     lines.extend('| ' + ' | '.join(row) + ' |' for row in table_rows(record))
     lines.extend(['', METHOD, '', '## Fault probes and cleanup', ''])
-    for tool, label in LABELS.items():
+    for tool, label in labels.items():
         s = record['summary'][tool]
         lines.append(f"- {label}: fault probes {json.dumps(s['fault_probe_failures'])}; "
                      f"shutdown/cleanup {json.dumps(s.get('lifecycle_failures', {}))}; "
                      f"successful 100 ms recovery retries: {s['recovery_retry_passes']}.")
+    catalog = m.get('competitors')
+    if catalog:
+        lines.extend(['', '## Hacker News competitor coverage', '',
+                      f"[Source discussion]({catalog['source']}) · reviewed {catalog['reviewed']}", '', catalog['scope'], '',
+                      '| Tool / repository | Coverage | Notes |', '|---|---|---|'])
+        for tool in catalog['tools']:
+            coverage = 'Measured in this run' if tool['id'] in labels else tool['status'] if tool['status'] != 'linux' else 'Not selected'
+            comments = ' '.join(f"[HN {kind}](https://news.ycombinator.com/item?id={id_})"
+                                for kind, key in (('comment', 'comments'), ('story', 'stories'))
+                                for id_ in tool.get(key, []))
+            lines.append(f"| [{tool['label']}]({tool.get('implementation', tool['github'])}) {comments} | {coverage} | {tool['notes']} |")
     lines.extend(['', '## Provenance', '', '```json', json.dumps(m, indent=2), '```', ''])
     return '\n'.join(lines)
 
@@ -201,8 +238,16 @@ def prepare(results, context):
     footprint = json.loads((results / 'footprint.json').read_text())
     validate(original['metadata'], rows, footprint)
     require(hashlib.sha256((results / 'package-lock.json').read_bytes()).hexdigest()
-            == original['metadata']['package_lock_sha256'], 'Resolved dependency lockfile changed during measurement')
-    record = {'schema_version': 1, 'context': context, 'metadata': original['metadata'],
+             == original['metadata']['package_lock_sha256'], 'Resolved dependency lockfile changed during measurement')
+    if context.get('local_validation'):
+        record_id({'context': context})
+        require(type(context['after_workflow_run_number']) is int and context['after_workflow_run_number'] >= 0,
+                'Invalid workflow publication anchor')
+        require(re.fullmatch(r'[0-9a-f]{40}', context['harness_sha']), 'Invalid harness commit')
+        datetime.fromisoformat(context['published_utc'])
+        require(hashlib.sha256((results / 'evidence.tar.gz').read_bytes()).hexdigest()
+                == context['evidence_sha256'], 'Local evidence archive changed')
+    record = {'schema_version': 2, 'context': context, 'metadata': original['metadata'],
               'summary': aggregate(rows), 'footprint': {k: v for k, v in footprint.items() if k != 'file_inventory'}}
     write_json(results / 'measurement.json', record)
     (results / 'report.md').write_text(markdown(record))
@@ -211,8 +256,8 @@ def prepare(results, context):
 
 def versions(metadata):
     packages = metadata['packages']
-    return (f"WebKitGTK {metadata.get('webkitgtk', 'unrecorded')} · Playwright {packages['playwright-core']} · "
-            f"Puppeteer {packages['puppeteer-core']} · agent-browser {packages['agent-browser']} · "
+    return (f"WebKitGTK {metadata.get('webkitgtk', 'unrecorded')} · "
+            + ' · '.join(f'{name} {version}' for name, version in packages.items()) + ' · '
             f"{metadata['chrome']} · Headless Shell {metadata.get('headless_shell', 'unrecorded')} · Node {metadata['node']}")
 
 
@@ -230,14 +275,21 @@ def page(record, history=None, base_url=SITE_URL):
     prefix = f"runs/{record_id(record)}/" if history is not None else ''
     home = '../' if history is not None else '../../../'
     repo = f'https://github.com/{c["repository"]}'
+    source_url = f'{repo}/blob/{c.get("harness_sha", c["sha"])}/benchmarks/README.md'
+    run_link = (f'<span class="badge badge-warn">Local validation · {m["rounds"]} session(s) per configuration</span>'
+                if c.get('local_validation') else
+                f'<a href="{e(c["run_url"])}">Workflow #{c["run_number"]} ↗</a>')
+    evidence_link = (f'<a href="{e(prefix + "evidence.tar.gz")}">Local raw evidence ↓</a>' if c.get('local_validation')
+                     else f'<a href="{e(c["run_url"])}">Workflow and raw artifacts ↗</a>')
     stats = record['summary']
+    tool_labels = recorded_labels(record)
 
     def time_label(value):
         return datetime.fromisoformat(value.replace('Z', '+00:00')).astimezone(timezone.utc).strftime('%d %b %Y · %H:%M UTC')
 
     def metric_row(key, label):
         cells = [f'<tr><th scope="row">{e(label)}</th>']
-        for tool in LABELS:
+        for tool in tool_labels:
             if key == 'footprint':
                 value = record['footprint']['tool_totals'][tool]['bytes'] / 1e6
                 content = f'<span class="number">{value:,.1f}</span>'
@@ -266,14 +318,14 @@ def page(record, history=None, base_url=SITE_URL):
     parts = ['<main class="container benchmark-content" id="main">',
              f'<p class="breadcrumbs"><a href="{home}">bruster</a><span>/</span>Benchmarks</p>',
              '<p class="eyebrow">Performance, with the context attached</p><h1>Browser benchmarks.</h1>',
-             '<p class="lead">Compare timing, memory, runtime footprint, and reliability across five browser configurations.</p>',
+             f'<p class="lead">Compare timing, memory, runtime footprint, and reliability across {len(tool_labels)} browser configurations.</p>',
              '<div class="run-meta">',
              f'<span class="badge badge-blue">{"Latest measurement" if history is not None else "Archived measurement"}</span>',
              f'<time datetime="{e(m["finished_utc"])}">{e(time_label(m["finished_utc"]))}</time>',
              f'<a href="{e(repo)}/commit/{e(c["sha"])}" title="{e(c["sha"])}">Commit <code>{e(c["sha"][:12])}</code></a>',
-             f'<a href="{e(c["run_url"])}">Workflow #{c["run_number"]} ↗</a></div>',
+              run_link + '</div>',
              '<dl class="facts">',
-             f'<div><dt>Configurations</dt><dd>{len(LABELS)}</dd></div>',
+             f'<div><dt>Configurations</dt><dd>{len(tool_labels)}</dd></div>',
              f'<div><dt>Sessions / configuration</dt><dd>{m["rounds"]}</dd></div>',
              f'<div><dt>Tiny iterations / session</dt><dd>{m["iterations"]}</dd></div>',
              '<div><dt>Viewport (px)</dt><dd>1280 × 800</dd></div></dl>',
@@ -285,11 +337,11 @@ def page(record, history=None, base_url=SITE_URL):
              '<div class="section-head"><div><h2 id="results-title">Performance results</h2>',
              '<p>Timings include controller round trips. Lower values mean less time, memory, or disk space.</p></div>',
              '<div class="legend"><strong>Median</strong><br>[observed min–max]</div></div>',
-             '<p class="scroll-hint">Scroll the table horizontally to compare all five configurations.</p>',
+             '<p class="scroll-hint">Scroll the table horizontally to compare all configurations.</p>',
              '<div class="panel"><div class="table-scroll" role="region" aria-labelledby="results-title" tabindex="0">',
-             '<table class="results-table"><caption class="sr-only">Performance comparison. Values are medians with observed minimum and maximum beneath, except runtime footprint and failure counts.</caption>',
-             '<colgroup><col>' + '<col>' * len(LABELS) + '</colgroup><thead><tr><th scope="col">Metric / unit</th>']
-    for label in LABELS.values():
+             f'<table class="results-table" style="--tool-count:{len(tool_labels)}"><caption class="sr-only">Performance comparison. Values are medians with observed minimum and maximum beneath, except runtime footprint and failure counts.</caption>',
+             '<colgroup><col>' + '<col>' * len(tool_labels) + '</colgroup><thead><tr><th scope="col">Metric / unit</th>']
+    for label in tool_labels.values():
         tool, engine = label.split(' / ')
         parts.append(f'<th scope="col"><span>{e(tool)}</span><span class="engine">{e(engine)}</span></th>')
     parts.append('</tr></thead>')
@@ -302,7 +354,7 @@ def page(record, history=None, base_url=SITE_URL):
         ('Memory and runtime footprint', ('total_pss_mib', 'rss_mib', 'footprint')),
         ('Reliability', ('failures',)),
     ):
-        parts.append(f'<tbody><tr class="group-row"><th scope="rowgroup" colspan="6">{e(group)}</th></tr>')
+        parts.append(f'<tbody><tr class="group-row"><th scope="rowgroup" colspan="{len(tool_labels) + 1}">{e(group)}</th></tr>')
         parts.extend(metric_row(key, labels[key]) for key in keys)
         parts.append('</tbody>')
     parts.extend(['</table></div><p class="table-note">Ranges show observed variation, not confidence intervals. '
@@ -320,9 +372,7 @@ def page(record, history=None, base_url=SITE_URL):
         ('Runner image', m.get('runner_image', {}).get('ImageVersion') or 'Unrecorded'),
     )), '</div><div class="panel environment-card"><h3>Browser runtimes &amp; tools</h3>', details((
         ('WebKitGTK', m.get('webkitgtk', 'Unrecorded')),
-        ('Playwright', m['packages']['playwright-core']),
-        ('Puppeteer', m['packages']['puppeteer-core']),
-        ('agent-browser', m['packages']['agent-browser']),
+        *m['packages'].items(),
         ('Chrome', m['chrome']),
         ('Headless Shell', m.get('headless_shell', 'Unrecorded')),
         ('Node.js', m['node']),
@@ -340,7 +390,7 @@ def page(record, history=None, base_url=SITE_URL):
                   '<table class="reliability-table"><caption class="sr-only">Post-workload fault probes and cleanup outcomes for each configuration.</caption>',
                   '<thead><tr><th scope="col">Configuration</th><th scope="col">Sessions with failures</th>',
                   '<th scope="col">Fault-probe failures</th><th scope="col">Shutdown / cleanup failures</th><th scope="col">Successful 100 ms retries</th></tr></thead><tbody>'])
-    for tool, label in LABELS.items():
+    for tool, label in tool_labels.items():
         s = stats[tool]
         tool_name, engine = label.split(' / ')
         color = 'warn' if s['sessions_with_failures'] else 'neutral'
@@ -348,38 +398,60 @@ def page(record, history=None, base_url=SITE_URL):
                      f'<td><span class="badge badge-{color}">{s["sessions_with_failures"]}/{m["rounds"]}</span></td>'
                      f'<td>{failures(s["fault_probe_failures"])}</td><td>{failures(s.get("lifecycle_failures", {}))}</td>'
                      f'<td>{s["recovery_retry_passes"]}</td></tr>')
-    parts.extend(['</tbody></table></div></section>',
+    parts.append('</tbody></table></div></section>')
+    catalog = m.get('competitors')
+    if catalog:
+        parts.extend(['<section class="section" id="competitors"><h2>Hacker News competitor coverage</h2>',
+                      f'<p><a href="{e(catalog["source"])}">Source discussion</a> · reviewed {e(catalog["reviewed"])}</p>',
+                      f'<p>{e(catalog["scope"])}</p>',
+                      '<div class="panel table-scroll"><table><thead><tr><th>Repository</th><th>Coverage</th><th>Notes</th></tr></thead><tbody>'])
+        for tool in catalog['tools']:
+            coverage = 'Measured in this run' if tool['id'] in tool_labels else tool['status'] if tool['status'] != 'linux' else 'Not selected'
+            comments = ' '.join(f'<a href="https://news.ycombinator.com/item?id={int(id_)}">HN {kind}</a>'
+                                for kind, key in (('comment', 'comments'), ('story', 'stories'))
+                                for id_ in tool.get(key, []))
+            parts.append(f'<tr><th><a href="{e(tool.get("implementation", tool["github"]))}">{e(tool["label"])}</a> {comments}</th>'
+                         f'<td>{e(coverage)}</td><td>{e(tool["notes"])}</td></tr>')
+        parts.append('</tbody></table></div><details><summary>Related agent/model mentions</summary><ul>')
+        for item in catalog.get('related_mentions', []):
+            name = f'<a href="{e(item["github"])}">{e(item["name"])}</a>' if item.get('github') else e(item['name'])
+            parts.append(f'<li>{name}: {e(item["notes"])}</li>')
+        parts.append('</ul></details></section>')
+    parts.extend([
                   '<section class="section" id="downloads" aria-labelledby="downloads-title"><div class="section-head"><div>',
                   '<h2 id="downloads-title">Raw data &amp; reproducibility</h2>',
                   '<p>Download the measurements, runtime inventory, and resolved dependency files for this run.</p></div>',
-                  f'<a href="{e(c["run_url"])}">Workflow and raw artifacts ↗</a></div><ul class="files">'])
-    for name in PUBLIC_FILES:
-        parts.append(f'<li><a href="{e(prefix + name)}"><code>{e(name)}</code><span>{"Markdown" if name.endswith(".md") else "JSON"} ↓</span></a></li>')
+                  evidence_link + '</div><ul class="files">'])
+    for name in public_files(record):
+        kind = 'Archive' if name.endswith('.tar.gz') else 'Markdown' if name.endswith('.md') else 'JSON'
+        parts.append(f'<li><a href="{e(prefix + name)}"><code>{e(name)}</code><span>{kind} ↓</span></a></li>')
     parts.extend(['</ul><details class="panel provenance"><summary>Full environment, versions and hashes</summary>',
                   '<pre tabindex="0" aria-label="Measurement provenance">' + e(json.dumps(m, indent=2)) + '</pre></details></section>'])
     if history is not None:
         parts.extend(['<section class="section" id="history" aria-labelledby="history-title"><div class="section-head"><div>',
                       '<h2 id="history-title">Measurement history</h2>',
-                      '<p>Newest workflow invocation first. Each run retains its own data and environment.</p></div></div>',
+                      '<p>Workflow runs are ordered by invocation. Local validations follow their recorded workflow boundary. '
+                      'Each run retains its own data and environment.</p></div></div>',
                       '<ol class="panel history-list">'])
         for item in history:
             ctx = item['context']
             latest = '<span class="badge badge-blue">Latest</span>' if record_id(item) == record_id(record) else ''
             date = item['metadata']['finished_utc']
-            parts.append(f'<li class="history-entry"><div><a href="runs/{e(record_id(item))}/">Run #{ctx["run_number"]} · attempt {ctx["run_attempt"]}</a>'
+            parts.append(f'<li class="history-entry"><div><a href="runs/{e(record_id(item))}/">{e(run_label(ctx))}</a>'
                          f'{latest}<code>{e(ctx["sha"][:12])}</code></div><div><time datetime="{e(date)}">{e(time_label(date))}</time>'
                          f'<p>{e(environment(item["metadata"]))}</p></div></li>')
         parts.append('</ol></section>')
     else:
         parts.append('<p class="back-link"><a href="../../">← All measurements</a></p>')
-    parts.extend([f'<p class="benchmark-source"><a href="{e(repo)}/blob/{e(c["sha"])}/benchmarks/README.md">Benchmark source &amp; methodology ↗</a></p>',
+    parts.extend([f'<p class="benchmark-source"><a href="{e(source_url)}">Benchmark source &amp; methodology ↗</a></p>',
                   '</main>'])
     archive = history is None
     path = f'benchmarks/runs/{record_id(record)}/' if archive else 'benchmarks/'
-    title = (f'Bruster Benchmark Run #{c["run_number"]} · Attempt {c["run_attempt"]}' if archive
-             else 'Browser Benchmarks: Bruster, Playwright & Puppeteer')
-    description = ('Compare Bruster, Playwright, Puppeteer, and agent-browser: startup, navigation, '
-                   'memory, runtime footprint, and reliability, with raw data and methodology.')
+    title = (f'Bruster Benchmark {run_label(c)}' if archive
+             else 'Browser Benchmarks: Bruster & Browser Automation Tools')
+    names = ', '.join(dict.fromkeys(label.split(' / ')[0] for label in tool_labels.values()))
+    description = (f'Compare {names}: startup, navigation, memory, runtime footprint, '
+                   'and reliability, with raw data and methodology.')
     if archive:
         description = f'Archived measurement from {m["finished_utc"]}. ' + description
     return render_page(title, description, path, '\n'.join(parts), base_url=base_url,
@@ -390,7 +462,7 @@ def page(record, history=None, base_url=SITE_URL):
 def render_reports(root, base_url=SITE_URL):
     """Refresh presentation from immutable records without running measurements."""
     history = [json.loads(p.read_text()) for p in (root / 'runs').glob('*/measurement.json')]
-    history.sort(key=lambda r: (r['context']['run_number'], r['context']['run_attempt'], r['context']['run_id']), reverse=True)
+    history.sort(key=history_order, reverse=True)
     if not history:
         return []
     for item in history:
@@ -406,7 +478,7 @@ def install(results, site):
     root = site / 'benchmarks'
     destination = root / 'runs' / record_id(record)
     destination.mkdir(parents=True, exist_ok=True)
-    for name in PUBLIC_FILES:
+    for name in public_files(record):
         target = destination / name
         content = (results / name).read_bytes()
         require(not target.exists() or target.read_bytes() == content, f'Refusing to overwrite immutable result: {target}')

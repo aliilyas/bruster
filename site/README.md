@@ -41,7 +41,7 @@ rsvg-convert site/assets/social.svg -o site/assets/social.png
 ## Publishing
 
 `.github/workflows/benchmark-pages.yml` checks pull requests. On relevant changes
-to `main`, a successful benchmark workflow, or a manual dispatch, it takes the
+to `main`, benchmark workflow completion, or a manual dispatch, it takes the
 deployment lock and reads the latest `main` source and `gh-pages` measurements.
 It builds the product site, bundles the Test Lab's pinned framework fixtures with
 Node.js 24, and assembles one artifact containing the site, benchmarks, and

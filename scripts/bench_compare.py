@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Same-machine Linux comparison: Bruster, Playwright, Puppeteer, agent-browser.
+"""Same-machine Linux comparison of local browser APIs, CLIs and MCP.
 
 Use an isolated dependency directory containing resolved playwright-core,
 puppeteer-core, agent-browser packages and a shared full Chromium executable.
@@ -25,9 +25,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import bench_audit as audit
+from bench_tools import CATALOG, CATALOG_PATH, LINUX_TOOLS, packages
 
 
-TOOLS = ['bruster', 'playwright', 'puppeteer', 'agent-browser', 'playwright-shell']
+TOOLS = LINUX_TOOLS
 EXTRACT = """(() => ({
   title: document.title,
   elements: Array.from(document.querySelectorAll('h1,h2,h3,p,li,a,input,button,select,textarea'))
@@ -41,9 +42,11 @@ EXTRACT = """(() => ({
 def isolated_environment(temp, chromium):
     env = os.environ.copy()
     for key in list(env):
-        if key.startswith('AGENT_BROWSER_'):
+        if key.startswith(('AGENT_BROWSER_', 'BROWSE_', 'BROWSERBASE_', 'STAGEHAND_', 'PLAYWRIGHT_MCP_',
+                           'CYPRESS_', 'BRUSTER_CYPRESS_', 'UIVISION_', 'RUSTWRIGHT_', 'BILOBA_')) or key in ('CHROME_PATH', 'CHROME', 'CHROMIUM'):
             del env[key]
     env['HOME'] = temp
+    env['DO_NOT_TRACK'] = '1'
     for key in ('XDG_CACHE_HOME', 'XDG_CONFIG_HOME', 'XDG_DATA_HOME', 'XDG_STATE_HOME'):
         env[key] = str(Path(temp) / key.lower())
     if chromium:
@@ -150,6 +153,61 @@ class AgentClient:
             self.temp.cleanup()
 
 
+class BrowseClient:
+    """Use the real CLI on every operation, including its daemon round trips."""
+    def __init__(self, node, deps, chrome, run_id):
+        self.command = [str(node), str(deps / 'node_modules/browse/bin/run.js')]
+        self.temp = tempfile.TemporaryDirectory(prefix='browse-compare-')
+        self.env = isolated_environment(self.temp.name, True)
+        self.env.update(CHROME_PATH=str(chrome), BROWSE_DISABLE_UPDATE_CHECK='1',
+                        BROWSE_SESSION=f'bench-{os.getpid()}-{run_id}',
+                        BROWSE_DAEMON_DIR=str(Path(self.temp.name) / 'daemon'))
+        self.stderr, self.close_error = [], None
+        self.started_ns = time.perf_counter_ns()
+        try:
+            self.invoke('open', 'about:blank', '--local', '--headless', '--chrome-arg=--no-sandbox')
+            self.invoke('viewport', '1280', '800', '--scale', '1')
+            self.startup_ms = (time.perf_counter_ns() - self.started_ns) / 1e6
+        except BaseException:
+            self.close()
+            raise
+
+    def invoke(self, *args):
+        start = time.perf_counter_ns()
+        proc = subprocess.run([*self.command, *args], env=self.env, capture_output=True, timeout=60)
+        elapsed = (time.perf_counter_ns() - start) / 1e6
+        self.stderr.extend(proc.stderr.decode(errors='replace').splitlines())
+        if proc.returncode:
+            raise RuntimeError(f'browse {args}: {proc.stdout!r} {proc.stderr!r}')
+        return elapsed, json.loads(proc.stdout), len(proc.stdout)
+
+    def call(self, method, params=None):
+        params = params or {}
+        if method == 'navigate':
+            return self.invoke('open', params['url'], '--wait', 'load', '--timeout', '60000')
+        if method == 'eval':
+            elapsed, data, size = self.invoke('eval', params['expression'])
+            return elapsed, data['result'], size
+        if method == 'snapshot':
+            return self.invoke('snapshot', '--full')
+        if method == 'screenshot':
+            return self.invoke('screenshot', '--path', params['path'], '--type', 'png')
+        raise ValueError(method)
+
+    def navigate(self, url):
+        elapsed, result, _ = self.call('navigate', {'url': url})
+        assert result['url'] == url, result
+        return elapsed
+
+    def close(self):
+        try:
+            self.invoke('stop')
+        except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
+            self.close_error = str(exc)
+        finally:
+            self.temp.cleanup()
+
+
 def process_table():
     table = {}
     for proc in Path('/proc').glob('[0-9]*'):
@@ -184,7 +242,7 @@ def background_work(exclude=()):
             # /proc/comm truncates names to 15 bytes, including frozen builds
             # and engine helpers. Other browser benchmarks can share library
             # pages (changing PSS) even when their controller is mostly idle.
-            competing = name in ('cargo', 'rustc', 'node') or name.startswith((
+            competing = name in ('cargo', 'rustc', 'node', 'bilobad', 'rustwright-mcp') or name.startswith((
                     'bruster', 'baseline-brust', 'candidate-brust', 'WebKit',
                     'chrome', 'headless_shell', 'agent-browser', 'smoke-', 'edge-', 'e2e-'))
             if name.startswith('python'):
@@ -264,7 +322,10 @@ def failure_checks(client, base):
         url = f'http://127.0.0.1:{refused.getsockname()[1]}/'
         start = time.perf_counter_ns()
         try:
-            client.navigate(url)
+            # A CLI can return success with chrome-error:// as the final URL.
+            # Count that as a failed fault probe; do not let navigate's normal
+            # URL assertion abort the otherwise valid timing measurements.
+            client.call('navigate', {'url': url})
             checks.append({'name': 'connection_refused', 'pass': False, 'error': 'unexpected success'})
         except RuntimeError as exc:
             checks.append({'name': 'connection_refused', 'pass': True, 'error': str(exc),
@@ -287,6 +348,10 @@ def failure_checks(client, base):
 
 
 def native_snapshot(client, tool, expected):
+    if tool == 'cypress':
+        return {'supported': False, 'reason': 'Cypress has no native DOM/accessibility snapshot API', 'result': None}
+    if tool == 'rustwright':
+        return {'supported': False, 'reason': 'Rustwright Node SDK has no native snapshot API', 'result': None}
     elapsed, result, wire = client.call('snapshot', {'max': 2500})
     if tool == 'bruster':
         assert len(result['elements']) == expected and not result.get('truncated', False)
@@ -294,13 +359,30 @@ def native_snapshot(client, tool, expected):
     elif tool == 'agent-browser':
         assert result['snapshot']
         controls = sum(v.get('role') in ('link', 'textbox') for v in result['refs'].values())
-    elif tool.startswith('playwright'):
+    elif tool in ('stagehand', 'browse'):
+        tree = result['formattedTree' if tool == 'stagehand' else 'tree']
+        assert isinstance(tree, str) and tree
+        # Stagehand prefixes each node with its stable reference, e.g. [0-12].
+        import re
+        controls = sum(bool(re.search(r'\b(?:link|textbox)\b', line.split(':', 1)[0]))
+                       for line in tree.splitlines())
+    elif tool == 'biloba':
+        assert isinstance(result, str) and result
+        controls = sum(line.lstrip().startswith(('link ', 'textbox ')) for line in result.splitlines())
+    elif tool.startswith('playwright') or tool in ('uivision', 'rustwright-mcp'):
         assert isinstance(result, str) and result
         controls = sum(line.lstrip().startswith(('- link ', '- textbox ')) for line in result.splitlines())
     else:
         def count(node):
             return int(node.get('role') in ('link', 'textbox')) + sum(count(c) for c in node.get('children', []))
         controls = count(result)
+    truncated = ((tool == 'uivision' and '(truncated:' in result)
+                 or (tool == 'biloba' and result.rstrip().endswith('... [truncated]'))
+                 or (tool == 'rustwright-mcp' and '(snapshot truncated)' in result))
+    if truncated:
+        assert expected == 2000 and 0 < controls < expected, (tool, controls)
+        return {'ms': elapsed, 'wire_bytes': wire, 'controls': controls, 'truncated': True,
+                'reason': 'Native snapshot API returned an explicitly truncated diagnostic', 'result': result}
     if expected == 2000:
         assert controls == 2000, (tool, controls)
     return {'ms': elapsed, 'wire_bytes': wire, 'controls': controls, 'result': result}
@@ -315,20 +397,41 @@ def validate_extract(result, expected, title):
         assert result['elements'][-1]['name'] == 'input 999'
 
 
+def create_client(args, tool, round_, base=None):
+    if tool == 'bruster':
+        client = ProcessClient([str(args.bruster), '--hidden'], False)
+    elif tool == 'agent-browser':
+        client = AgentClient(args.deps / 'node_modules/agent-browser/bin/agent-browser-linux-x64', args.chrome, round_)
+    elif tool == 'browse':
+        client = BrowseClient(args.node, args.deps, args.chrome, round_)
+    elif tool in ('playwright-mcp', 'uivision', 'rustwright-mcp'):
+        driver = {'playwright-mcp': 'bench_mcp_driver.mjs', 'uivision': 'bench_uivision_driver.mjs',
+                  'rustwright-mcp': 'bench_rustwright_mcp_driver.mjs'}[tool]
+        client = ProcessClient([str(args.node), str(Path(__file__).with_name(driver)),
+                                str(args.chrome), str(args.deps)], True)
+    elif tool == 'cypress':
+        client = ProcessClient([str(args.node), str(Path(__file__).with_name('bench_cypress_driver.mjs')),
+                                str(args.chrome), str(args.deps), str(2 * args.iterations + 64), base], True)
+    else:
+        client = ProcessClient([str(args.node), str(Path(__file__).with_name('bench_competitor_driver.mjs')),
+                                tool, str(args.shell if tool == 'playwright-shell' else args.chrome), str(args.deps)], True)
+    return client
+
+
 def measure(args, server, tool, round_):
     started_utc = datetime.now(timezone.utc).isoformat()
     before = set(process_table())
     competing_before = background_work()
     if competing_before:
         raise RuntimeError(f'Concurrent browser/build workload: {competing_before}')
-    if tool == 'bruster':
-        client = ProcessClient([str(args.bruster), '--hidden'], False)
-    elif tool == 'agent-browser':
-        client = AgentClient(args.deps / 'node_modules/agent-browser/bin/agent-browser-linux-x64', args.chrome, round_)
-    else:
-        client = ProcessClient([str(args.node), str(Path(__file__).with_name('bench_competitor_driver.mjs')),
-                                tool, str(args.shell if tool == 'playwright-shell' else args.chrome), str(args.deps)], True)
     base = f'http://127.0.0.1:{server.server_port}'
+    try:
+        client = create_client(args, tool, round_, base)
+    except BaseException:
+        # A startup exception can leave a detached daemon/browser even before a
+        # client object exists. Reap only the children acquired by this session.
+        cleanup(owned_processes(before))
+        raise
     row = {'tool': tool, 'round': round_, 'startup_ms': client.startup_ms,
            'started_utc': started_utc,
            'load_before': os.getloadavg(), 'failures': [], 'competing_before': competing_before}
@@ -448,18 +551,41 @@ def main():
         'rustc': subprocess.check_output(['rustc', '--version'], text=True).strip(),
         'gtk': subprocess.check_output(['pkg-config', '--modversion', 'gtk+-3.0'], text=True).strip(),
         'webkitgtk': subprocess.check_output(['pkg-config', '--modversion', 'webkit2gtk-4.1'], text=True).strip(),
+        'tools': args.tools, 'competitors': CATALOG,
+        'competitors_sha256': hashlib.sha256(CATALOG_PATH.read_bytes()).hexdigest(),
         'packages': {name: json.loads((args.deps / 'node_modules' / name / 'package.json').read_text())['version']
-                     for name in ('playwright-core', 'puppeteer-core', 'agent-browser')},
+                     for name in packages(args.tools)},
         'bruster_bytes': args.bruster.stat().st_size,
         'bruster_sha256': hashlib.sha256(args.bruster.read_bytes()).hexdigest(),
         'chrome_sha256': hashlib.sha256(args.chrome.read_bytes()).hexdigest(),
         'headless_shell_sha256': hashlib.sha256(args.shell.read_bytes()).hexdigest(),
         'rounds': args.rounds, 'iterations': args.iterations, 'common_extraction_js': EXTRACT,
         'harness_sha256': {name: hashlib.sha256(Path(__file__).with_name(name).read_bytes()).hexdigest()
-                           for name in ('bench_compare.py', 'bench_competitor_driver.mjs', 'bench_audit.py')},
+                             for name in ('bench_compare.py', 'bench_competitor_driver.mjs', 'bench_mcp_driver.mjs',
+                                          'bench_cypress_driver.mjs', 'bench_cypress.config.cjs', 'bench_cypress.cy.js',
+                                          'bench_uivision_driver.mjs', 'bench_install_uivision.py',
+                                          'bench_rustwright_mcp_driver.mjs', 'bench_footprint.py',
+                                          'bench_tools.py', 'bench_audit.py')},
         'package_lock_sha256': hashlib.sha256((args.deps / 'package-lock.json').read_bytes()).hexdigest(),
         'args': {k: str(v) if isinstance(v, Path) else v for k, v in vars(args).items()},
     }
+    if 'uivision' in args.tools:
+        metadata['uivision_extension'] = json.loads((args.deps / 'uivision-provenance.json').read_text())
+        manifest = (args.deps / 'uivision-extension/manifest.json').read_bytes()
+        if hashlib.sha256(manifest).hexdigest() != metadata['uivision_extension']['manifest_sha256']:
+            raise RuntimeError('Installed Ui.Vision manifest differs from its provenance')
+    native_artifacts = {
+        'rustwright': 'node_modules/rustwright/rustwright.linux-x64-gnu.node',
+        'rustwright-mcp': 'node_modules/@skyvernai/rustwright-mcp-linux-x64-gnu/bin/rustwright-mcp',
+        'biloba': 'node_modules/biloba-linux-x64/bin/bilobad',
+    }
+    metadata['native_artifacts'] = {}
+    for tool in args.tools:
+        if tool in native_artifacts:
+            relative = native_artifacts[tool]
+            data = (args.deps / relative).read_bytes()
+            metadata['native_artifacts'][tool] = {'path': relative, 'bytes': len(data),
+                                                 'sha256': hashlib.sha256(data).hexdigest()}
     (args.output / 'metadata.json').write_text(json.dumps(metadata, indent=2) + '\n')
     server = audit.ThreadingHTTPServer(('127.0.0.1', 0), audit.Fixtures)
     server.image_hits, server.hits_lock = 0, threading.Lock()
@@ -499,6 +625,8 @@ def main():
         for key in ('rss_mib', 'pss_mib', 'display_pss_mib', 'total_pss_mib', 'process_count'):
             result[key] = audit.summary([statistics.median(m[key] for m in r['idle_memory']) for r in subset])
         for page in ('tiny', 'large'):
+            if not subset[0][f'native_{page}_snapshot'].get('supported', True):
+                continue
             for key in ('ms', 'wire_bytes', 'controls'):
                 result[f'native_{page}_snapshot_{key}'] = audit.summary([r[f'native_{page}_snapshot'][key] for r in subset])
         result['sessions_with_failures'] = sum(bool(r['failures']) for r in subset)

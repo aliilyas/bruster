@@ -7,10 +7,14 @@ This is an installed-file lower bound: unobserved OS resources can add more.
 import argparse
 import json
 import os
+import platform
 import re
 import shutil
+import struct
 import subprocess
 from pathlib import Path
+
+from bench_tools import CONFIGURATIONS, packages
 
 
 def files(root):
@@ -27,10 +31,22 @@ def inventory(paths):
 
 def libraries(paths):
     result = set()
+    machine = {'x86_64': 62, 'aarch64': 183}.get(platform.machine())
+    if machine is None:
+        raise RuntimeError(f'Unsupported runtime inventory architecture: {platform.machine()}')
     for path in sorted(paths):
         with path.open('rb') as stream:
-            if stream.read(4) != b'\x7fELF':
-                continue
+            header = stream.read(20)
+        if header[:4] != b'\x7fELF':
+            continue
+        # Some npm bundles ship several architectures and Android prebuilds.
+        # Count every installed file, but resolve linked OS libraries only for
+        # host binaries; Android's ELF files use Bionic rather than glibc.
+        if struct.unpack('<H' if header[5] == 1 else '>H', header[18:20])[0] != machine:
+            continue
+        if any(part == 'prebuilds' and path.parts[i + 1].startswith('android-')
+               for i, part in enumerate(path.parts[:-1])):
+            continue
         proc = subprocess.run(['ldd', str(path)], capture_output=True, text=True, timeout=30)
         output = proc.stdout + proc.stderr
         if 'not found' in output:
@@ -54,18 +70,22 @@ def package_files(deps, name):
         seen.add(package)
         result.update(files(package))
         manifest = json.loads((package / 'package.json').read_text())
-        for dependency in manifest.get('dependencies', {}):
+        optional = manifest.get('optionalDependencies', {})
+        for dependency in manifest.get('dependencies', {}).keys() | optional.keys():
             for parent in (package, *package.parents):
                 resolved = parent / 'node_modules' / dependency
                 if (resolved / 'package.json').is_file():
                     pending.append(resolved)
                     break
             else:
-                raise RuntimeError(f'Missing dependency: {dependency}')
+                if dependency not in optional:
+                    raise RuntimeError(f'Missing dependency: {dependency}')
     return result
 
 
 def measure(args):
+    samples = json.loads(args.samples.read_text())
+    selected = set(row['tool'] for row in samples)
     bruster_libraries = libraries({args.bruster})
     webkit_library = next(p for p in bruster_libraries if p.name.startswith('libwebkit2gtk-4.1'))
     helpers = Path(os.environ.get('WEBKIT_EXEC_PATH', webkit_library.parent / 'webkit2gtk-4.1'))
@@ -90,8 +110,33 @@ def measure(args):
         'puppeteer': puppeteer | node | chrome_runtime,
         'agent-browser': agent | libraries(agent) | chrome_runtime,
     }
+    for tool in selected - groups.keys():
+        if tool not in CONFIGURATIONS or CONFIGURATIONS[tool]['status'] != 'linux':
+            raise ValueError(f'Unknown measured tool: {tool}')
+        runtime = set()
+        for package in packages([tool]):
+            runtime.update(package_files(args.deps, package))
+        if tool == 'cypress':
+            version = json.loads((args.deps / 'node_modules/cypress/package.json').read_text())['version']
+            binary = args.deps / 'cypress-cache' / version / 'Cypress'
+            if not (binary / 'Cypress').is_file():
+                raise RuntimeError(f'Missing installed Cypress runner: {binary}')
+            runtime.update(files(binary))
+            for name in ('Xvfb', 'xauth', 'sh'):
+                executable = shutil.which(name)
+                if not executable:
+                    raise RuntimeError(f'Missing Cypress display runtime: {name}')
+                runtime.add(Path(executable).resolve())
+        if tool == 'uivision':
+            extension = args.deps / 'uivision-extension'
+            if not (extension / 'manifest.json').is_file():
+                raise RuntimeError(f'Missing Ui.Vision extension: {extension}')
+            runtime.update(files(extension))
+        runtime.update(libraries(runtime))
+        groups[tool] = runtime | node | chrome_runtime
+    groups = {tool: paths for tool, paths in groups.items() if tool in selected}
     # Include observed dlopened libraries, mapped fonts and other runtime files.
-    for row in json.loads(args.samples.read_text()):
+    for row in samples:
         for sample in row['idle_memory']:
             for proc in sample['processes'] + sample['display']:
                 for name in proc.get('mapped_files', []):
