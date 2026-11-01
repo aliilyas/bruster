@@ -18,16 +18,17 @@ jobs:
   build:
     name: ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
         include:
           # Use supported native pools instead of the capacity-constrained macOS 14 pool.
-          - { os: macos-15,         target: aarch64-apple-darwin,       test: full }
-          - { os: macos-15-intel,   target: x86_64-apple-darwin,        test: full }
-          - { os: ubuntu-24.04,     target: x86_64-unknown-linux-gnu,   test: full }
-          - { os: ubuntu-24.04-arm, target: aarch64-unknown-linux-gnu,  test: full }
-          - { os: windows-2022,     target: x86_64-pc-windows-msvc,     test: unit }
+          - { os: macos-15,         target: aarch64-apple-darwin }
+          - { os: macos-15-intel,   target: x86_64-apple-darwin }
+          - { os: ubuntu-24.04,     target: x86_64-unknown-linux-gnu }
+          - { os: ubuntu-24.04-arm, target: aarch64-unknown-linux-gnu }
+          - { os: windows-2022,     target: x86_64-pc-windows-msvc }
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -54,13 +55,6 @@ jobs:
         if: runner.os == 'Linux'
         run: xvfb-run -a /usr/bin/python3 tests/startup_portal.py target/${{ matrix.target }}/release/bruster
 
-      - name: Smoke and edge tests (Linux)
-        if: runner.os == 'Linux' && matrix.test == 'full'
-        env:
-          BRUSTER_TEST_STDERR: 1
-          BRUSTER_TRACE_NAV: 1
-        run: xvfb-run -a cargo test --release --locked --target ${{ matrix.target }} --test smoke --test edge
-
       - name: Diagnostics (macOS, stderr of one navigate)
         if: runner.os == 'macOS'
         run: |
@@ -70,10 +64,26 @@ jobs:
           (printf '%s\n' '{"id":1,"method":"title"}' '{"id":2,"method":"close"}'; sleep 2) \
             | target/${{ matrix.target }}/release/bruster --hidden --profile /tmp/diagprof 2>&1 | head -20 || true
 
-      - name: Smoke and edge tests (macOS)
-        if: runner.os == 'macOS' && matrix.test == 'full'
-        env: { BRUSTER_TEST_STDERR: 1 }
-        run: cargo test --release --locked --target ${{ matrix.target }} --test smoke --test edge -- --nocapture
+      - name: Smoke and edge tests (three complete rounds)
+        if: ${{ !cancelled() && steps.bruster_build.outcome == 'success' }}
+        shell: bash
+        env:
+          BRUSTER_TEST_STDERR: 1
+          BRUSTER_TRACE_NAV: 1
+        # Each test owns several native browser processes. Run serially within
+        # a platform; the platform matrix still runs in parallel. Every round
+        # and both binaries must pass, even if an earlier one has failed.
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then set -- xvfb-run -a; else set --; fi
+          status=0
+          for round in 1 2 3; do
+            echo "::group::Native test round $round of 3"
+            if ! "$@" cargo test --release --locked --target ${{ matrix.target }} --no-fail-fast --test smoke --test edge -- --test-threads=1; then
+              status=1
+            fi
+            echo "::endgroup::"
+          done
+          exit "$status"
 
       - name: Repeat navigation race regression (macOS)
         if: runner.os == 'macOS'
@@ -83,20 +93,6 @@ jobs:
             echo "Navigation regression round $round"
             cargo test --release --locked --target ${{ matrix.target }} --test edge -- --exact duplicate_load_does_not_release_requests_for_the_next_page queued_page_requests_expire_without_running_after_navigation same_url_replacement_loads_the_new_document old_document_cannot_finish_the_new_pages_idle_wait --nocapture --test-threads=1 || exit 1
           done
-
-      - name: Smoke tests (Windows)
-        if: runner.os == 'Windows'
-        env:
-          BRUSTER_TEST_STDERR: 1
-          BRUSTER_TRACE_NAV: 1
-        run: cargo test --release --locked --target ${{ matrix.target }} --test smoke -- --test-threads=1
-
-      - name: Edge tests (Windows)
-        if: runner.os == 'Windows'
-        env:
-          BRUSTER_TEST_STDERR: 1
-          BRUSTER_TRACE_NAV: 1
-        run: cargo test --release --locked --target ${{ matrix.target }} --test edge -- --test-threads=1
 
       - name: Repeat queued native starts (Windows)
         if: runner.os == 'Windows'

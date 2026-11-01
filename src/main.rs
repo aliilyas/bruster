@@ -223,6 +223,10 @@ struct Queued {
 
 impl Queued {
     fn new(method: String, params: Value) -> Result<Self, String> {
+        Self::new_at(method, params, std::time::Instant::now())
+    }
+
+    fn new_at(method: String, params: Value, now: std::time::Instant) -> Result<Self, String> {
         // Let action/wait timeouts complete first. request_timeout is a
         // separate outer deadline for page code that never replies.
         let timeout_ms = match params.get("request_timeout") {
@@ -239,7 +243,7 @@ impl Queued {
                     .max(expected.saturating_add(PAGE_TIMEOUT_MARGIN_MS))
             }
         };
-        let deadline = std::time::Instant::now()
+        let deadline = now
             .checked_add(Duration::from_millis(timeout_ms))
             .ok_or("request_timeout is too large")?;
         Ok(Self {
@@ -362,6 +366,40 @@ impl Pending {
         self.js.remove(&id);
         true
     }
+
+    /// Move in-flight calls to the new document without renewing their deadlines.
+    /// Return IDs that have already survived too many navigations.
+    fn requeue_page_requests(&mut self) -> Vec<u64> {
+        let mut interrupted = Vec::new();
+        for (id, mut q) in self.js.drain() {
+            q.retries += 1;
+            if q.retries > MAX_REDISPATCH {
+                interrupted.push(id);
+            } else {
+                self.queue.push((id, q));
+            }
+        }
+        interrupted
+    }
+
+    fn expire_page_requests(
+        &mut self,
+        now: std::time::Instant,
+        next: &mut Option<std::time::Instant>,
+        mut expired: impl FnMut(u64, &str),
+    ) {
+        let mut retain = |id, request: &Queued| {
+            if request.deadline <= now {
+                expired(id, &request.method);
+                false
+            } else {
+                *next = Some(next.map_or(request.deadline, |n| n.min(request.deadline)));
+                true
+            }
+        };
+        self.js.retain(|id, request| retain(*id, request));
+        self.queue.retain(|(id, request)| retain(*id, request));
+    }
 }
 
 fn trace_navigation(stage: &str, tab: TabId, p: &Pending, url: &str) {
@@ -402,13 +440,8 @@ fn page_load(
             p.loading = true;
             p.hinted = None;
             p.loaded = false;
-            for (id, mut q) in p.js.drain().collect::<Vec<_>>() {
-                q.retries += 1;
-                if q.retries > MAX_REDISPATCH {
-                    fail(id, "navigation interrupted");
-                } else {
-                    p.queue.push((id, q));
-                }
+            for id in p.requeue_page_requests() {
+                fail(id, "navigation interrupted");
             }
             if let Some(nav) = p.navigate.as_mut() {
                 nav.1 = true;
@@ -1015,27 +1048,8 @@ impl App {
                     }
                 }
             }
-            pending.js.retain(|id, request| {
-                if request.deadline <= now {
-                    fail(*id, format!("{}: page request timed out", request.method));
-                    false
-                } else {
-                    next = Some(next.map_or(request.deadline, |n: std::time::Instant| {
-                        n.min(request.deadline)
-                    }));
-                    true
-                }
-            });
-            pending.queue.retain(|(id, request)| {
-                if request.deadline <= now {
-                    fail(*id, format!("{}: page request timed out", request.method));
-                    false
-                } else {
-                    next = Some(next.map_or(request.deadline, |n: std::time::Instant| {
-                        n.min(request.deadline)
-                    }));
-                    true
-                }
+            pending.expire_page_requests(now, &mut next, |id, method| {
+                fail(id, format!("{method}: page request timed out"));
             });
         }
         if next != self.next_deadline {
@@ -2338,6 +2352,69 @@ fn trim_webkit(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn page_requests_expire_at_their_deadline_once_in_both_queues() {
+        let now = std::time::Instant::now();
+        let mut p = Pending::default();
+        let request = |ms| {
+            Queued::new_at("eval".into(), json!({ "request_timeout": ms }), now).unwrap()
+        };
+        p.js.insert(1, request(200));
+        p.queue.push((2, request(300)));
+        let mut expired = Vec::new();
+        let mut next = None;
+        p.expire_page_requests(now + Duration::from_millis(199), &mut next, |id, _| {
+            expired.push(id)
+        });
+        assert!(expired.is_empty());
+        assert_eq!(next, Some(now + Duration::from_millis(200)));
+        next = None;
+        p.expire_page_requests(now + Duration::from_millis(200), &mut next, |id, _| {
+            expired.push(id)
+        });
+        assert_eq!(expired, vec![1]);
+        assert_eq!(next, Some(now + Duration::from_millis(300)));
+        next = None;
+        p.expire_page_requests(now + Duration::from_millis(300), &mut next, |id, _| {
+            expired.push(id)
+        });
+        assert_eq!(expired, vec![1, 2]);
+        assert_eq!(next, None);
+        p.expire_page_requests(now + Duration::from_secs(10), &mut next, |id, _| {
+            expired.push(id)
+        });
+        assert_eq!(expired, vec![1, 2], "expired calls must not reply twice");
+    }
+
+    #[test]
+    fn page_request_deadlines_survive_redispatch() {
+        let now = std::time::Instant::now();
+        let mut p = Pending::default();
+        // Both an expired call awaiting the deadline sweep and a live call
+        // retain their original deadline through every permitted navigation.
+        let deadlines = [now - Duration::from_secs(1), now + Duration::from_secs(30)];
+        for (id, deadline) in deadlines.into_iter().enumerate() {
+            let mut q = Queued::new("eval".into(), json!({ "expression": "42" })).unwrap();
+            q.deadline = deadline;
+            p.js.insert(id as u64, q);
+        }
+        for retry in 1..=MAX_REDISPATCH {
+            assert!(p.requeue_page_requests().is_empty());
+            assert!(p.js.is_empty());
+            assert_eq!(p.queue.len(), 2);
+            for (id, q) in p.queue.drain(..) {
+                assert_eq!(q.deadline, deadlines[id as usize]);
+                assert_eq!(q.retries, retry);
+                p.js.insert(id, q);
+            }
+        }
+        let mut interrupted = p.requeue_page_requests();
+        interrupted.sort_unstable();
+        assert_eq!(interrupted, vec![0, 1]);
+        assert!(p.queue.is_empty());
+        assert!(p.js.is_empty());
+    }
 
     #[test]
     fn navigation_timeout_follows_the_waiter_across_document_changes() {

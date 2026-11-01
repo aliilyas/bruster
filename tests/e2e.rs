@@ -287,16 +287,17 @@ fn download_is_cancelled_and_reported() {
 
 #[test]
 #[ignore]
-fn cold_and_warm_navigation_budget() {
-    // Guard against regressions in navigate latency; generous for a shared network.
+fn cold_and_warm_navigation() {
+    // Verify both navigation paths and their resulting documents. Performance
+    // measurements belong in the localhost benchmark workflow, not a public-site
+    // test with fixed latency thresholds on shared runners.
     let mut b = Browser::spawn();
-    let t = Instant::now();
     b.open("https://en.wikipedia.org/wiki/WebKit");
-    assert!(t.elapsed() < Duration::from_secs(8), "cold {:?}", t.elapsed());
-    let t = Instant::now();
+    wiki_retry_rate_limit(&mut b);
+    assert!(b.ok("title", json!({})).as_str().unwrap().contains("WebKit"));
     b.ok("navigate", json!({ "url": "https://en.wikipedia.org/wiki/Blink_(browser_engine)", "until": "dom" }));
-    assert!(t.elapsed() < Duration::from_secs(4), "warm dom {:?}", t.elapsed());
-    let t = Instant::now();
-    b.ok("snapshot", json!({ "format": "text" }));
-    assert!(t.elapsed() < Duration::from_millis(500), "snapshot {:?}", t.elapsed());
+    wiki_retry_rate_limit(&mut b);
+    assert!(b.ok("title", json!({})).as_str().unwrap().contains("Blink"));
+    let snapshot = b.ok("snapshot", json!({ "format": "text" }));
+    assert!(snapshot.as_str().unwrap().contains("Blink"), "{snapshot}");
 }

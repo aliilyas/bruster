@@ -4,6 +4,10 @@
 # tests/run_all.sh [--no-e2e] [--no-lab] [--rounds N]
 # Exit status is non-zero if any part fails.
 set -u
+# Each test starts native browser processes; match CI's default concurrency.
+# Override explicitly when stress-testing concurrent sessions.
+RUST_TEST_THREADS=${RUST_TEST_THREADS:-1}
+export RUST_TEST_THREADS
 E2E=1
 LAB=1
 ROUNDS=1
@@ -29,12 +33,12 @@ run() {
   fi
 }
 
-run build cargo build --release --tests
-run unit cargo test --release --bin bruster
+run build cargo build --release --locked --tests
+run unit cargo test --release --locked --bin bruster
 i=1
 while [ "$i" -le "$ROUNDS" ]; do
-  run "smoke-$i" cargo test --release --test smoke
-  run "edge-$i" cargo test --release --test edge
+  run "smoke-$i" cargo test --release --locked --test smoke
+  run "edge-$i" cargo test --release --locked --test edge
   i=$((i + 1))
 done
 if [ "$LAB" = 1 ]; then

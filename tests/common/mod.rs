@@ -4,12 +4,13 @@
 
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpListener;
-use std::process::{Child, Command, Stdio};
+use std::process::{Child, Command, ExitStatus, Stdio};
 use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};
 
-/// Generous: e2e tests wait on real sites. Hangs are still caught, just later.
+/// A watchdog for missing replies and process exit, not a performance budget.
+/// Functional tests assert results/state; latency measurements live in benchmarks/.
 pub const REPLY_TIMEOUT: Duration = Duration::from_secs(60);
 pub const SLOW_DELAY: Duration = Duration::from_millis(300);
 
@@ -183,10 +184,18 @@ impl Browser {
     }
 
     pub fn next_line(&mut self) -> Value {
-        let line = self
-            .lines
-            .recv_timeout(REPLY_TIMEOUT)
-            .expect("no line from bruster within REPLY_TIMEOUT");
+        self.read_line(REPLY_TIMEOUT, "next message")
+    }
+
+    fn read_line(&mut self, timeout: Duration, what: &str) -> Value {
+        let line = self.lines.recv_timeout(timeout).unwrap_or_else(|e| {
+            panic!(
+                "waiting for {what}: {e}; pid={}, exit={:?}, stashed messages={}",
+                self.child.id(),
+                self.child.try_wait(),
+                self.stash.len()
+            )
+        });
         serde_json::from_str(&line).unwrap()
     }
 
@@ -198,11 +207,11 @@ impl Browser {
             if let Some(i) = self.stash.iter().position(&pick) {
                 return self.stash.remove(i);
             }
-            assert!(
-                start.elapsed() < REPLY_TIMEOUT,
-                "timeout waiting for {what}"
-            );
-            let v = self.next_line();
+            let remaining = REPLY_TIMEOUT
+                .checked_sub(start.elapsed())
+                .unwrap_or_else(|| panic!("timeout waiting for {what}"));
+            // Unrelated events must not restart the reply's watchdog.
+            let v = self.read_line(remaining, what);
             self.stash.push(v);
         }
     }
@@ -268,16 +277,65 @@ impl Browser {
     pub fn open(&mut self, url: &str) {
         self.ok("navigate", json!({ "url": url }));
     }
+
+    /// Poll observable page state rather than sleeping for a guessed paint/load delay.
+    pub fn wait_js(&mut self, expression: &str, expected: Value) {
+        let start = Instant::now();
+        loop {
+            let actual = self.ok("eval", json!({ "expression": expression }));
+            if actual == expected {
+                return;
+            }
+            assert!(
+                start.elapsed() < REPLY_TIMEOUT,
+                "waiting for {expression} == {expected}, got {actual}"
+            );
+            std::thread::sleep(Duration::from_millis(50));
+        }
+    }
+
+    /// Bound native teardown too: receiving a close reply does not prove exit.
+    pub fn wait_exit(&mut self) -> ExitStatus {
+        let start = Instant::now();
+        loop {
+            if let Some(status) = self.child.try_wait().expect("wait for bruster exit") {
+                return status;
+            }
+            if start.elapsed() >= REPLY_TIMEOUT {
+                let _ = self.child.kill();
+                let _ = self.child.wait();
+                panic!(
+                    "bruster pid {} did not exit within {REPLY_TIMEOUT:?}",
+                    self.child.id()
+                );
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+    }
+
+    pub fn close(&mut self) {
+        let closing = if self.closed {
+            None
+        } else {
+            self.closed = true;
+            Some(self.send("close", Value::Null))
+        };
+        let status = self.wait_exit();
+        assert!(status.success(), "bruster shutdown failed: {status}");
+        if let Some(id) = closing {
+            self.recv(id).expect("close reply");
+        }
+    }
 }
 
 impl Drop for Browser {
     fn drop(&mut self) {
         if std::thread::panicking() {
             let _ = self.child.kill(); // a dead or wedged server must not hang the run
-        } else if !self.closed {
-            let _ = self.call("close", Value::Null);
+            let _ = self.child.wait();
+        } else {
+            self.close();
         }
-        let _ = self.child.wait();
     }
 }
 
@@ -359,6 +417,74 @@ pub fn serve() -> String {
     });
 
     base
+}
+
+/// A page with a /held resource that only completes when the test releases it.
+/// This makes DOM/load/idle ordering independent of runner speed.
+pub struct GatedPage {
+    pub url: String,
+    requested: std::sync::mpsc::Receiver<()>,
+    release: Option<std::sync::mpsc::Sender<()>>,
+}
+
+impl GatedPage {
+    pub fn new(page: &'static str) -> Self {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}/", listener.local_addr().unwrap());
+        let (requested, requests) = std::sync::mpsc::channel();
+        let (release, released) = std::sync::mpsc::channel();
+        let released = std::sync::Arc::new(std::sync::Mutex::new(released));
+        std::thread::spawn(move || {
+            for mut stream in listener.incoming().flatten() {
+                let requested = requested.clone();
+                let released = released.clone();
+                std::thread::spawn(move || {
+                    let mut head = String::new();
+                    if BufReader::new(&stream).read_line(&mut head).is_err() {
+                        return;
+                    }
+                    match head.split_whitespace().nth(1) {
+                        Some("/") => send(&mut stream, "200 OK", "text/html", "", page),
+                        Some("/held") => {
+                            let _ = requested.send(());
+                            if matches!(
+                                released.lock().unwrap().recv_timeout(REPLY_TIMEOUT),
+                                Err(std::sync::mpsc::RecvTimeoutError::Timeout)
+                            ) {
+                                return;
+                            }
+                            send(&mut stream, "200 OK", "text/html", "", OTHER);
+                        }
+                        _ => send(&mut stream, "404 Not Found", "text/plain", "", ""),
+                    }
+                });
+            }
+        });
+        Self {
+            url,
+            requested: requests,
+            release: Some(release),
+        }
+    }
+
+    pub fn wait_requested(&self) {
+        self.requested
+            .recv_timeout(REPLY_TIMEOUT)
+            .expect("held resource was not requested");
+    }
+
+    pub fn release(&mut self) {
+        // Disconnecting also releases subsequent requests (for example a reload).
+        if let Some(release) = self.release.take() {
+            let _ = release.send(());
+        }
+    }
+}
+
+impl Drop for GatedPage {
+    fn drop(&mut self) {
+        self.release();
+    }
 }
 
 fn send(stream: &mut std::net::TcpStream, status: &str, ctype: &str, extra: &str, body: &str) {

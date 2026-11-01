@@ -33,6 +33,23 @@ smoke and edge tests, focused Test Lab fixtures, process cleanup checks, MCP
 launch, and public-site tests. Use `--no-e2e` for local tests, `--no-lab` to omit
 the lab, or `--rounds N` to repeat smoke and edge tests.
 
+CI runs smoke and edge tests **three times on each platform**, with one test at
+a time and `--no-fail-fast`, so a failing edge binary does not hide smoke-test
+failures. Every round must pass; these are repetitions, not retries that erase
+an earlier failure. To reproduce locally:
+
+```sh
+RUST_TEST_THREADS=1 xvfb-run -a tests/run_all.sh --no-e2e --no-lab --rounds 3
+```
+
+Omit `xvfb-run -a` on macOS. Functional tests should assert replies, persisted
+data, and observable page state. Use `GatedPage` in `tests/common/mod.rs` to
+control resource completion when testing DOM/load/idle ordering, and
+`Browser::wait_js` for asynchronous viewport changes. The shared reply/exit
+watchdog catches hangs. Exact deadline-preservation rules belong in unit tests
+that manipulate request state; latency measurements belong in
+[`benchmarks/`](benchmarks/README.md).
+
 Run the focused Test Lab fixtures through JSON lines and MCP:
 
 ```sh

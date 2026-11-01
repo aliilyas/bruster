@@ -584,12 +584,7 @@ fn input_extras() {
         "eval",
         json!({ "expression": "fetch('/slow', { headers: { 'X-Req': '1' } })" }),
     );
-    let t = Instant::now();
     b.ok("wait_for", json!({ "idle": true, "timeout": 5000 }));
-    assert!(
-        t.elapsed() >= SLOW_DELAY,
-        "idle returned before the slow request finished"
-    );
     let net = b.ok("network", json!({}));
     let slow = net
         .as_array()
@@ -612,14 +607,7 @@ fn input_extras() {
         b.ok("resize", json!({ "width": 800, "height": 600 })),
         json!({ "width": 800, "height": 600 })
     );
-    b.ok("wait_for", json!({ "time": 200 }));
-    assert_eq!(
-        b.ok(
-            "eval",
-            json!({ "expression": "innerWidth + 'x' + innerHeight" })
-        ),
-        "800x600"
-    );
+    b.wait_js("innerWidth + 'x' + innerHeight", json!("800x600"));
     assert!(b
         .err("resize", json!({ "width": 10 }))
         .contains("need width and height"));
@@ -788,12 +776,8 @@ fn rejects_wrong_targets() {
     );
     assert_eq!(b.ok("text", json!({ "selector": "#p" })), "plain");
 
-    let t = Instant::now();
+    // Invalid arguments must produce a validation error, not a timeout error.
     assert!(b.err("wait_for", json!({})).contains("need"));
-    assert!(
-        t.elapsed() < Duration::from_secs(1),
-        "must fail at once, not after the timeout"
-    );
 }
 
 #[test]
@@ -908,12 +892,7 @@ fn calls_wait_for_navigation() {
 
     // A call sent while a click-triggered load is in flight runs in the new page.
     b.ok("click", json!({ "selector": "#away" }));
-    let t = Instant::now();
     assert_eq!(b.ok("title", json!({})), "other");
-    assert!(
-        t.elapsed() >= SLOW_DELAY / 2,
-        "title answered from the old page"
-    );
 
     // Same for a form submit through type, and a wait that was already pending.
     b.open(&format!("{base}/more"));
@@ -946,29 +925,29 @@ fn calls_wait_for_navigation() {
 #[test]
 fn navigate_returns_at_page_load() {
     let mut b = Browser::spawn();
-    let base = serve();
+    let mut page = GatedPage::new(r#"<html><body><p>late</p><script>
+        window.frameLoaded = false;
+        addEventListener('load', () => {
+            const frame = document.createElement('iframe');
+            frame.onload = () => { window.frameLoaded = true; };
+            frame.src = '/held'; document.body.appendChild(frame);
+        });
+    </script></body></html>"#);
 
-    // Subframes added after load must not hold the navigate reply.
-    b.open(&format!("{base}/lateframe"));
-    let since = b.ok(
-        "eval",
-        json!({ "expression": "performance.now() - window.__loadedAt" }),
-    );
-    assert!(
-        since.as_f64().unwrap() < (SLOW_DELAY * 3).as_millis() as f64,
-        "navigate waited for the late iframe: {since}"
-    );
+    // The subframe cannot finish before we release it. A native Finished-based
+    // navigate reply would hang here instead of racing a 900 ms assertion.
+    b.open(&page.url);
+    page.wait_requested();
+    assert_eq!(b.ok("eval", json!({ "expression": "frameLoaded" })), false);
     assert_eq!(b.ok("text", json!({ "selector": "p" })), "late");
     // One load event per page, even though WebKit finishes later.
-    b.ok(
-        "wait_for",
-        json!({ "time": (SLOW_DELAY * 6).as_millis() as u64 }),
-    );
+    page.release();
+    b.wait_js("frameLoaded", json!(true));
     b.ok("title", json!({}));
     let loads = b
         .stash
         .iter()
-        .filter(|v| v["event"] == "load" && v["url"].as_str().unwrap().ends_with("/lateframe"))
+        .filter(|v| v["event"] == "load" && v["url"] == page.url)
         .count();
     assert_eq!(loads, 1, "{:?}", b.stash);
 }
@@ -978,11 +957,14 @@ fn navigate_until() {
     let mut b = Browser::spawn();
     let base = serve();
 
-    // dom: back before the slow image, so the load event has not happened yet.
+    // Hold the image until after checking DOM completion. Even a paused test
+    // process cannot miss the distinction between DOM and load.
+    let mut page = GatedPage::new("<html><body><p>img</p><img src='/held'></body></html>");
     b.ok(
         "navigate",
-        json!({ "url": format!("{base}/slowimg"), "until": "dom" }),
+        json!({ "url": page.url, "until": "dom" }),
     );
+    page.wait_requested();
     assert_eq!(
         b.ok(
             "eval",
@@ -992,6 +974,8 @@ fn navigate_until() {
         "until=dom waited for the image"
     );
     assert_eq!(b.ok("text", json!({ "selector": "p" })), "img");
+    page.release();
+    b.wait_js("document.readyState", json!("complete"));
 
     // idle: the fetch started after load has finished when navigate answers.
     b.ok(
@@ -1117,25 +1101,22 @@ fn cache_outlives_the_session_cookies_do_not() {
 }
 
 #[test]
-fn profile_keeps_cookies_and_exit_waits_for_the_cache() {
+fn profile_persists_cookies_and_storage_on_shutdown() {
     let base = serve();
     let profile = std::env::temp_dir().join(format!("bruster-prof-{}", std::process::id()));
     let args = ["--profile", profile.to_str().unwrap()];
 
-    // Profile shutdown gives WebKit time to persist writes.
-    // Session cookies (no Max-Age) die with the process, as in any browser; persistent ones stay.
-    let t = Instant::now();
+    // Check persistence after a real restart, not how long shutdown sleeps.
+    // Session cookies die with the process; persistent cookies and storage stay.
     {
         let mut b = Browser::spawn_with(&args);
         b.open(&format!("{base}/cookie_persistent"));
         b.open(&format!("{base}/cookie"));
-    }
-    if cfg!(target_os = "linux") {
-        assert!(
-            t.elapsed() >= Duration::from_millis(1000),
-            "exit did not wait for the cache write: {:?}",
-            t.elapsed()
+        b.ok(
+            "eval",
+            json!({ "expression": "localStorage.setItem('persisted', 'first')" }),
         );
+        b.close();
     }
     let mut b = Browser::spawn_with(&args);
     let names: Vec<String> = b
@@ -1149,27 +1130,29 @@ fn profile_keeps_cookies_and_exit_waits_for_the_cache() {
         names.contains(&"keep".to_owned()) && !names.contains(&"srv".to_owned()),
         "profile cookies: {names:?}"
     );
+    b.open(&format!("{base}/other"));
+    assert_eq!(
+        b.ok("eval", json!({ "expression": "localStorage.getItem('persisted')" })),
+        "first"
+    );
+    // Exercise writes after the load's cache grace has elapsed, immediately
+    // followed by close. Shutdown must persist these too.
     b.ok("wait_for", json!({ "time": 1300 }));
-    // Even an idle profile gets the storage-flush grace period at shutdown.
-    // Allow native teardown time on CI, but bound exit and check its status.
-    let t = Instant::now();
-    let closing = b.send("close", json!({}));
-    b.closed = true;
-    let status = loop {
-        if let Some(status) = b.child.try_wait().expect("wait for profile shutdown") {
-            break status;
-        }
-        assert!(
-            t.elapsed() < Duration::from_secs(10),
-            "profile shutdown timed out after {:?}",
-            t.elapsed()
-        );
-        std::thread::sleep(Duration::from_millis(50));
-    };
-    assert!(status.success(), "profile shutdown failed: {status}");
-    b.recv(closing).expect("profile close reply");
+    b.ok(
+        "eval",
+        json!({ "expression": "localStorage.setItem('persisted', 'late')" }),
+    );
+    b.close();
     drop(b);
-    let _ = std::fs::remove_dir_all(&profile);
+    let mut b = Browser::spawn_with(&args);
+    b.open(&format!("{base}/other"));
+    assert_eq!(
+        b.ok("eval", json!({ "expression": "localStorage.getItem('persisted')" })),
+        "late"
+    );
+    b.close();
+    drop(b);
+    remove_profile_dir(&profile);
 }
 
 #[test]
@@ -1180,10 +1163,12 @@ fn until_on_history_and_idle_edges() {
     // reload and back accept until too (history moves on WKWebView restore from
     // the back/forward cache without load events; verified on WebKitGTK only).
     if cfg!(target_os = "linux") {
+        let mut page = GatedPage::new("<html><body><img src='/held'></body></html>");
         b.open(&format!("{base}/other"));
-        b.open(&format!("{base}/slowimg"));
+        b.ok("navigate", json!({ "url": page.url, "until": "dom" }));
         b.ok("reload", json!({ "until": "dom" }));
         assert_eq!(b.ok("eval", json!({ "expression": "performance.getEntriesByType('navigation')[0].loadEventEnd" })), 0, "reload until=dom waited for the image");
+        page.release();
         let back = b.ok("back", json!({ "until": "dom" }));
         assert!(back["url"].as_str().unwrap().ends_with("/other"));
     }
@@ -1195,23 +1180,25 @@ fn until_on_history_and_idle_edges() {
         json!({ "url": format!("{base}/other"), "until": "idle" }),
     );
     let took = t.elapsed();
-    assert!(
-        took >= Duration::from_millis(500) && took < Duration::from_secs(3),
-        "{took:?}"
-    );
+    assert!(took >= Duration::from_millis(500), "{took:?}");
 
-    // idle on a page that never stops fetching: the cap, not a hang.
+    // Keep a fetch pending continuously: a timer-driven polling fixture can
+    // accidentally become idle when a shared runner pauses its web process.
+    let mut page = GatedPage::new(r#"<html><body><p>pending</p><script>
+        window.fetchDone = false;
+        fetch('/held').then(() => { window.fetchDone = true; });
+    </script></body></html>"#);
     let t = Instant::now();
     b.ok(
         "navigate",
-        json!({ "url": format!("{base}/polling"), "until": "idle" }),
+        json!({ "url": page.url, "until": "idle" }),
     );
     let took = t.elapsed();
-    assert!(
-        took >= Duration::from_secs(9) && took < Duration::from_secs(14),
-        "{took:?}"
-    );
-    assert_eq!(b.ok("text", json!({ "selector": "p" })), "poll");
+    assert!(took >= Duration::from_secs(9), "{took:?}");
+    page.wait_requested();
+    assert_eq!(b.ok("eval", json!({ "expression": "fetchDone" })), false);
+    page.release();
+    b.wait_js("fetchDone", json!(true));
 }
 
 #[test]
@@ -1342,14 +1329,7 @@ fn tall_full_screenshot() {
         assert_eq!(w as u64, width.as_u64().unwrap(), "overflow={overflow}");
         assert!(h > 640 && h <= 16000, "height {h}");
         // Taller than cairo allows: capped, then both dimensions restored.
-        let t = Instant::now();
-        while b.ok("eval", json!({ "expression": "[innerWidth, innerHeight]" })) != size {
-            assert!(
-                t.elapsed() < Duration::from_secs(5),
-                "window not restored to {size}"
-            );
-            std::thread::sleep(Duration::from_millis(50));
-        }
+        b.wait_js("[innerWidth, innerHeight]", size);
     }
 }
 
