@@ -3,15 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Bruster Benchmark Run #6 · Attempt 1</title>
-  <meta name="description" content="Archived measurement from 2026-10-27T23:15:27.476320+00:00. Compare Bruster, Playwright, Puppeteer, and agent-browser: startup, navigation, memory, runtime footprint, and reliability, with raw data and methodology.">
+  <title>Bruster Benchmark Run #6 · attempt 1</title>
+  <meta name="description" content="Archived measurement from 2026-10-27T23:15:27.476320+00:00. Compare Bruster, Playwright, Puppeteer, agent-browser: startup, navigation, memory, runtime footprint, and reliability, with raw data and methodology.">
   <meta name="robots" content="noindex, follow">
   <link rel="canonical" href="https://aliilyas.github.io/bruster/benchmarks/runs/869249d36768ef3cc6a56b6902a2dadf7b697698-40600226323-1/">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="bruster">
   <meta property="og:locale" content="en_US">
-  <meta property="og:title" content="Bruster Benchmark Run #6 · Attempt 1">
-  <meta property="og:description" content="Archived measurement from 2026-10-27T23:15:27.476320+00:00. Compare Bruster, Playwright, Puppeteer, and agent-browser: startup, navigation, memory, runtime footprint, and reliability, with raw data and methodology.">
+  <meta property="og:title" content="Bruster Benchmark Run #6 · attempt 1">
+  <meta property="og:description" content="Archived measurement from 2026-10-27T23:15:27.476320+00:00. Compare Bruster, Playwright, Puppeteer, agent-browser: startup, navigation, memory, runtime footprint, and reliability, with raw data and methodology.">
   <meta property="og:url" content="https://aliilyas.github.io/bruster/benchmarks/runs/869249d36768ef3cc6a56b6902a2dadf7b697698-40600226323-1/">
   <meta property="og:image" content="https://aliilyas.github.io/bruster/assets/social.png">
   <meta property="og:image:type" content="image/png">
@@ -19,11 +19,11 @@
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="bruster — Browser automation. Native by design. Rust · JSON lines · MCP">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Bruster Benchmark Run #6 · Attempt 1">
-  <meta name="twitter:description" content="Archived measurement from 2026-10-27T23:15:27.476320+00:00. Compare Bruster, Playwright, Puppeteer, and agent-browser: startup, navigation, memory, runtime footprint, and reliability, with raw data and methodology.">
+  <meta name="twitter:title" content="Bruster Benchmark Run #6 · attempt 1">
+  <meta name="twitter:description" content="Archived measurement from 2026-10-27T23:15:27.476320+00:00. Compare Bruster, Playwright, Puppeteer, agent-browser: startup, navigation, memory, runtime footprint, and reliability, with raw data and methodology.">
   <meta name="twitter:image" content="https://aliilyas.github.io/bruster/assets/social.png">
   <meta name="twitter:image:alt" content="bruster — Browser automation. Native by design. Rust · JSON lines · MCP">
-  <script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://aliilyas.github.io/bruster/#website", "name": "bruster", "url": "https://aliilyas.github.io/bruster/", "inLanguage": "en"}, {"@type": "WebPage", "@id": "https://aliilyas.github.io/bruster/benchmarks/runs/869249d36768ef3cc6a56b6902a2dadf7b697698-40600226323-1/#webpage", "url": "https://aliilyas.github.io/bruster/benchmarks/runs/869249d36768ef3cc6a56b6902a2dadf7b697698-40600226323-1/", "name": "Bruster Benchmark Run #6 · Attempt 1", "description": "Archived measurement from 2026-10-27T23:15:27.476320+00:00. Compare Bruster, Playwright, Puppeteer, and agent-browser: startup, navigation, memory, runtime footprint, and reliability, with raw data and methodology.", "inLanguage": "en", "isPartOf": {"@id": "https://aliilyas.github.io/bruster/#website"}}]}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://aliilyas.github.io/bruster/#website", "name": "bruster", "url": "https://aliilyas.github.io/bruster/", "inLanguage": "en"}, {"@type": "WebPage", "@id": "https://aliilyas.github.io/bruster/benchmarks/runs/869249d36768ef3cc6a56b6902a2dadf7b697698-40600226323-1/#webpage", "url": "https://aliilyas.github.io/bruster/benchmarks/runs/869249d36768ef3cc6a56b6902a2dadf7b697698-40600226323-1/", "name": "Bruster Benchmark Run #6 · attempt 1", "description": "Archived measurement from 2026-10-27T23:15:27.476320+00:00. Compare Bruster, Playwright, Puppeteer, agent-browser: startup, navigation, memory, runtime footprint, and reliability, with raw data and methodology.", "inLanguage": "en", "isPartOf": {"@id": "https://aliilyas.github.io/bruster/#website"}}]}</script>
 
   <meta name="theme-color" content="#fafbf9">
   <link rel="icon" type="image/svg+xml" href="/bruster/assets/logo.svg">
@@ -59,8 +59,8 @@
 .benchmark-page .table-scroll { margin: 0; border: 0; border-radius: 0; }
 .benchmark-page .panel.table-scroll { border: 1px solid var(--line); border-radius: 9px; }
 .benchmark-page table { border-collapse: separate; border-spacing: 0; font-variant-numeric: tabular-nums; }
-.results-table { min-width: 1050px; table-layout: fixed; }
-.results-table col:first-child { width: 28%; }
+.results-table { min-width: calc(300px + var(--tool-count, 5) * 150px); table-layout: fixed; }
+.results-table col:first-child { width: 300px; }
 .results-table th, .results-table td { text-align: right; vertical-align: middle; padding: .85rem 1rem; }
 .results-table thead th { padding-block: 1.1rem; font-weight: 600; font-size: .8rem; }
 .results-table thead th span { display: block; }
@@ -123,7 +123,7 @@
   .legend { text-align: left; }
   .environment-grid, .method-grid { grid-template-columns: 1fr; }
   .files { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .results-table { min-width: 920px; }
+  .results-table { min-width: calc(180px + var(--tool-count, 5) * 148px); }
   .results-table col:first-child { width: 180px; }
   .results-table th, .results-table td { padding-inline: .8rem; }
   .history-entry { grid-template-columns: 1fr; gap: .65rem; }
@@ -131,7 +131,7 @@
 }
 @media (max-width: 420px) {
   .files { grid-template-columns: 1fr; }
-  .results-table { min-width: 848px; }
+  .results-table { min-width: calc(148px + var(--tool-count, 5) * 140px); }
   .results-table col:first-child { width: 148px; }
   .detail-list > div { grid-template-columns: 7rem minmax(0, 1fr); }
   .environment-card, .method-card { padding: 1.1rem; }
@@ -166,7 +166,7 @@
   <main class="container benchmark-content" id="main">
 <p class="breadcrumbs"><a href="../../../">bruster</a><span>/</span>Benchmarks</p>
 <p class="eyebrow">Performance, with the context attached</p><h1>Browser benchmarks.</h1>
-<p class="lead">Compare timing, memory, runtime footprint, and reliability across five browser configurations.</p>
+<p class="lead">Compare timing, memory, runtime footprint, and reliability across 5 browser configurations.</p>
 <div class="run-meta">
 <span class="badge badge-blue">Archived measurement</span>
 <time datetime="2026-10-27T23:15:27.476320+00:00">27 Oct 2026 · 23:15 UTC</time>
@@ -185,9 +185,9 @@
 <div class="section-head"><div><h2 id="results-title">Performance results</h2>
 <p>Timings include controller round trips. Lower values mean less time, memory, or disk space.</p></div>
 <div class="legend"><strong>Median</strong><br>[observed min–max]</div></div>
-<p class="scroll-hint">Scroll the table horizontally to compare all five configurations.</p>
+<p class="scroll-hint">Scroll the table horizontally to compare all configurations.</p>
 <div class="panel"><div class="table-scroll" role="region" aria-labelledby="results-title" tabindex="0">
-<table class="results-table"><caption class="sr-only">Performance comparison. Values are medians with observed minimum and maximum beneath, except runtime footprint and failure counts.</caption>
+<table class="results-table" style="--tool-count:5"><caption class="sr-only">Performance comparison. Values are medians with observed minimum and maximum beneath, except runtime footprint and failure counts.</caption>
 <colgroup><col><col><col><col><col><col></colgroup><thead><tr><th scope="col">Metric / unit</th>
 <th scope="col"><span>Bruster</span><span class="engine">WebKitGTK</span></th>
 <th scope="col"><span>Playwright</span><span class="engine">Headless Shell</span></th>
@@ -226,13 +226,13 @@
 <div class="environment-grid"><div class="panel environment-card"><h3>Runner</h3>
 <dl class="detail-list"><div><dt>Operating system</dt><dd>Ubuntu 24.04.5 LTS</dd></div><div><dt>Processor</dt><dd>AMD EPYC 9V45 96-Core Processor</dd></div><div><dt>Visible CPUs</dt><dd>4</dd></div><div><dt>System memory</dt><dd>15.6 GiB</dd></div><div><dt>Runner image</dt><dd>20261026.354.1</dd></div></dl>
 </div><div class="panel environment-card"><h3>Browser runtimes &amp; tools</h3>
-<dl class="detail-list"><div><dt>WebKitGTK</dt><dd>2.52.6</dd></div><div><dt>Playwright</dt><dd>1.64.1</dd></div><div><dt>Puppeteer</dt><dd>25.16.0</dd></div><div><dt>agent-browser</dt><dd>0.40.0</dd></div><div><dt>Chrome</dt><dd>Google Chrome for Testing 156.0.8078.4</dd></div><div><dt>Headless Shell</dt><dd>Google Chrome for Testing 156.0.8078.4</dd></div><div><dt>Node.js</dt><dd>v26.12.1</dd></div></dl>
+<dl class="detail-list"><div><dt>WebKitGTK</dt><dd>2.52.6</dd></div><div><dt>playwright-core</dt><dd>1.64.1</dd></div><div><dt>puppeteer-core</dt><dd>25.16.0</dd></div><div><dt>agent-browser</dt><dd>0.40.0</dd></div><div><dt>Chrome</dt><dd>Google Chrome for Testing 156.0.8078.4</dd></div><div><dt>Headless Shell</dt><dd>Google Chrome for Testing 156.0.8078.4</dd></div><div><dt>Node.js</dt><dd>v26.12.1</dd></div></dl>
 </div></div></section>
 <section class="section" id="method" aria-labelledby="method-title">
 <div class="section-head"><div><h2 id="method-title">How to read these results</h2>
 <p>Measurement conditions, accounting boundaries, and comparison guidance.</p></div></div><div class="method-grid">
 <article class="panel method-card"><h3>Sampling</h3><p>Ten sessions per configuration by default, with rotating order and fresh browser profiles. Values are medians [observed minimum–maximum], not confidence intervals. Startup and first navigation have one sample per session; repeated-operation timings pool all iterations; memory uses the median of three idle readings per session.</p></article>
-<article class="panel method-card"><h3>Startup and workloads</h3><p>Startup ends at the adapter ready event, or after blank-page/viewport setup for agent-browser. The combined launch-to-first-page measurement includes both setup and the first navigation. Xvfb is already running: its startup time is excluded, but its memory is included. 1280×800 viewport; localhost fixtures; no-store HTTP responses; navigation waits for load. OS filesystem caches are not flushed. Identical extraction JavaScript and cross-tool result hashes. Timings include controller round trips; agent-browser includes its per-command native CLI.</p></article>
+<article class="panel method-card"><h3>Startup and workloads</h3><p>Startup includes adapter/daemon/server initialization and blank-page/viewport setup. The combined launch-to-first-page measurement includes both setup and the first navigation. Xvfb is already running: its startup time is excluded, but its memory is included. 1280×800 viewport; localhost fixtures; no-store HTTP responses; navigation waits for load. OS filesystem caches are not flushed. Identical extraction JavaScript and cross-tool result hashes. Timings include controller round trips and per-command CLI launches. These deterministic workloads do not measure LLM inference or token efficiency.</p></article>
 <article class="panel method-card"><h3>Memory and scope</h3><p>Memory covers the complete owned process forest (including detached daemons and helpers), plus Xvfb for Bruster. PSS apportions shared pages; summed RSS double-counts them. Memory is small-page idle usage, not peak usage. Native snapshots have different semantics and are retained in the raw artifacts rather than ranked as equal work. MB = 1,000,000 bytes; MiB = 1,048,576 bytes.</p></article>
 <article class="panel method-card"><h3>Footprint and comparability</h3><p>Installed-file inventories are lower bounds including browser/engine, linked libraries, observed mapped files and Node where required; unobserved OS resources may add more. GitHub-hosted runner hardware and OS packages can change: compare the configurations within a run and inspect provenance before interpreting trends.</p></article>
 </div></section><section class="section" id="reliability" aria-labelledby="reliability-title">

@@ -1,6 +1,17 @@
 [
   {
     "repository": "aliilyas/bruster",
+    "sha": "b016caf60549186f1f843e74b8d68b64649c1944",
+    "harness_sha": "26daa9277daf0b89c53367c91f801549681a5f43",
+    "local_validation": true,
+    "local_id": "20261101T180138Z",
+    "published_utc": "2026-11-01T20:42:31.528401+00:00",
+    "after_workflow_run_number": 29,
+    "evidence_sha256": "91a9a7184e8cead71589296b621d89024943748ee6d1880dbd93b58448e7ffef",
+    "path": "runs/b016caf60549186f1f843e74b8d68b64649c1944-local-20261101T180138Z/"
+  },
+  {
+    "repository": "aliilyas/bruster",
     "sha": "fb694ab4400bd4616525eb89d0dc716c31e2a52e",
     "run_id": 40957570970,
     "run_number": 29,
