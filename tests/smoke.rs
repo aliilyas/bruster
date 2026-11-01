@@ -614,6 +614,107 @@ fn input_extras() {
 }
 
 #[test]
+fn snapshots_and_selectors_keep_nested_root_order() {
+    let mut b = Browser::spawn();
+    let base = serve();
+    b.open(&format!("{base}/other"));
+    b.ok("eval", json!({ "expression": r#"(async () => {
+        document.body.innerHTML = '<button>outside</button><section id="scope"><div id="host"></div><button class="target">root first</button><iframe id="frame"></iframe><button>root last</button></section>';
+        const shadow = document.getElementById('host').attachShadow({mode: 'open'});
+        shadow.innerHTML = '<button class="target">shadow first</button><div id="nested"></div><button>shadow last</button>';
+        shadow.getElementById('nested').attachShadow({mode: 'open'}).innerHTML = '<button>deep shadow</button>';
+        const frame = document.getElementById('frame');
+        await new Promise(resolve => {
+            frame.onload = resolve;
+            frame.srcdoc = '<button class="target">frame first</button><div id="host"></div>';
+        });
+        frame.contentDocument.getElementById('host').attachShadow({mode: 'open'}).innerHTML = '<button>frame shadow</button>';
+    })()"# }));
+    assert_eq!(b.ok("text", json!({ "selector": ".target" })), "root first");
+    assert_eq!(b.ok("count", json!({ "selector": ".target" })), 3);
+
+    let expected = [
+        "root first",
+        "root last",
+        "shadow first",
+        "shadow last",
+        "deep shadow",
+        "frame first",
+        "frame shadow",
+    ];
+    for max in [0, 3, 7, 20] {
+        let snap = b.ok("snapshot", json!({ "selector": "#scope", "max": max }));
+        let elements = snap["elements"].as_array().unwrap();
+        let names: Vec<&str> = elements
+            .iter()
+            .map(|el| el["name"].as_str().unwrap())
+            .collect();
+        assert_eq!(names, expected[..max.min(expected.len())]);
+        assert_eq!(snap.get("truncated").is_some(), max < expected.len());
+        for element in elements {
+            assert_eq!(
+                b.ok("text", json!({ "ref": element["ref"] })),
+                element["name"]
+            );
+        }
+    }
+    let found = b.ok(
+        "find",
+        json!({ "selector": "#scope", "text": "shadow", "max": 3 }),
+    );
+    let names: Vec<&str> = found["elements"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|el| el["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(names, ["shadow first", "shadow last", "deep shadow"]);
+    assert_eq!(found["truncated"], true);
+}
+
+#[test]
+fn snapshot_visibility_with_and_without_native_checks() {
+    let mut b = Browser::spawn();
+    let base = serve();
+    for native in [true, false] {
+        b.open(&format!("{base}/other"));
+        b.ok("eval", json!({ "expression": r#"document.body.innerHTML = `
+            <button>shown</button><button style="opacity:0">transparent</button>
+            <button style="visibility:hidden">hidden</button>
+            <div style="visibility:hidden"><button style="visibility:visible">override</button><button>inherited hidden</button></div>
+            <div style="display:none"><button>display hidden</button></div>
+            <button style="display:contents">no box</button>
+            <div style="display:contents"><button>contents child</button></div>
+            <button aria-label="zero area" style="width:0;height:0;padding:0;border:0;display:block;overflow:hidden">zero area</button>
+            <details><summary>summary</summary><button>closed</button></details>`"# }));
+        if !native {
+            b.ok(
+                "eval",
+                json!({ "expression": "Element.prototype.checkVisibility = undefined" }),
+            );
+        }
+        let snap = b.ok("snapshot", json!({}));
+        let names: Vec<&str> = snap["elements"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|el| el["name"].as_str().unwrap())
+            .collect();
+        assert_eq!(
+            names,
+            [
+                "shown",
+                "transparent",
+                "override",
+                "contents child",
+                "zero area",
+                "summary"
+            ]
+        );
+    }
+}
+
+#[test]
 fn snapshot_reads_plain_text() {
     let mut b = Browser::spawn();
     let base = serve();

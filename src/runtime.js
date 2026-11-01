@@ -226,15 +226,19 @@
   function visible(el) {
     // Opacity-zero targets still receive pointer events. visibility:hidden does
     // not, unless a descendant explicitly overrides the inherited visibility.
-    if (getComputedStyle(el).visibility !== 'visible') return false;
-    if (el.checkVisibility && !el.checkVisibility({ checkVisibilityCSS: true })) return false;
+    const hasVisibilityCheck = !!el.checkVisibility;
+    // The native check covers both CSS visibility and the presence of a layout
+    // box. Avoid two extra style/geometry queries for every snapshot element.
+    if (hasVisibilityCheck) {
+      if (!el.checkVisibility({ checkVisibilityCSS: true })) return false;
+    } else if (getComputedStyle(el).visibility !== 'visible') return false;
     // Older WKWebView versions report layout boxes for closed details content.
     // Only the first summary (and its composed descendants) is rendered there.
     for (let child = el, parent = composedParent(child); parent; child = parent, parent = composedParent(child)) {
       if (parent.tagName === 'DETAILS' && !parent.open
           && child !== [...parent.children].find(node => node.tagName === 'SUMMARY')) return false;
     }
-    return el.getClientRects().length > 0;
+    return hasVisibilityCheck || el.getClientRects().length > 0;
   }
   const describe = (el) => `<${el.tagName.toLowerCase()}${el.id ? '#' + el.id : ''}>`;
 
@@ -260,24 +264,28 @@
   // page, and a NodeList left over from a navigated-away page kept 13 MB per
   // 10k-node document alive until a full GC that never came (measured: 30
   // loads 627 MB settled vs 212 MB with a walker).
-  // ponytail: scans every element per query, fine at agent call rates.
   function* elements(root) {
     const walker = (root.ownerDocument || root).createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
     for (let el = walker.nextNode(); el; el = walker.nextNode()) yield el;
   }
-  function roots(root, out = []) {
-    out.push(root);
-    for (const el of elements(root)) {
-      if (el.shadowRoot) roots(el.shadowRoot, out);
-      else if (el.contentDocument) roots(el.contentDocument, out);
+  function* nodesInRoots(root, whatToShow) {
+    const nested = [];
+    const walker = (root.ownerDocument || root).createTreeWalker(root, whatToShow);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      if (node.nodeType !== TEXT_NODE) {
+        const child = node.shadowRoot || node.contentDocument;
+        if (child) nested.push(child);
+      }
+      yield node;
     }
-    return out;
+    // Keep the existing order: this root first, then embedded roots depth-first.
+    // Discover them during the same walk instead of scanning the whole page
+    // before a selector's first match or a capped snapshot can return.
+    for (const child of nested) yield* nodesInRoots(child, whatToShow);
   }
   // `matches` throws the same error as querySelector on a bad selector.
   function* matching(root, sel) {
-    for (const r of roots(root)) {
-      for (const el of elements(r)) if (el.matches(sel)) yield el;
-    }
+    for (const el of nodesInRoots(root, NodeFilter.SHOW_ELEMENT)) if (el.matches(sel)) yield el;
   }
   const queryAll = (root, sel) => [...matching(root, sel)];
   function query(root, sel) {
@@ -459,15 +467,12 @@
   // has no role but is what the agent needs to read), in document order,
   // through open shadow roots and same-origin frames.
   function* nodes(root) {
-    for (const r of roots(root)) {
-      const walker = (r.ownerDocument || r).createTreeWalker(r, SHOW_ELEMENT_AND_TEXT);
-      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-        if (node.nodeType === TEXT_NODE) {
-          const parent = node.parentElement;
-          if (node.data.trim() && parent && !parent.closest(TEXT_OWNERS)) yield { el: parent, text: node.data };
-        } else if (node.matches(SNAPSHOT_TAGS)) {
-          yield { el: node };
-        }
+    for (const node of nodesInRoots(root, SHOW_ELEMENT_AND_TEXT)) {
+      if (node.nodeType === TEXT_NODE) {
+        const parent = node.parentElement;
+        if (node.data.trim() && parent && !parent.closest(TEXT_OWNERS)) yield { el: parent, text: node.data };
+      } else if (node.matches(SNAPSHOT_TAGS)) {
+        yield { el: node };
       }
     }
   }
