@@ -7,9 +7,10 @@ stable npm releases** of Playwright, Puppeteer, agent-browser, Stagehand,
 browse.sh, Playwright MCP, Cypress, Ui.Vision's MCP bridge, Rustwright,
 Rustwright MCP, Biloba and the MCP client SDK. Transitive dependencies can
 include prereleases selected by those upstream packages; the full lockfile
-records them. Node uses the
-latest release available to `setup-node`. Dependency installs explicitly request
-`@latest` with online metadata; no previous run's lockfile selects versions.
+records them. Node uses the latest stable release from its official release
+index; prereleases are excluded before `setup-node` receives an exact version.
+Dependency installs explicitly request `@latest` with online metadata; no
+previous run's lockfile selects versions.
 
 Full Chrome for Testing and Headless Shell come from the newly resolved
 Playwright release. Playwright's browser manifest determines those builds;

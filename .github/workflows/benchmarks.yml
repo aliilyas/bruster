@@ -74,13 +74,28 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: benchmarks-linux-x86_64
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 'node'
-          check-latest: true
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Resolve latest stable Node.js
+        id: node
+        run: |
+          python3 - <<'PY'
+          import json, os, re, urllib.request
+          with urllib.request.urlopen('https://nodejs.org/dist/index.json', timeout=30) as response:
+              releases = json.load(response)
+          versions = [release['version'][1:] for release in releases
+                      if re.fullmatch(r'v\d+\.\d+\.\d+', release['version'])
+                      and 'linux-x64' in release['files']]
+          version = max(versions, key=lambda value: tuple(map(int, value.split('.'))))
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f'version={version}\n')
+          print(f'Latest stable Node.js: {version}')
+          PY
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ steps.node.outputs.version }}
+          check-latest: true
       - name: Check publication logic
         run: python3 -m unittest discover -s scripts -p 'test_bench_*.py'
       - name: Install runtimes
