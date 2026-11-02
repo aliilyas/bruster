@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 256 256" role="img" aria-label="bruster">
+  <title>Bruster — Relay avatar</title>
+  <desc>The coral b/R mark on warm paper, padded for square and circular profile pictures.</desc>
+  <rect width="256" height="256" fill="#faeee5"/>
+  <g transform="translate(18 18) scale(.86)">
+    <g transform="matrix(1 0 -.1763 1 30 -4)">
+      <path fill="#c6402b" fill-rule="evenodd" d="M40 24H84V80H148C194 80 220 108 220 152C220 196 194 224 148 224H40ZM84 108H136C160 108 176 120 176 140C176 154 168 164 156 168L180 196H144L120 170H112V196H84ZM112 132V148H134C141 148 146 145 146 140C146 135 141 132 134 132Z"/>
+    </g>
+  </g>
+</svg>

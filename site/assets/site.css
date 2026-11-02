@@ -2,8 +2,8 @@
   color-scheme: light;
   --ink: #172c2c;
   --muted: #576866;
-  --accent: #176d63;
-  --accent-hover: #10564e;
+  --accent: #c6402b;
+  --accent-hover: #a53220;
   --line: #dfe5e0;
   --surface: #fff;
   --soft: #f1f5ef;
@@ -43,8 +43,7 @@ ul, ol { padding-left: 1.3rem; }
 .site-header { position: sticky; top: 0; z-index: 20; background: rgb(250 251 249 / 96%); border-bottom: 1px solid var(--line); }
 .header-inner { display: flex; min-height: 80px; align-items: center; justify-content: space-between; gap: 2rem; }
 .brand { display: inline-flex; align-items: center; gap: .6rem; color: var(--ink); font-size: 1.5rem; font-weight: 750; letter-spacing: -.055em; text-decoration: none; white-space: nowrap; }
-.brand img { flex: none; border-radius: 8px; }
-.brand-dot { color: var(--accent); margin-left: -.55rem; }
+.brand img { flex: none; }
 .site-nav { display: flex; align-items: center; gap: 2rem; }
 .site-nav > a { font-size: .84rem; font-weight: 550; text-decoration: none; color: var(--muted); }
 .site-nav > a:hover, .site-nav > a[aria-current="page"] { color: var(--accent); }
