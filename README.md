@@ -1,4 +1,9 @@
-# bruster
+<h1>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/wordmark-dark.svg">
+    <img src="assets/wordmark.svg" alt="bruster" width="320" height="80">
+  </picture>
+</h1>
 
 [![CI](https://github.com/aliilyas/bruster/actions/workflows/ci.yml/badge.svg)](https://github.com/aliilyas/bruster/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/aliilyas/bruster?label=release&color=6ee7f7)](https://github.com/aliilyas/bruster/releases/latest)
