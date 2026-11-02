@@ -19,16 +19,11 @@ full-Chrome configurations use the same executable.
 Ui.Vision's official extension is downloaded from the Chrome Web Store; its
 version, CRX hash and unpacked-manifest change are recorded separately.
 
-## Competitors from Hacker News
+## Competitor coverage
 
-The inventory in [`competitors.json`](competitors.json) covers the story and
-complete public comment tree of [this discussion](https://news.ycombinator.com/item?id=49756671),
-reviewed on 2026-11-01, plus the user-requested Rustwright, Rustwright MCP and
-Biloba additions from separate stories. It records GitHub repositories, individual source
-comments or stories, execution status, and comparison boundaries. Each new measurement
-embeds this inventory in its provenance and renders a coverage table on the
-benchmark page, including tools that are not measured. It is not an exhaustive
-search of all Hacker News submissions.
+[`competitors.json`](competitors.json) defines the comparison inventory,
+execution status, and adapter boundaries. Each measurement embeds the inventory
+in its provenance and renders a coverage table, including unmeasured tools.
 
 | Competitor | GitHub | Benchmark coverage |
 |---|---|---|
@@ -43,21 +38,6 @@ search of all Hacker News submissions.
 | Rustwright | [Skyvern-AI/rustwright](https://github.com/Skyvern-AI/rustwright) | Public Node SDK with in-process Rust engine, full Chrome |
 | Rustwright MCP (requested as “Rust MCP”) | [Rustwright `mcp/`](https://github.com/Skyvern-AI/rustwright/tree/main/mcp) | Actual native Rust MCP server and tools, full Chrome |
 | Biloba | [onsi/biloba](https://github.com/onsi/biloba) | Public TypeScript SDK and Go daemon, full Chrome |
-
-Rustwright's separate HN stories are [48923788](https://news.ycombinator.com/item?id=48923788),
-[48932230](https://news.ycombinator.com/item?id=48932230) and
-[49319583](https://news.ycombinator.com/item?id=49319583); Biloba's is
-[49699819](https://news.ycombinator.com/item?id=49699819). “Rust MCP” was confirmed
-to mean Rustwright's native MCP server in the same repository.
-
-Puppeteer remains an additional baseline from the existing suite; it was not
-named in this thread. Jev/TypeSafe is a **decision model integrated into
-Stagehand**, not another browser. Browserbase is a hosting service. Codex,
-Claude Code, Deep Agents, Mastra, Vercel Eve and Fx are agent harnesses/frameworks. Their
-verified links and source comments are recorded under `related_mentions`.
-Stagehand's integration docs resolve Eve to `vercel/eve` and Fx to
-`vercel-labs/fx`. No authoritative standalone browser repository was identified
-for the Astra computer-use mention; unrelated namesakes are not substituted.
 
 ### Adapter boundaries
 

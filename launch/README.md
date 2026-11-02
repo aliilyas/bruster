@@ -124,12 +124,12 @@ python3 scripts/launch_media.py chart \
 - [r/mcp showcase post](posts/mcp.md)
 - [Claude Code workflow post](posts/claude-code.md)
 - [Cursor: Built for Cursor post](posts/cursor.md)
-- [Hacker News factual notes](posts/hacker-news.md)
-- [Rust technical article outline and sources](posts/rust-notes.md)
+- [Hacker News submission guidelines](https://news.ycombinator.com/newsguidelines.html)
+- [Rust implementation](../src/) and [API reference](../docs/reference.md)
 - [Submission status and links](STATUS.md)
 
-The HN notes are reference material: HN requires human-written submissions and
-forbids automated posting. This Week in Rust requires a human-authored article
+HN requires human-written submissions and forbids automated posting.
+This Week in Rust requires a human-authored article
 and currently does not accept Project/Tooling Updates PRs. Write the personal
 motivation and technical narrative yourself for those channels.
 
