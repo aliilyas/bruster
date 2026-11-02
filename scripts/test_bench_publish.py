@@ -208,8 +208,6 @@ class Reports(unittest.TestCase):
         self.assertIn('https://github.com/bensyverson/sleepyhollow', latest)
         self.assertIn('macos-timing', latest)
         self.assertIn('Rustwright MCP', latest)
-        self.assertIn('https://news.ycombinator.com/item?id=49699819', latest)
-        self.assertIn('HN story', latest)
         record = json.loads((newer / 'measurement.json').read_text())
         self.assertEqual(set(record['summary']), set(LINUX_TOOLS))
         self.assertNotIn('sleepyhollow', record['summary'])

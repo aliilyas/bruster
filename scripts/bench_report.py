@@ -425,24 +425,6 @@ def page(record, history=None, base_url=SITE_URL):
                      f'<td>{failures(s["fault_probe_failures"])}</td><td>{failures(s.get("lifecycle_failures", {}))}</td>'
                      f'<td>{s["recovery_retry_passes"]}</td></tr>')
     parts.append('</tbody></table></div></section>')
-    catalog = m.get('competitors')
-    if catalog:
-        parts.extend(['<section class="section" id="competitors"><h2>Hacker News competitor coverage</h2>',
-                      f'<p><a href="{e(catalog["source"])}">Source discussion</a> · reviewed {e(catalog["reviewed"])}</p>',
-                      f'<p>{e(catalog["scope"])}</p>',
-                      '<div class="panel table-scroll"><table><thead><tr><th>Repository</th><th>Coverage</th><th>Notes</th></tr></thead><tbody>'])
-        for tool in catalog['tools']:
-            coverage = 'Measured in this run' if tool['id'] in tool_labels else tool['status'] if tool['status'] != 'linux' else 'Not selected'
-            comments = ' '.join(f'<a href="https://news.ycombinator.com/item?id={int(id_)}">HN {kind}</a>'
-                                for kind, key in (('comment', 'comments'), ('story', 'stories'))
-                                for id_ in tool.get(key, []))
-            parts.append(f'<tr><th><a href="{e(tool.get("implementation", tool["github"]))}">{e(tool["label"])}</a> {comments}</th>'
-                         f'<td>{e(coverage)}</td><td>{e(tool["notes"])}</td></tr>')
-        parts.append('</tbody></table></div><details><summary>Related agent/model mentions</summary><ul>')
-        for item in catalog.get('related_mentions', []):
-            name = f'<a href="{e(item["github"])}">{e(item["name"])}</a>' if item.get('github') else e(item['name'])
-            parts.append(f'<li>{name}: {e(item["notes"])}</li>')
-        parts.append('</ul></details></section>')
     parts.extend([
                   '<section class="section" id="downloads" aria-labelledby="downloads-title"><div class="section-head"><div>',
                   '<h2 id="downloads-title">Raw data &amp; reproducibility</h2>',
@@ -459,7 +441,7 @@ def page(record, history=None, base_url=SITE_URL):
                       '<p>Workflow runs are ordered by invocation. Local validations follow their recorded workflow boundary. '
                       'Each run retains its own data and environment.</p></div></div>',
                       '<ol class="panel history-list">'])
-        for item in history:
+        for item in history[:10]:
             ctx = item['context']
             latest = '<span class="badge badge-blue">Latest</span>' if record_id(item) == record_id(record) else ''
             date = item['metadata']['finished_utc']
