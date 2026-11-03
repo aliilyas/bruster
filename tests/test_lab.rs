@@ -213,6 +213,7 @@ lab_cases!(
     "ref-clone",
     "ref-find-refresh",
     "snapshot-label-for",
+    "snapshot-labelledby",
     "snapshot-unicode"
 );
 lab_cases!(
@@ -235,13 +236,25 @@ lab_cases!(
     "hit-shadow-descendant",
     "hit-overlay",
     "hit-coordinate",
+    "event-click-order",
     "event-propagation",
-    "key-cancelled-press"
+    "key-cancelled-press",
+    "hover-js"
 );
 lab_cases!(
     shadow_frames_and_uploads,
     "shadow-open",
     "shadow-slots",
+    "shadow-event-click",
+    "shadow-event-hover",
+    "shadow-event-fill",
+    "shadow-event-type",
+    "shadow-event-press",
+    "shadow-event-select",
+    "shadow-event-upload",
+    "shadow-event-stopped",
+    "shadow-key-cancelled",
+    "shadow-label-scope",
     "frame-same-origin",
     "frame-replaced-ref",
     "frame-removed-ref",
