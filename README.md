@@ -14,15 +14,23 @@
 ![Windows](https://img.shields.io/badge/Windows-x86__64-0078D4.svg)
 [![Documentation](https://img.shields.io/badge/docs-%E2%9C%93-6ee7f7.svg)](https://aliilyas.github.io/bruster/)
 
-Native-webview browser automation for agents and scripts. Built in Rust, with
-MCP and JSON-lines interfaces. No Node.js required.
+**Bruster is an open-source Rust browser automation tool and Model Context
+Protocol (MCP) server.** Control native webviews from AI agents, Python scripts,
+or your own test runner through MCP or a JSON-lines API. No Node.js required.
 
 [Documentation](https://aliilyas.github.io/bruster/docs/) ·
+[MCP setup](https://aliilyas.github.io/bruster/mcp/) ·
+[Compare with Playwright](https://aliilyas.github.io/bruster/compare/) ·
 [Benchmarks](https://aliilyas.github.io/bruster/benchmarks/) ·
 [Releases](https://github.com/aliilyas/bruster/releases/latest)
 
 Navigate pages, inspect the DOM, fill forms, take screenshots, and manage tabs
-and persistent sessions on macOS, Linux, and Windows.
+and persistent sessions on macOS (WKWebView), Linux (WebKitGTK), and Windows
+(WebView2). Bruster fits native-webview scripts, focused smoke tests, and
+agent-driven workflows; bring your own assertions and test runner.
+
+For AI tools: [documentation index](https://aliilyas.github.io/bruster/llms.txt) ·
+[full CLI and API reference](https://aliilyas.github.io/bruster/llms-full.txt).
 
 ## Demo
 

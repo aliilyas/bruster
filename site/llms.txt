@@ -1,0 +1,36 @@
+# Bruster
+
+> Bruster is an open-source Rust browser automation tool and Model Context Protocol (MCP) server for AI agents, scripts, and smoke tests. It controls native webviews through JSON lines or MCP over stdio. No Node.js is required.
+
+The documentation is built from Bruster {{version}} source. Bruster is MIT licensed.
+
+Bruster uses WKWebView on macOS, WebKitGTK 4.1 on Linux, and Microsoft Edge WebView2 on Windows. Native runtimes and browser helper processes are separate from the Rust controller; WebView2 is Chromium-based. Linux hidden mode still needs a display or Xvfb. The Docker image includes WebKitGTK and a virtual display for linux/amd64 and linux/arm64.
+
+Use Bruster for navigation, DOM snapshots, form filling, screenshots, tabs, and persistent profiles. Start `bruster --mcp --quiet` for MCP or `bruster --hidden --quiet` for the native JSON-lines protocol. Native requests include `id`, `method`, and optional `params`; match response IDs while handling page events on stdout. Keep stdin open for the session.
+
+Input events are synthetic. Cross-origin iframes and OS-level controls are outside Bruster's scope. Same-origin iframes and open shadow roots are supported. Bruster uses the platform's webview and does not include a test runner, assertions, or Playwright's cross-browser engine selection.
+
+## Documentation
+
+- [Bruster overview]({{url}}): Product overview, installation, use cases, and frequently asked questions.
+- [Installation and getting started]({{url}}docs/): Platform requirements, Docker commands, a Python example, and the browser API.
+- [MCP client setup]({{url}}mcp/): Configurations for Claude Code, Claude Desktop, Cursor, OpenCode, Codex, and VS Code, including Docker and troubleshooting.
+- [CLI and API reference in Markdown]({{url}}docs/reference.md): Complete maintained flags, methods, parameters, results, events, and platform limitations.
+- [Browser automation limitations]({{url}}docs/#limits): Synthetic input, frames, network inspection, screenshots, and hidden-mode behavior.
+
+## Comparison and evidence
+
+- [Bruster vs Playwright and Puppeteer]({{url}}compare/): Interfaces, browser engines, requirements, and guidance on choosing a tool.
+- [Reproducible browser benchmarks]({{url}}benchmarks/): Results with environment, tool versions, methodology, and raw measurements when published. Performance comparisons apply to the recorded workload and configuration; controller binary size is not total runtime footprint.
+- [Benchmark methodology and source]({{repository}}/blob/main/benchmarks/README.md): How the benchmark suite measures startup, navigation, screenshots, process-tree memory, installed runtime files, and reliability.
+
+## Project
+
+- [Source repository]({{repository}}): Rust source, issues, and contribution instructions.
+- [Releases]({{repository}}/releases): Versioned binaries and release notes.
+- [Docker Hub](https://hub.docker.com/r/ilyastmn/bruster): Multi-platform container image.
+- [MIT License]({{repository}}/blob/main/LICENSE): License terms.
+
+## Optional
+
+- [Combined overview and full API reference]({{url}}llms-full.txt): This index followed by the maintained CLI and API reference in one plain-text file.

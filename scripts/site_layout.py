@@ -10,6 +10,17 @@ ROOT = Path(__file__).resolve().parent.parent
 SITE = ROOT / 'site'
 SITE_URL = 'https://aliilyas.github.io/bruster/'
 REPOSITORY = 'https://github.com/aliilyas/bruster'
+SOFTWARE_DESCRIPTION = (
+    'Bruster is an open-source Rust browser automation tool and MCP server. '
+    'Control native webviews on macOS, Linux, and Windows through JSON lines '
+    'or the Model Context Protocol.'
+)
+
+
+def project_version():
+    # Only product-site builds need TOML; the shared Test Lab supports Python 3.10.
+    import tomllib
+    return tomllib.loads((ROOT / 'Cargo.toml').read_text())['package']['version']
 
 
 def site_url(value):
@@ -32,20 +43,37 @@ def render_metadata(title, description, path, *, base_url=SITE_URL, section='',
         '@type': page_type, '@id': canonical + '#webpage', 'url': canonical,
         'name': title, 'description': description, 'inLanguage': 'en',
         'isPartOf': {'@id': base_url + '#website'},
+        'about': {'@id': base_url + '#software'},
     }
     graph = [{
-        '@type': 'WebSite', '@id': base_url + '#website', 'name': 'bruster',
-        'url': base_url, 'inLanguage': 'en',
+        '@type': 'WebSite', '@id': base_url + '#website', 'name': 'Bruster',
+        'alternateName': 'bruster', 'url': base_url, 'inLanguage': 'en',
+        'about': {'@id': base_url + '#software'},
     }, webpage]
     if application:
         webpage['mainEntity'] = {'@id': base_url + '#software'}
         graph.append({
-            '@type': 'SoftwareApplication', '@id': base_url + '#software', 'name': 'bruster',
-            'url': base_url, 'description': description, 'applicationCategory': 'DeveloperApplication',
+            '@type': 'SoftwareApplication', '@id': base_url + '#software', 'name': 'Bruster',
+            'alternateName': 'bruster', 'url': base_url, 'description': SOFTWARE_DESCRIPTION,
+            'applicationCategory': 'DeveloperApplication', 'softwareVersion': project_version(),
             'operatingSystem': 'macOS, Linux, Windows', 'isAccessibleForFree': True,
+            'softwareRequirements': 'WKWebView on macOS; WebKitGTK 4.1 and a display or Xvfb on Linux; '
+                                    'Microsoft Edge WebView2 Runtime on Windows.',
+            'featureList': ['JSON-lines API over stdio', 'Built-in Model Context Protocol (MCP) server',
+                            'DOM snapshots and element references', 'Form interaction and screenshots',
+                            'Browser tabs and persistent profiles'],
             'license': REPOSITORY + '/blob/main/LICENSE', 'downloadUrl': REPOSITORY + '/releases',
-            'sameAs': [REPOSITORY],
+            'sameAs': [REPOSITORY], 'image': base_url + 'assets/social.png',
+            'mainEntityOfPage': {'@id': base_url + '#webpage'},
+            'softwareHelp': {'@id': base_url + 'docs/#webpage'},
+            'subjectOf': {'@id': REPOSITORY + '#source'},
             'offers': {'@type': 'Offer', 'price': '0', 'priceCurrency': 'USD'},
+        })
+        graph.append({
+            '@type': 'SoftwareSourceCode', '@id': REPOSITORY + '#source',
+            'name': 'Bruster source code', 'url': REPOSITORY, 'codeRepository': REPOSITORY,
+            'programmingLanguage': 'Rust', 'license': REPOSITORY + '/blob/main/LICENSE',
+            'targetProduct': {'@id': base_url + '#software'},
         })
     if path and not noindex:
         webpage['breadcrumb'] = {'@id': canonical + '#breadcrumb'}
