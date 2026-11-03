@@ -2,8 +2,10 @@
 import contextlib
 import io
 import json
+import re
 import struct
 import tempfile
+import tomllib
 import unittest
 from html.parser import HTMLParser
 from pathlib import Path
@@ -13,7 +15,7 @@ from xml.etree import ElementTree as ET
 import bench_report
 import site_build
 from lab.build import assemble
-from site_layout import ROOT, SITE
+from site_layout import REPOSITORY, ROOT, SITE
 from test_bench_publish import fixture
 
 
@@ -84,6 +86,21 @@ class SiteBuild(unittest.TestCase):
         documents = {path.relative_to(output).as_posix(): Document(path.read_text())
                      for path in output.rglob('*.html')}
         origin = urlsplit(base_url)
+
+        def assert_link(name, link, page_url):
+            target = urlsplit(urljoin(page_url, link))
+            if (target.scheme, target.netloc) != (origin.scheme, origin.netloc):
+                return
+            self.assertTrue(target.path.startswith(origin.path), f'Escaped project path: {link}')
+            target_name = unquote(target.path[len(origin.path):])
+            target_file = output / target_name
+            if target_file.is_dir():
+                target_file /= 'index.html'
+            self.assertTrue(target_file.is_file(), f'{name}: missing {link}')
+            if target.fragment and target_file.suffix == '.html':
+                resolved = target_file.relative_to(output).as_posix()
+                self.assertIn(unquote(target.fragment), documents[resolved].ids, f'{name}: missing anchor {link}')
+
         titles = []
         for name, document in documents.items():
             with self.subTest(page=name):
@@ -101,21 +118,36 @@ class SiteBuild(unittest.TestCase):
                 webpage = next(node for node in document.schemas[0]['@graph'] if node['@type']=='WebPage')
                 self.assertEqual(webpage['url'],base_url + path)
                 self.assertEqual(webpage['isPartOf'],{'@id':base_url + '#website'})
+                self.assertEqual(webpage['about'], {'@id': base_url + '#software'})
                 self.assertNotIn('{{', (output / name).read_text())
                 for link in document.links:
-                    target = urlsplit(urljoin(base_url + path, link))
-                    if (target.scheme, target.netloc) != (origin.scheme, origin.netloc):
-                        continue
-                    self.assertTrue(target.path.startswith(origin.path), f'Escaped project path: {link}')
-                    target_name = unquote(target.path[len(origin.path):])
-                    target_file = output / target_name
-                    if target_file.is_dir():
-                        target_file /= 'index.html'
-                    self.assertTrue(target_file.is_file(), f'{name}: missing {link}')
-                    if target.fragment and target_file.suffix == '.html':
-                        resolved = target_file.relative_to(output).as_posix()
-                        self.assertIn(unquote(target.fragment), documents[resolved].ids, f'{name}: missing anchor {link}')
+                    assert_link(name, link, base_url + path)
         self.assertEqual(len(titles), len(set(titles)), 'Every page should have its own search title')
+        for name in ('llms.txt', 'llms-full.txt', 'docs/reference.md'):
+            with self.subTest(resource=name):
+                content = (output / name).read_text()
+                self.assertNotIn('{{', content)
+                links = re.findall(r'\]\(([^\s)]+)\)', content)
+                self.assertTrue(links)
+                for link in links:
+                    self.assertIn(urlsplit(link).scheme, ('http', 'https'), f'{name}: non-absolute link {link}')
+                    assert_link(name, link, base_url + name)
+        home_graph = {node['@id']: node for node in documents['index.html'].schemas[0]['@graph']}
+        software = home_graph[base_url + '#software']
+        version = tomllib.loads((ROOT / 'Cargo.toml').read_text())['package']['version']
+        self.assertEqual(software['softwareVersion'], version)
+        self.assertEqual(software['mainEntityOfPage'], {'@id': base_url + '#webpage'})
+        self.assertEqual(software['softwareHelp'], {'@id': base_url + 'docs/#webpage'})
+        source = home_graph[software['subjectOf']['@id']]
+        self.assertEqual(source['codeRepository'], REPOSITORY)
+        self.assertEqual(source['targetProduct'], {'@id': software['@id']})
+        self.assertIn(version, (output / 'llms.txt').read_text())
+        reference = (output / 'docs/reference.md').read_text()
+        # Export the maintained method table verbatim, including escaped pipes and code.
+        source_api = (ROOT / 'docs/reference.md').read_text().split('\n## API\n')[1].split('\n## Events\n')[0]
+        self.assertIn(source_api, reference)
+        self.assertIn(REPOSITORY + '/blob/main/server.json', reference)
+        self.assertTrue((output / 'llms-full.txt').read_text().endswith(reference))
         return documents
 
     def test_project_and_custom_domain_builds_keep_all_links_and_evidence(self):
@@ -167,7 +199,8 @@ class SiteBuild(unittest.TestCase):
                 self.assertEqual(home.count('data-bruster-test-lab'), 1)
                 self.assertIn('Browser automation.<br>', home)
                 self.assertEqual(Document(home).canonical, [base_url])
-                for name in ('docs/index.html', 'benchmarks/latest.json', 'benchmarks/history.json'):
+                for name in ('docs/index.html', 'benchmarks/latest.json', 'benchmarks/history.json',
+                             'llms.txt', 'llms-full.txt', 'docs/reference.md'):
                     self.assertEqual((published / name).read_bytes(), (output / name).read_bytes())
                 original = [item.text for item in ET.parse(output / 'sitemap.xml').findall('.//{*}loc')]
                 locations = [item.text for item in ET.parse(published / 'sitemap.xml').findall('.//{*}loc')]
@@ -180,6 +213,7 @@ class SiteBuild(unittest.TestCase):
                 self.assertEqual(catalog.headings, 1)
                 collection = next(node for node in catalog.schemas[0]['@graph'] if node['@type']=='CollectionPage')
                 self.assertEqual(collection['url'], catalog.canonical[0])
+                self.assertEqual(collection['about'], {'@id': base_url + '#software'})
                 # Every case is discoverable in the initial HTML, without fetching JS or the manifest.
                 for case in manifest['cases']:
                     self.assertIn(case['url'], catalog.links)

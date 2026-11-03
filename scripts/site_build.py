@@ -4,26 +4,25 @@ import argparse
 import html
 import re
 import shutil
-import tomllib
 from datetime import datetime
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import urljoin, urlsplit
 from xml.etree import ElementTree as ET
 
 from bench_report import render_reports
-from site_layout import ROOT, SITE, SITE_URL, render_page, site_url, substitute
+from site_layout import REPOSITORY, ROOT, SITE, SITE_URL, project_version, render_page, site_url, substitute
 
 
 PAGES = (
-    ('', 'Bruster — Native Browser Automation for Scripts & Tests',
-     'Automate native browsers with a small Rust controller. JSON-lines API, built-in MCP, '
-     'and reproducible benchmarks. macOS, Linux, Windows. No Node.js required.', ''),
+    ('', 'Bruster — Rust Browser Automation & MCP Server',
+     'Bruster is an open-source Rust browser automation tool and MCP server for AI agents, '
+     'scripts, and tests. Native webviews on macOS, Linux, and Windows. No Node.js.', ''),
     ('docs/', 'Bruster Docs — Install, Docker, Python & Browser API',
      'Install Bruster or run its Docker image. Automate a browser with Python, JSON lines, '
      'or MCP. Platform setup, container commands, CLI options, and browser API.', 'Docs'),
-    ('mcp/', 'Browser MCP Server Setup — Bruster',
-     'Connect Bruster’s native browser MCP server to OpenCode, Claude Code, Cursor, Codex, '
-     'or VS Code. Native and Docker configurations, browser tools, and troubleshooting.', 'MCP setup'),
+    ('mcp/', 'Bruster Browser MCP Server — Claude Code, Cursor & More',
+     'Connect Bruster’s browser MCP server to Claude Code, Cursor, OpenCode, Codex, or VS Code. '
+     'Copy native and Docker configurations for browser automation over stdio.', 'MCP setup'),
     ('compare/', 'Bruster vs Playwright & Puppeteer — Browser Automation',
      'Compare Bruster, Playwright, and Puppeteer for browser automation and testing: '
      'engines, APIs, runtime requirements, limitations, and reproducible benchmarks.', 'Compare'),
@@ -82,6 +81,28 @@ def write_page(output, path, content):
     target.write_text(content, encoding='utf-8')
 
 
+def write_ai_docs(output, base_url, version):
+    """Publish an AI-readable index and the maintained reference with portable links."""
+    index = substitute((SITE / 'llms.txt').read_text(), {
+        'url': base_url, 'version': version, 'repository': REPOSITORY,
+    })
+    reference = (ROOT / 'docs/reference.md').read_text()
+
+    def resolve_link(match):
+        target = match[2]
+        if target.startswith(SITE_URL):
+            target = base_url + target[len(SITE_URL):]
+        elif not urlsplit(target).scheme and not target.startswith('#'):
+            # Relative reference links refer to repository files, not Pages assets.
+            target = urljoin(REPOSITORY + '/blob/main/docs/', target)
+        return match[1] + target + match[3]
+
+    reference = re.sub(r'(\]\()([^\s)]+)(\))', resolve_link, reference)
+    write_page(output, 'docs/reference.md', reference)
+    write_page(output, 'llms.txt', index)
+    write_page(output, 'llms-full.txt', index + '\n---\n\n' + reference)
+
+
 def build(output, measurements=None, base_url=SITE_URL):
     base_url = site_url(base_url)
     output = output.resolve()
@@ -104,7 +125,8 @@ def build(output, measurements=None, base_url=SITE_URL):
                  'favicon-32.png', 'apple-touch-icon.png'):
         shutil.copyfile(ROOT / 'assets' / name, output / 'assets' / name)
     base = html.escape(urlsplit(base_url).path, quote=True)
-    version = tomllib.loads((ROOT / 'Cargo.toml').read_text())['package']['version']
+    version = project_version()
+    write_ai_docs(output, base_url, version)
     values = {
         'base': base, 'version': 'v' + html.escape(version),
         'api_table': reference_table('API', 'Browser methods, parameters, and results'),

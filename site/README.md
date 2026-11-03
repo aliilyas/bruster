@@ -59,9 +59,12 @@ JavaScript is available.
 The comparison uses the projects' official documentation for capability claims,
 not snippets or third-party performance claims. Production HTML includes unique
 titles/descriptions, self-canonicals, Open Graph and Twitter cards, software/site
-structured data, and breadcrumbs. Historical run pages use `noindex, follow` and
-are excluded from the sitemap; their raw data and links remain available. The
-current benchmark page is indexable once measurements exist.
+structured data, and breadcrumbs. Every page identifies Bruster as its subject;
+the homepage connects the software entity to its Rust source repository, license,
+runtime requirements, documentation, and version from `Cargo.toml`. Historical
+run pages use `noindex, follow` and are excluded from the sitemap; their raw data
+and links remain available. The current benchmark page is indexable once
+measurements exist.
 
 The assembled sitemap also includes the Test Lab catalog, which has its own
 canonical, social metadata, and `CollectionPage` structured data. Its fixture
@@ -78,3 +81,26 @@ For a project site, search engines only honor robots rules at
 `https://aliilyas.github.io/robots.txt`, which belongs to the account-level site.
 This project therefore uses HTML indexing directives and a project sitemap. A
 root-domain build generates `robots.txt` with its sitemap URL automatically.
+
+## AI-readable documentation (GEO)
+
+The build publishes three linked resources for generative-engine optimization:
+
+- `llms.txt`: a concise project description and annotated documentation index,
+  maintained in `site/llms.txt`. Its URLs follow `--base-url`, and its version
+  comes from `Cargo.toml`.
+- `docs/reference.md`: the maintained CLI/API reference from `docs/reference.md`.
+  Repository-relative links become absolute GitHub links, and website links use
+  the deployment's base URL.
+- `llms-full.txt`: the index and full reference combined into one plain-text file.
+
+These files are generated during normal Pages builds and preserved when the Test
+Lab is assembled. Update the source reference rather than a second copy of the API.
+The site footer and documentation link to the index; the index links to the full
+reference and human-readable pages. The homepage also has directly addressable
+answers under `#faq`, including `#what-is-bruster` and `#bruster-vs-playwright`.
+
+Keep facts, runtime requirements, and limitations consistent with the reference.
+Performance claims should link to measured runs and their methodology. These
+resources make the project easier to retrieve and cite; `llms.txt` is an emerging
+convention, not a crawler permission file or a guarantee of search or AI placement.
