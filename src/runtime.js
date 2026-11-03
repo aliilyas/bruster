@@ -363,7 +363,8 @@
     const aria = el.getAttribute('aria-label');
     if (aria) return trunc(aria, NAME_MAX);
     const labelled = el.getAttribute('aria-labelledby');
-    if (labelled) return trunc(el.ownerDocument.getElementById(labelled)?.innerText, NAME_MAX);
+    // ID references stay in the control's tree, even when it is slotted.
+    if (labelled) return trunc(el.getRootNode().getElementById(labelled)?.innerText, NAME_MAX);
     if (el.labels && el.labels.length) return trunc(el.labels[0].innerText, NAME_MAX);
     // An image link is named by its alt. A value is only a name on button-like inputs.
     const img = el.tagName === 'A' && el.querySelector('img[alt]');
@@ -397,13 +398,15 @@
       if (desc && desc.set) desc.set.call(el, value);
       else el.value = value;
     }
-    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
   }
 
   const valueOf = (el) => (el.isContentEditable ? el.textContent : el.value) || '';
 
   function mouse(el, type, x, y) {
-    el.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window, clientX: x, clientY: y }));
+    // Unlike click/over events, mouseenter neither bubbles nor crosses roots.
+    const enter = type === 'mouseenter';
+    el.dispatchEvent(new MouseEvent(type, { bubbles: !enter, cancelable: !enter, composed: !enter, view: window, clientX: x, clientY: y }));
   }
 
   // jQuery `event.which` and React `keyCode === 13` sites need the legacy codes.
@@ -437,7 +440,7 @@
   }
 
   function key(el, type, k) {
-    return el.dispatchEvent(new KeyboardEvent(type, { ...keyInit(k), bubbles: true, cancelable: true }));
+    return el.dispatchEvent(new KeyboardEvent(type, { ...keyInit(k), bubbles: true, cancelable: true, composed: true }));
   }
 
   // One keystroke. A printable key inserts its character into an editable
@@ -697,7 +700,7 @@
       const miss = wanted.find((w) => !options.some((o) => o.value === w || o.text === w));
       if (miss !== undefined) throw new Error(`no option matches '${miss}' in ${describe(el)}`);
       for (const o of options) o.selected = wanted.includes(o.value) || wanted.includes(o.text);
-      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
       el.dispatchEvent(new Event('change', { bubbles: true }));
       return [...el.selectedOptions].map((o) => o.value);
     },
@@ -751,7 +754,7 @@
         dt.items.add(new File([bytes], f.name, { type: f.type }));
       }
       el.files = dt.files;
-      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
       el.dispatchEvent(new Event('change', { bubbles: true }));
       return [...el.files].map((f) => f.name);
     },

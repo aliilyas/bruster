@@ -11,8 +11,8 @@ Last updated: 2026-10-28.
 | r/mcp | Prepared; this environment received Reddit's network-security block | [Post](posts/mcp.md); submit from an accessible browser |
 | Claude Code community | Prepared; Reddit posting blocked here | [Workflow post](posts/claude-code.md) |
 | Cursor community | Prepared; authenticated browser session needed | [Post](posts/cursor.md); Built for Cursor category |
-| Show HN | Human-written text and manual submission required by HN | [Factual notes](posts/hacker-news.md) |
-| r/rust | Technical outline prepared | [Sources and outline](posts/rust-notes.md) |
+| Show HN | Awaiting human-written manual submission | [Submission guidelines](https://news.ycombinator.com/newsguidelines.html) |
+| r/rust | Technical outline prepared | [Implementation sources](../src/) |
 | This Week in Rust | Needs a public human-authored technical article; project-update PRs are closed | [Contributor rules](https://github.com/rust-lang/this-week-in-rust#llm-written-articles) |
 
 The demo and benchmark chart describe different builds: v0.3.2 for the demo,

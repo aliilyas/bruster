@@ -270,13 +270,3 @@ links and coverage counts in its initial HTML; JavaScript adds filters and
 imported results. Only the catalog is included in the sitemap. Generated case
 pages and support HTML use `noindex, follow` to keep synthetic test content out
 of search results.
-
-## Research notes
-
-The test design was informed by the
-[`vercel-labs/agent-browser` test suite at `5801a50`](https://github.com/vercel-labs/agent-browser/tree/5801a50d262a4d3e1a2381996a962b22000d8289).
-Useful patterns included recording event sequences, checking duplicate-label
-and wrong-target behavior, asserting unchanged state after failed actions,
-and inspecting screenshot pixels. These fixtures are authored for Bruster's
-native-engine and synthetic-event contracts; compatibility probes make
-differences such as caret editing and pointer-driven dragging observable.

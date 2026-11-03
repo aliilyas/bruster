@@ -7,3 +7,8 @@ benchmarks/node_modules/
 benchmarks/results/
 __pycache__/
 tests/site/frameworks/node_modules/
+
+# Local research, audit reports and publication notes.
+/research/
+/launch/posts/hacker-news.md
+/launch/posts/rust-notes.md

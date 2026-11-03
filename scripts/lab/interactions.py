@@ -155,6 +155,8 @@ def events_and_files():
 
 
 def composed_trees():
+    shadow_events()
+    shadow_names()
     case('shadow-open', 'Selectors and refs reach open shadow roots', 'Composed trees','<div id="host"></div>',
          [command('snapshot', {'format':'json'}, capture={'ref':"result.elements.find(e=>e.name==='Inside').ref"}),
           command('click', {'ref':'{{ref}}'}), check('__lab.state.clicks',1), command('count',{'selector':'#inside'},expect=1)],
@@ -200,6 +202,96 @@ def composed_trees():
     case('frame-sandbox', 'Opaque sandbox frame does not leak into traversal', 'Composed trees',
          '<iframe sandbox="allow-scripts" title="Sandbox" srcdoc="<button id=opaque>Opaque</button>"></iframe>',
          [command('count',{'selector':'#opaque'},expect=0)])
+
+
+def shadow_events():
+    nested = """
+const outer=host.attachShadow({mode:'open'});
+outer.innerHTML='<div id="inner"></div>';
+const root=outer.getElementById('inner').attachShadow({mode:'open'});
+"""
+    listeners = """
+const target=__lab.target=root.getElementById('target');
+__lab.state.events=[];
+for(const [name,node,capture] of [['capture',document,true],['target',target,false],['root',root,false],['outer',outer,false],['document',document,false]]){
+  for(const type of ['pointerdown','mousedown','pointerup','mouseup','click','pointerover','mouseover','mouseenter','keydown','keypress','keyup','input','change']){
+    node.addEventListener(type,e=>{
+      if(e.isTrusted || e.composedPath()[0]!==target)return;
+      __lab.state.events.push([e.type,name,e.target.id,e.composedPath().filter(n=>n.id).map(n=>n.id),e.composed,e.bubbles,e.cancelable]);
+    },capture);
+  }
+}
+"""
+    for method, html, params, types, observation, value in [
+        ('click', '<button id="target">Click</button>', {},
+         ['pointerdown','mousedown','pointerup','mouseup','click'], None, None),
+        ('hover', '<button id="target">Hover</button>', {},
+         ['pointerover','mouseover','mouseenter'], None, None),
+        ('fill', '<input id="target">', {'value':'shadow'},
+         ['input','change'], '__lab.target.value', 'shadow'),
+        ('type', '<input id="target">', {'text':'x'},
+         ['keydown','keypress','input','keyup'], '__lab.target.value', 'x'),
+        ('press', '<input id="target">', {'key':'x'},
+         ['keydown','input','keyup'], '__lab.target.value', 'x'),
+        ('select', '<select id="target"><option value="a">A</option><option value="b">B</option></select>', {'value':'b'},
+         ['input','change'], '__lab.target.value', 'b'),
+        ('upload', '<input id="target" type="file">', {'paths':['{{textFile}}']},
+         ['input','change'], 'await __lab.target.files[0].text()', 'hello\n'),
+    ]:
+        expected = []
+        for type in types:
+            # UI/input events cross both roots; change and mouseenter stay local.
+            composed = type not in ('change','mouseenter')
+            bubbles = type != 'mouseenter'
+            cancelable = type not in ('input','change','mouseenter')
+            path = ['target','inner','host'] if composed else ['target']
+            deliveries = [('target','target')]
+            if bubbles:
+                deliveries += [('root','target')]
+            if composed:
+                deliveries = [('capture','host')] + deliveries + [('outer','inner'),('document','host')]
+            expected += [[type,where,target,path,composed,bubbles,cancelable] for where,target in deliveries]
+        steps = [command(method, {'selector':'#target',**params}), check('__lab.state.events',expected)]
+        if observation:
+            steps.append(check(observation,value))
+        case('shadow-event-' + method, f'{method} events propagate and retarget across nested roots', 'Composed trees',
+             '<div id="host"></div>', steps, setup=nested+f'root.innerHTML={html!r};'+listeners)
+    case('shadow-event-stopped', 'Stopping a composed click still blocks outer bubble listeners', 'Composed trees',
+         '<div id="host"></div>',
+         [command('click',{'selector':'#target'}),
+          check("__lab.state.events.filter(e=>e[0]==='click').map(e=>[e[1],e[2]])",[['capture','host'],['target','target']])],
+         setup=nested+"root.innerHTML='<button id=target>Click</button>';"+listeners+
+         "target.addEventListener('click',e=>e.stopPropagation())")
+    case('shadow-key-cancelled', 'Document listeners can cancel a shadow control keystroke', 'Composed trees',
+         '<div id="host"></div>',
+         [command('press',{'selector':'#target','key':'x'}),check('__lab.target.value','start'),
+          check("__lab.state.events.filter(e=>e[1]==='document').map(e=>e[0])",['keydown','keyup'])],
+         setup=nested+"root.innerHTML='<input id=target value=start>';"+listeners+
+         "document.addEventListener('keydown',e=>e.preventDefault())")
+
+
+def shadow_names():
+    case('shadow-label-scope', 'Label IDs resolve in each control\'s own tree, including slotted controls', 'Composed trees',
+         '<span id="field-name">Document label</span><input value="document" aria-labelledby="field-name">'
+         '<span id="outside-only">Outside only</span>'
+         '<div id="host"><input id="slotted" slot="field" value="slotted" aria-labelledby="field-name"></div><div id="sibling"></div>',
+         [command('snapshot',{'format':'json'},verify="""
+result.elements.filter(e=>e.role==='textbox').length===6 &&
+[['document','Document label'],['outer','Outer shadow label'],['inner','Inner shadow label'],
+ ['sibling','Sibling label'],['slotted','Document label'],['missing','']].every(([value,name])=>
+ result.elements.some(e=>e.role==='textbox' && e.value===value && e.name===name))
+"""),
+          command('find',{'regex':'^Inner shadow label$','format':'json'},
+                  verify="result.elements.filter(e=>e.role==='textbox').length===1",
+                  capture={'ref':"result.elements.find(e=>e.role==='textbox').ref"}),
+          command('fill',{'ref':'{{ref}}','value':'named correctly'}),
+          check("host.shadowRoot.getElementById('inner').shadowRoot.getElementById('deep').value",'named correctly')],
+         setup="""
+const outer=host.attachShadow({mode:'open'});
+outer.innerHTML='<span id="field-name">Outer shadow label</span><input value="outer" aria-labelledby="field-name"><slot name="field"></slot><div id="inner"></div>';
+outer.getElementById('inner').attachShadow({mode:'open'}).innerHTML='<span id="field-name">Inner shadow label</span><input id="deep" value="inner" aria-labelledby="field-name"><input value="missing" aria-labelledby="outside-only">';
+sibling.attachShadow({mode:'open'}).innerHTML='<span id="field-name">Sibling label</span><input value="sibling" aria-labelledby="field-name">';
+""")
 
 
 def rendering():
