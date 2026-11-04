@@ -21,7 +21,7 @@ The candidate targets these costs, with each stage checked before proceeding:
    was rejected after diagnostic PNGs grew eightfold and inline latency rose.
    Record bytes alongside latency and verify pixels.
 6. **Selectors:** native first-match lookup within each root, preserving root
-   ordering and the walker semantics of `:scope` and escaped selectors. Counting
+   ordering and the walker semantics of `:scope`, `&` and escaped selectors. Counting
    no longer builds an array of every matching node.
 7. **Startup:** opt-in stage tracing identifies engine construction versus
    controller work. Measure launch-to-first-page, including blank-page warmup,

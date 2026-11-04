@@ -684,6 +684,7 @@ fn snapshots_and_selectors_keep_nested_root_order() {
     assert_eq!(b.ok("text", json!({ "selector": ".targ\\65 t" })), "root first");
     assert!(b.err("text", json!({ "selector": ":scope > .target" })).contains("no element matches"));
     assert!(b.err("text", json!({ "selector": ":sco\\70 e > .target" })).contains("no element matches"));
+    b.err("text", json!({ "selector": "& > body" }));
     b.err("text", json!({ "selector": "[broken" }));
 
     let expected = [

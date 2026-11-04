@@ -356,9 +356,9 @@
   }
   function query(root, sel) {
     // Native lookup can stop at an indexed ID/class without visiting the page.
-    // :scope in matches() is relative to each candidate, unlike querySelector;
+    // :scope (and its nesting alias &) in matches() is relative to each candidate;
     // escaped selectors may spell :scope too, so retain the walker for those.
-    if (typeof sel === 'string' && !/\\|:scope\b|:host\b/i.test(sel)) {
+    if (typeof sel === 'string' && !/\\|&|:scope\b|:host\b/i.test(sel)) {
       const select = root.nodeType === 9 ? documentQuery : root.nodeType === 11 ? fragmentQuery : elementQuery;
       const found = select.call(root, sel);
       if (found) return found;
