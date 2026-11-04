@@ -704,6 +704,50 @@ fn network_body_capture_is_bounded_and_preserves_the_response() {
 }
 
 #[test]
+fn repeated_large_fetches_keep_the_page_responsive() {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!("http://{}/large", listener.local_addr().unwrap());
+    const ROUNDS: usize = 32;
+    const SIZE: usize = 16 * 1024 * 1024;
+    let server = std::thread::spawn(move || {
+        let body = vec![b'x'; SIZE];
+        for _ in 0..ROUNDS {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut head = String::new();
+            BufReader::new(&stream).read_line(&mut head).unwrap();
+            write!(stream, "HTTP/1.1 200 OK\r\nAccess-Control-Allow-Origin: *\r\nContent-Type: text/plain\r\nCache-Control: no-store\r\nContent-Length: {SIZE}\r\nConnection: close\r\n\r\n").unwrap();
+            if stream.write_all(&body).is_err() {
+                break;
+            }
+        }
+    });
+    let mut b = Browser::spawn();
+    b.open(&format!("{}/other", serve()));
+    // Allocation pressure can collect stream readers during prefix cleanup.
+    // WebKit's releaseLock() then used to deadlock the entire page, including
+    // subsequent eval/network_request calls (WebKit bug 326046).
+    for _ in 0..ROUNDS {
+        b.ok("network", json!({ "clear": true }));
+        let response = b.ok("eval", json!({ "expression": format!(
+            "fetch({}).then(r => r.arrayBuffer()).then(buffer => {{ const bytes = new Uint8Array(buffer); return [bytes.length, bytes[0], bytes[bytes.length - 1]]; }})", json!(url)
+        ) }));
+        assert_eq!(response, json!([SIZE, b'x', b'x']));
+        let start = Instant::now();
+        loop {
+            let request = b.ok("network_request", json!({ "index": 0 }));
+            if let Some(body) = request.get("body") {
+                assert_eq!(body, &json!("x".repeat(16384)));
+                break;
+            }
+            assert!(start.elapsed() < REPLY_TIMEOUT, "large response prefix missing");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+    server.join().unwrap();
+    assert_eq!(b.ok("eval", json!({ "expression": "21 * 2" })), 42);
+}
+
+#[test]
 fn snapshots_and_selectors_keep_nested_root_order() {
     let mut b = Browser::spawn();
     let base = serve();

@@ -118,7 +118,10 @@
       // Cancel only the cloned tee branch. Awaiting cancellation would wait
       // for the page's branch too, defeating the prefix bound on live streams.
       reader.cancel().catch(() => {});
-      reader.releaseLock();
+      // This private clone is discarded, so its reader need not be unlocked.
+      // releaseLock() can allocate during GC while holding WebKit's stream
+      // mutex, deadlocking the page: https://bugs.webkit.org/show_bug.cgi?id=326046
+      // The cancelled reader and clone can be collected together instead.
     }
   }
 

@@ -50,6 +50,21 @@ log prefix becomes available.
 An additional single-chunk fixture checks BOM handling, split multibyte
 characters and the maximum bytes passed to each decoder call.
 
+### WebKit reader cleanup compatibility
+
+Fresh main validation exposed an intermittent large-fetch timeout. A local
+stress reproduction stopped responding to all page commands; native stacks
+showed garbage collection waiting on the reader's stream lock, matching
+[WebKit bug 326046](https://bugs.webkit.org/show_bug.cgi?id=326046).
+`ReadableStreamDefaultReader.releaseLock()` holds that lock while running an
+allocating JavaScript builtin, whose collector can try to acquire it again.
+
+The logger now cancels its private cloned branch and discards its reader without
+calling `releaseLock()`. Nothing reuses that clone, and the cancelled reader and
+stream can be collected together. The original page response is unaffected.
+A regression repeatedly consumes 32 complete 16 MiB responses, checks their log
+prefixes, and verifies that page commands remain responsive.
+
 ## Verified comparison — 2026-11-04
 
 [Run 41912450834](https://github.com/aliilyas/bruster/actions/runs/41912450834)
