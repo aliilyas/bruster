@@ -1,0 +1,19 @@
+{
+  "name": "bruster-competitor-review",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@browserbasehq/stagehand": "4.3.0",
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "@playwright/mcp": "0.0.84",
+    "agent-browser": "0.41.1",
+    "biloba": "0.21.0",
+    "browse": "0.11.3",
+    "cypress": "16.2.1",
+    "playwright-core": "1.64.1",
+    "puppeteer-core": "25.16.0",
+    "rustwright": "0.3.0",
+    "rustwright-mcp": "0.1.0",
+    "uivision-mcp-bridge": "1.7.20"
+  }
+}
