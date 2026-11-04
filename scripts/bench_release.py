@@ -42,7 +42,7 @@ def main():
     for name in ('baseline', 'candidate', 'output'):
         parser.add_argument('--' + name, type=Path, required=True)
     parser.add_argument('--baseline-tag', default='v0.3.3')
-    parser.add_argument('--candidate-tag', default='v0.3.4')
+    parser.add_argument('--candidate-tag', default='v0.3.5')
     parser.add_argument('--rounds', type=int, default=40)
     args = parser.parse_args()
     if args.rounds < 2:

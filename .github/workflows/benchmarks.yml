@@ -1,5 +1,5 @@
 name: benchmarks
-run-name: Paired published releases v0.3.3 vs v0.3.4
+run-name: Paired published releases v0.3.3 vs v0.3.5
 
 on:
   workflow_dispatch:
@@ -32,7 +32,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          for version in 0.3.3 0.3.4; do
+          for version in 0.3.3 0.3.5; do
             dir="$RUNNER_TEMP/releases/$version"
             mkdir -p "$dir"
             gh release download "v$version" --repo aliilyas/bruster --dir "$dir" \
@@ -45,7 +45,8 @@ jobs:
         run: |
           xvfb-run -a python scripts/bench_release.py \
             --baseline "$RUNNER_TEMP/releases/0.3.3/bruster-0.3.3-x86_64-unknown-linux-gnu/bruster" \
-            --candidate "$RUNNER_TEMP/releases/0.3.4/bruster-0.3.4-x86_64-unknown-linux-gnu/bruster" \
+            --candidate "$RUNNER_TEMP/releases/0.3.5/bruster-0.3.5-x86_64-unknown-linux-gnu/bruster" \
+            --baseline-tag v0.3.3 --candidate-tag v0.3.5 \
             --output "$RUNNER_TEMP/release-comparison" --rounds 40 \
             2>&1 | tee "$RUNNER_TEMP/release-comparison/measurement.log"
           cat "$RUNNER_TEMP/release-comparison/report.md" >> "$GITHUB_STEP_SUMMARY"
@@ -53,7 +54,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: paired-release-v0.3.3-v0.3.4
+          name: paired-release-v0.3.3-v0.3.5
           path: ${{ runner.temp }}/release-comparison/
           retention-days: 90
           if-no-files-found: error
