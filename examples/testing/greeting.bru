@@ -1,0 +1,20 @@
+# Serve this directory: python3 -m http.server 8000 --directory examples/testing
+base_url "http://127.0.0.1:8000"
+timeout 5000
+
+before_each
+  navigate "/"
+end
+
+test "greets a visitor"
+  fill "#name" "Ada"
+  click "button"
+  expect text "#result" "Hello, Ada!"
+  screenshot "greeting.png"
+end
+
+test "starts with an empty greeting"
+  expect title "Greeting demo"
+  expect visible "#name"
+  expect text "#result" ""
+end

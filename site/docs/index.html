@@ -1,5 +1,5 @@
 <main id="main" class="container docs-layout">
-  <aside class="docs-sidebar"><p>Documentation</p><nav aria-label="On this page"><a href="#install">Installation</a><a href="#docker">Docker</a><a href="#quickstart">Quickstart</a><a href="#python">Python example</a><a href="#mcp">MCP setup</a><a href="#usage">CLI options</a><a href="#protocol">Native protocol</a><a href="#api">API reference</a><a href="#events">Page events</a><a href="#limits">Limitations</a><a href="#development">Development</a></nav><nav class="sidebar-external" aria-label="Related guides"><a href="{{base}}compare/">Compare browser tools ↗</a><a href="{{base}}benchmarks/">Live benchmarks ↗</a></nav></aside>
+  <aside class="docs-sidebar"><p>Documentation</p><nav aria-label="On this page"><a href="#install">Installation</a><a href="#docker">Docker</a><a href="#quickstart">Quickstart</a><a href="#testing">UI testing DSL</a><a href="#python">Python example</a><a href="#mcp">MCP setup</a><a href="#usage">CLI options</a><a href="#protocol">Native protocol</a><a href="#api">API reference</a><a href="#events">Page events</a><a href="#limits">Limitations</a><a href="#development">Development</a></nav><nav class="sidebar-external" aria-label="Related guides"><a href="{{base}}compare/">Compare browser tools ↗</a><a href="{{base}}benchmarks/">Live benchmarks ↗</a></nav></aside>
   <div class="docs-content prose">
     <header class="page-intro"><p class="breadcrumbs"><a href="{{base}}">bruster</a><span>/</span>Docs</p><p class="eyebrow">Get up and running</p><h1>Bruster documentation.<br>Native browser automation.</h1><p class="lead">Install Bruster on macOS, Linux, or Windows, or run it with Docker. Control a native webview from Python, any JSON-lines client, or an AI agent using the built-in MCP server.</p><p><a href="{{base}}docs/reference.md">Read the CLI and API reference as Markdown</a> · <a href="{{base}}llms.txt">Documentation index for AI tools</a></p></header>
 
@@ -26,6 +26,17 @@ docker run --rm -i ilyastmn/bruster:latest</code></pre></div>
 {"id":3,"method":"screenshot","params":{"path":"example.png"}}
 {"id":4,"method":"close"}</code></pre></div><p>Responses and page events share stdout. Match responses using <code>id</code>; handle events separately. For example:</p><div class="code-block"><div class="code-toolbar"><span>Example · stdout</span></div><pre tabindex="0"><code>{"event":"load","tab":1,"url":"https://example.com/"}
 {"id":1,"result":{"tab":1,"url":"https://example.com/"}}</code></pre></div><p>Keep stdin open while you use the session. Closing it shuts down the browser, so piping a batch of commands and immediately ending the stream is not a substitute for a request/response client.</p></section>
+
+    <section id="testing" aria-labelledby="testing-title"><h2 id="testing-title">UI tests with the .bru DSL</h2><p>Source builds include a compact test runner. Write one command per line, group steps in named tests, and run <code>bruster test login.bru</code>. Older release binaries may not include this command.</p><div class="code-block"><pre tabindex="0"><code>base_url "http://localhost:3000"
+
+test "opens the dashboard"
+  navigate "/login"
+  fill "#email" "tester@example.com"
+  fill "#password" "test-password"
+  click "button[type=submit]"
+  expect url "/dashboard"
+  expect text "h1" "Dashboard"
+end</code></pre></div><p>Assertions retry until the step deadline. Each test gets a fresh browser and profile; failures retain screenshots, snapshots, and console logs. A JSON report and exit codes support CI. Use <code>before_each</code> for shared setup and <code>--base-url</code> to target another environment.</p><p><a href="{{base}}testing/">Read the UI testing guide</a> · <a href="https://github.com/aliilyas/bruster/blob/main/docs/reference.md#ui-tests">Full DSL reference</a> · <a href="https://github.com/aliilyas/bruster/blob/main/examples/testing/greeting.bru">Try the local greeting example</a></p></section>
 
     <section id="python" aria-labelledby="python-title"><h2 id="python-title">Automate a browser with Python</h2><p>Use the standard library to run a small smoke test. This example waits for matching response IDs, handles errors, checks the page title, and saves a screenshot. It requires the bruster executable on <code>PATH</code>.</p><div class="code-block"><div class="code-toolbar"><span>Python · smoke_test.py</span><button type="button" class="copy-button" data-copy="python-example" aria-label="Copy Python smoke test" hidden>Copy</button></div><pre tabindex="0"><code id="python-example">import json
 import subprocess

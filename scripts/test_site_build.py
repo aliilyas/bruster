@@ -171,7 +171,7 @@ class SiteBuild(unittest.TestCase):
                     self.assertEqual((output / name).read_bytes(), content, 'Published evidence was altered')
             sitemap = ET.parse(output / 'sitemap.xml')
             locations = [item.text for item in sitemap.findall('.//{*}loc')]
-            self.assertEqual(set(locations), {base_url + path for path in ('', 'docs/', 'mcp/', 'compare/', 'benchmarks/')})
+            self.assertEqual(set(locations), {base_url + path for path in ('', 'docs/', 'testing/', 'mcp/', 'compare/', 'benchmarks/')})
             for name, document in documents.items():
                 archived = '/runs/' in name or name == '404.html'
                 self.assertEqual('noindex' in document.meta['robots'], archived)
@@ -202,7 +202,7 @@ class SiteBuild(unittest.TestCase):
                 self.assertEqual(home.count('data-bruster-test-lab'), 1)
                 self.assertIn('Browser automation.<br>', home)
                 self.assertEqual(Document(home).canonical, [base_url])
-                for name in ('docs/index.html', 'benchmarks/latest.json', 'benchmarks/history.json',
+                for name in ('docs/index.html', 'testing/index.html', 'benchmarks/latest.json', 'benchmarks/history.json',
                              'llms.txt', 'llms-full.txt', 'docs/reference.md',
                              *(path.name for path in SITE.glob('google*.html'))):
                     self.assertEqual((published / name).read_bytes(), (output / name).read_bytes())

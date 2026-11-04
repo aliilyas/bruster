@@ -61,7 +61,8 @@ def render_metadata(title, description, path, *, base_url=SITE_URL, section='',
                                     'Microsoft Edge WebView2 Runtime on Windows.',
             'featureList': ['JSON-lines API over stdio', 'Built-in Model Context Protocol (MCP) server',
                             'DOM snapshots and element references', 'Form interaction and screenshots',
-                            'Browser tabs and persistent profiles'],
+                            'Browser tabs and persistent profiles',
+                            '.bru UI test runner with retrying assertions and failure screenshots'],
             'license': REPOSITORY + '/blob/main/LICENSE', 'downloadUrl': REPOSITORY + '/releases',
             'sameAs': [REPOSITORY], 'image': base_url + 'assets/social.png',
             'mainEntityOfPage': {'@id': base_url + '#webpage'},
@@ -97,7 +98,8 @@ def render_page(title, description, path, content, *, base_url=SITE_URL, section
     e = lambda value: html.escape(str(value), quote=True)
     base = urlsplit(base_url).path
     nav = []
-    for name, target in (('Docs', 'docs/'), ('Benchmarks', 'benchmarks/'), ('Compare', 'compare/')):
+    for name, target in (('Docs', 'docs/'), ('Testing', 'testing/'),
+                         ('Benchmarks', 'benchmarks/'), ('Compare', 'compare/')):
         current = ' aria-current="page"' if section == name else ''
         nav.append(f'<a href="{e(base + target)}"{current}>{name}</a>')
     values = {

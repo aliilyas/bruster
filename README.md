@@ -19,6 +19,7 @@ Protocol (MCP) server.** Control native webviews from AI agents, Python scripts,
 or your own test runner through MCP or a JSON-lines API. No Node.js required.
 
 [Documentation](https://aliilyas.github.io/bruster/docs/) ·
+[UI testing](https://aliilyas.github.io/bruster/testing/) ·
 [MCP setup](https://aliilyas.github.io/bruster/mcp/) ·
 [Compare with Playwright](https://aliilyas.github.io/bruster/compare/) ·
 [Benchmarks](https://aliilyas.github.io/bruster/benchmarks/) ·
@@ -27,7 +28,7 @@ or your own test runner through MCP or a JSON-lines API. No Node.js required.
 Navigate pages, inspect the DOM, fill forms, take screenshots, and manage tabs
 and persistent sessions on macOS (WKWebView), Linux (WebKitGTK), and Windows
 (WebView2). Bruster fits native-webview scripts, focused smoke tests, and
-agent-driven workflows; bring your own assertions and test runner.
+agent-driven workflows. Run `.bru` tests with the built-in runner or use your own.
 
 For AI tools: [documentation index](https://aliilyas.github.io/bruster/llms.txt) ·
 [full CLI and API reference](https://aliilyas.github.io/bruster/llms-full.txt).
@@ -103,6 +104,40 @@ Run `bruster`, then send requests on stdin, waiting for each response before the
 
 Responses carry the matching `id`; page events also arrive on stdout.
 [Protocol and API reference](docs/reference.md#protocol).
+
+## UI tests with the .bru DSL
+
+Bruster includes a compact, line-oriented DSL for repeatable UI checks. It handles
+browser startup, waits, assertions, and failure evidence so you can focus on the
+flow being tested. Write a `login.bru` file:
+
+```text
+base_url "http://localhost:3000"
+
+test "opens the dashboard"
+  navigate "/login"
+  fill "#email" "tester@example.com"
+  fill "#password" "test-password"
+  click "button[type=submit]"
+  expect url "/dashboard"
+  expect text "h1" "Dashboard"
+end
+```
+
+Run `bruster test login.bru`. Assertions retry until their deadline; each test
+gets a fresh browser and profile. Failures include source lines, screenshots,
+and page diagnostics. The runner writes a JSON report and returns a nonzero exit
+code on failure. No Node.js or Python is needed to run tests.
+
+Use `before_each` for shared setup and `--base-url` to run the same tests against
+another environment. The time savings are in authoring and debugging tests.
+
+The runner is available in source builds from `main`; older release binaries may
+not include `bruster test` yet.
+
+[UI testing guide](https://aliilyas.github.io/bruster/testing/) ·
+[DSL reference](docs/reference.md#ui-tests) ·
+[Runnable local example](examples/testing/greeting.bru)
 
 ## Limitations
 

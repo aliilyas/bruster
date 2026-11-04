@@ -20,6 +20,9 @@ PAGES = (
     ('docs/', 'Bruster Docs — Install, Docker, Python & Browser API',
      'Install Bruster or run its Docker image. Automate a browser with Python, JSON lines, '
      'or MCP. Platform setup, container commands, CLI options, and browser API.', 'Docs'),
+    ('testing/', 'Bruster UI Testing — The .bru Test DSL',
+     'Write compact browser tests with Bruster’s .bru DSL. Reusable setup, retrying assertions, '
+     'isolated browsers, failure screenshots, JSON reports, and CI exit codes.', 'Testing'),
     ('mcp/', 'Bruster Browser MCP Server — Claude Code, Cursor & More',
      'Connect Bruster’s browser MCP server to Claude Code, Cursor, OpenCode, Codex, or VS Code. '
      'Copy native and Docker configurations for browser automation over stdio.', 'MCP setup'),

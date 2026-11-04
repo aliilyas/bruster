@@ -5,6 +5,10 @@ third-party build dependencies. The API and CLI tables come from
 [`docs/reference.md`](../docs/reference.md), and the displayed controller version
 comes from `Cargo.toml`.
 
+The dedicated UI testing guide lives in `site/testing/index.html` and is published
+at `/testing/`. Keep its examples and feature descriptions aligned with the `.bru`
+grammar in `src/testing/parser.rs` and the full reference in `docs/reference.md`.
+
 ## Local preview
 
 ```sh

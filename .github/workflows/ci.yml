@@ -51,6 +51,12 @@ jobs:
       - name: Unit tests
         run: cargo test --release --locked --target ${{ matrix.target }} --bin bruster
 
+      - name: Test DSL
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then set -- xvfb-run -a; else set --; fi
+          "$@" cargo test --release --locked --target ${{ matrix.target }} --test testing -- --test-threads=1
+
       - name: Startup with an unresponsive desktop portal (Linux)
         if: runner.os == 'Linux'
         run: xvfb-run -a /usr/bin/python3 tests/startup_portal.py target/${{ matrix.target }}/release/bruster

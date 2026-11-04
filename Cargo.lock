@@ -97,6 +97,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tao",
+ "url",
  "webkit2gtk",
  "webview2-com",
  "windows",

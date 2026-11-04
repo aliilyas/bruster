@@ -40,6 +40,7 @@ mod navigation_macos;
 #[cfg(target_os = "windows")]
 mod navigation_windows;
 mod screenshot;
+mod testing;
 mod timing;
 #[cfg(target_os = "linux")]
 mod webkit_compat;
@@ -667,8 +668,11 @@ fn parse_viewport(s: &str) -> Option<(u32, u32)> {
 }
 
 fn main() -> wry::Result<()> {
-    let startup = timing::Span::new("startup_to_ready");
     let args: Vec<String> = std::env::args().collect();
+    if args.get(1).is_some_and(|arg| arg == "test") {
+        std::process::exit(testing::run(&args[2..]));
+    }
+    let startup = timing::Span::new("startup_to_ready");
     let has = |flag: &str| args.iter().any(|a| a == flag);
     ensure_display(&args[1..]);
     mcp::enable(has(MCP_FLAG));

@@ -93,6 +93,141 @@ snapshot refs, scope snapshots with `selector`/`max`, and use `fill_form` for
 multiple fields. `navigate` with `until: "dom"` can finish earlier when the task
 only needs parsed HTML; use `load` or `idle` when those later milestones matter.
 
+## UI tests
+
+Run line-oriented `.bru` files with the built-in test runner.
+The [UI testing guide](https://aliilyas.github.io/bruster/testing/) introduces
+the workflow and includes a runnable example.
+
+```sh
+bruster test login.bru checkout.bru
+bruster test tests/*.bru --base-url http://localhost:3000 --visible
+bruster test --help
+```
+
+The shell expands `*.bru`; pass individual files on shells without glob expansion.
+Start your application's HTTP server before running tests. Linux uses the same
+display/Xvfb setup as browser automation. These commands are available in source
+builds containing the test runner; older release binaries may not include them.
+
+### File syntax
+
+```text
+# Comments start with # outside quoted strings.
+base_url "http://localhost:3000"
+timeout 5000
+
+before_each
+  navigate "/login"
+end
+
+test "opens the dashboard"
+  fill "#email" "tester@example.com"
+  fill "#password" "test-password"
+  click "button[type=submit]"
+  expect url "/dashboard"
+  expect text "h1" "Dashboard"
+  screenshot "dashboard.png"
+end
+```
+
+Each command occupies one line. Indentation is optional. Strings must use double
+quotes, with JSON escapes such as `\"`, `\\`, and `\n`. Quote CSS selectors so
+their `#` is not interpreted as a comment. UTF-8, CRLF, and a leading UTF-8 BOM
+are supported. Test names must be nonempty and unique within a file.
+
+Each file can have one `base_url`, one `timeout`, and one `before_each` block.
+These apply to every test in the file. `before_each` runs in each test's fresh
+browser, immediately before its steps. Blocks end with `end`; nested and empty
+blocks are rejected. All files are parsed and URLs validated before any browser
+starts. Syntax errors include the file and line number.
+
+`navigate` and `expect url` resolve relative URLs against `base_url` using normal
+URL rules: `/login` starts at the origin root; `login` is relative to the base
+path. Absolute HTTP(S) URLs work without a base. CLI values override file settings.
+
+### Test options
+
+| option | effect |
+|---|---|
+| `--base-url URL` | override the base URL in every file |
+| `--timeout MS` | override the per-step deadline; default 5000 ms, range 1–3600000 |
+| `--output DIR` | report parent directory; default `bruster-results` |
+| `--visible` | show browser windows; default is off-screen |
+| `--viewport WxH` | initial viewport, default 1280x800 |
+| `--help`, `-h` | print syntax and options without starting a browser |
+
+### Actions and assertions
+
+| command | meaning |
+|---|---|
+| `navigate "URL"` | navigate and wait for load |
+| `click "selector"`, `hover "selector"` | interact with an element |
+| `fill "selector" "value"` | replace an input's contents |
+| `type "selector" "text"` | type additional text |
+| `press "key"`, `press "selector" "key"` | press a key on the focused or selected element |
+| `select "selector" "value"` | select an option by value or text |
+| `check "selector"`, `uncheck "selector"` | set a checkbox's state |
+| `upload "selector" "file"` | upload one file; relative paths are relative to the `.bru` file |
+| `screenshot "filename.png"` | save a viewport screenshot in this test's artifact directory |
+| `eval "JavaScript"` | execute JavaScript once, awaiting a returned promise |
+| `reload`, `back`, `forward` | navigate browser history |
+| `expect visible "selector"` | wait for an element to be visible |
+| `expect hidden "selector"` | wait for an element to be hidden or absent |
+| `expect attached "selector"` | wait for an element to exist in the document |
+| `expect text "selector" "value"` | exact match against whitespace-normalized element text |
+| `expect contains "selector" "value"` | substring match against that text |
+| `expect title "value"` | exact page title |
+| `expect url "URL"` | exact URL, resolved against the base URL when relative |
+| `expect url_contains "value"` | substring match against the current URL |
+| `expect count "selector" 3` | exact matching-element count; zero is allowed |
+| `expect attr "selector" "name" "value"` | exact attribute string |
+| `expect js "expression"` | expression must evaluate to the boolean `true` |
+
+Assertions retry observations until the step deadline, including when an element
+has not appeared yet. `expect js` expressions should be side-effect free because
+they can run more than once. Actions run once and use Bruster's existing
+actionability waits. A failed step stops its test; later tests still run. Entire
+tests are not retried automatically.
+
+Steps have bounded response waits, browser startup has a 30-second deadline, and
+shutdown has a 5-second deadline. Diagnostic capture has separate, short deadlines
+so a failed test can still produce evidence. Fresh processes and profiles isolate
+cookies, storage, and page state between tests.
+
+### Results and example
+
+Each invocation creates a unique subdirectory of `--output`. `results.json`
+contains pass/fail totals, test names, source files/lines, step durations, errors,
+and artifact paths. Each test has a `test-NNN/` directory with `stderr.log` and
+any requested screenshots. On failure the runner also attempts `failure.png`,
+`snapshot.json`, and `console.json`; capture failures are recorded separately
+without replacing the original error. Temporary browser profiles are cleaned up
+after each test. Screenshot filenames are relative to that test's artifact
+directory; subdirectories are allowed, absolute paths and `..` are rejected.
+
+Exit codes: **0** for all tests passed, **1** for test/browser failures, **2** for
+invalid CLI/files or report setup/write errors. Existing run directories are not
+overwritten.
+
+Try the included example from a source checkout. In one terminal:
+
+```sh
+python3 -m http.server 8000 --directory examples/testing
+```
+
+In another:
+
+```sh
+bruster test examples/testing/greeting.bru
+```
+
+The DSL saves test-authoring and debugging work through reusable setup, assertions,
+and diagnostics. It does not make the browser engine faster or change the native
+webview and synthetic-input limitations. This initial grammar is intentionally
+small: use `eval` and `expect js` for application-specific checks, or the JSON-lines
+API with your own language when you need loops and general-purpose control flow.
+
 ## MCP
 
 With `--mcp`, every native method becomes an MCP tool. Screenshots return as
