@@ -1,8 +1,11 @@
 {
   "server": {
     "name": "bruster",
-    "version": "0.3.2"
+    "version": "0.3.5"
   },
+  "capturedUtc": "2026-11-04T22:16:25.419347+00:00",
+  "sourceRevision": "45ab247049458deabda7c7d4795281184af71119",
+  "fixtureSha256": "37fe524908f4a6ee744d8c6b840f39385d72c40ef462d619beb35373f5f27f20",
   "presentation": "Six actual screenshots, each held for five seconds. Scripted MCP client, not an LLM recording or a timing benchmark.",
   "calls": [
     {
@@ -30,11 +33,11 @@
           "protocolVersion": "2024-11-05",
           "serverInfo": {
             "name": "bruster",
-            "version": "0.3.2"
+            "version": "0.3.5"
           }
         }
       },
-      "elapsed_ms": 691.518
+      "elapsed_ms": 65.618
     },
     {
       "request": {
@@ -1199,7 +1202,7 @@
           ]
         }
       },
-      "elapsed_ms": 2.351
+      "elapsed_ms": 1.538
     },
     {
       "request": {
@@ -1209,7 +1212,7 @@
         "params": {
           "name": "navigate",
           "arguments": {
-            "url": "http://127.0.0.1:43845/"
+            "url": "http://127.0.0.1:39325/"
           }
         }
       },
@@ -1219,13 +1222,13 @@
         "result": {
           "content": [
             {
-              "text": "{\"tab\":1,\"url\":\"http://127.0.0.1:43845/\"}",
+              "text": "{\"tab\":1,\"url\":\"http://127.0.0.1:39325/\"}",
               "type": "text"
             }
           ]
         }
       },
-      "elapsed_ms": 611.516
+      "elapsed_ms": 211.712
     },
     {
       "request": {
@@ -1245,13 +1248,13 @@
             {
               "mimeType": "image/png",
               "type": "image",
-              "image_sha256": "2fdd493aba8460a1a0f615d4493f48def65d90315520d5bae001d84171e457a5",
-              "image_bytes": 37300
+              "image_sha256": "361ddc1fb228fe6be5a38c8c4f2dde8fe08ed1575001ab386131e6eac5103ccf",
+              "image_bytes": 48731
             }
           ]
         }
       },
-      "elapsed_ms": 26.218
+      "elapsed_ms": 19.218
     },
     {
       "request": {
@@ -1260,22 +1263,24 @@
         "method": "tools/call",
         "params": {
           "name": "snapshot",
-          "arguments": {}
+          "arguments": {
+            "selector": "#test-form"
+          }
         }
       },
       "response": {
-        "id": 5,
         "jsonrpc": "2.0",
+        "id": 5,
         "result": {
           "content": [
             {
-              "text": "http://127.0.0.1:43845/\nBruster browser lab\ne1 text \"bruster / browser lab\"\ne2 text \"LOCAL DEMO \u00b7 NO ACCOUNT\"\ne3 heading \"Create a browser smoke test\"\ne4 text \"A small form for trying navigation, snapshots, inputs, and screenshots.\"\ne5 label \"Your name\"\ne6 textbox \"Your name\"\ne7 label \"Project\"\ne8 textbox \"Project\"\ne9 label \"Workflow\"\ne10 combobox \"Workflow\" value=\"navigation\"\ne11 label \"Include screenshots\"\ne12 checkbox \"Include screenshots\" checked=false\ne13 button \"Create smoke test\"\ne14 text \"This fixture runs entirely in your browser. Nothing is sent to a service.\"",
-              "type": "text"
+              "type": "text",
+              "text": "http://127.0.0.1:39325/\nBruster browser lab\ne1 heading \"01 Input\"\ne2 text \"#test-form\"\ne3 label \"Your name #name\"\ne4 textbox \"Your name #name\"\ne5 label \"Project #project\"\ne6 textbox \"Project #project\"\ne7 label \"Workflow #workflow\"\ne8 combobox \"Workflow #workflow\" value=\"navigation\"\ne9 label \"Include screenshots\"\ne10 checkbox \"Include screenshots\" checked=false\ne11 button \"Create smoke test \u21b5\""
             }
           ]
         }
       },
-      "elapsed_ms": 3.987
+      "elapsed_ms": 3.496
     },
     {
       "request": {
@@ -1295,13 +1300,13 @@
             {
               "mimeType": "image/png",
               "type": "image",
-              "image_sha256": "2fdd493aba8460a1a0f615d4493f48def65d90315520d5bae001d84171e457a5",
-              "image_bytes": 37300
+              "image_sha256": "361ddc1fb228fe6be5a38c8c4f2dde8fe08ed1575001ab386131e6eac5103ccf",
+              "image_bytes": 48731
             }
           ]
         }
       },
-      "elapsed_ms": 21.058
+      "elapsed_ms": 12.305
     },
     {
       "request": {
@@ -1325,18 +1330,18 @@
         }
       },
       "response": {
-        "id": 7,
         "jsonrpc": "2.0",
+        "id": 7,
         "result": {
           "content": [
             {
-              "text": "null",
-              "type": "text"
+              "type": "text",
+              "text": "null"
             }
           ]
         }
       },
-      "elapsed_ms": 3.776
+      "elapsed_ms": 3.218
     },
     {
       "request": {
@@ -1356,13 +1361,13 @@
             {
               "mimeType": "image/png",
               "type": "image",
-              "image_sha256": "ad624fc7973cd1d1e88d76f671cbb50a2197f1de94601dd21ca57ada5e1b4f66",
-              "image_bytes": 37556
+              "image_sha256": "d3ebdf45856ea21ed8a462c8f870ff327d457b4d67fed3d909c00003df7da22c",
+              "image_bytes": 49582
             }
           ]
         }
       },
-      "elapsed_ms": 21.617
+      "elapsed_ms": 13.567
     },
     {
       "request": {
@@ -1386,18 +1391,18 @@
         }
       },
       "response": {
-        "id": 9,
         "jsonrpc": "2.0",
+        "id": 9,
         "result": {
           "content": [
             {
-              "text": "null",
-              "type": "text"
+              "type": "text",
+              "text": "null"
             }
           ]
         }
       },
-      "elapsed_ms": 2.592
+      "elapsed_ms": 3.417
     },
     {
       "request": {
@@ -1405,30 +1410,56 @@
         "id": 10,
         "method": "tools/call",
         "params": {
+          "name": "text",
+          "arguments": {
+            "selector": "#payload"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 10,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{ \"name\": \"Ada Lovelace\", \"project\": \"Bruster\", \"workflow\": \"forms\", \"screenshots\": true }"
+            }
+          ]
+        }
+      },
+      "elapsed_ms": 2.424
+    },
+    {
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 11,
+        "method": "tools/call",
+        "params": {
           "name": "screenshot",
           "arguments": {}
         }
       },
       "response": {
-        "id": 10,
+        "id": 11,
         "jsonrpc": "2.0",
         "result": {
           "content": [
             {
               "mimeType": "image/png",
               "type": "image",
-              "image_sha256": "9305fd229b29a5382d796ecdfb608b30cb623a52f50c4d7f561e8b31c68ecd37",
-              "image_bytes": 37511
+              "image_sha256": "4f79af7195cad69abb4de283f73b25a1fbf72d22df0f643f4dae05af1092f1e6",
+              "image_bytes": 48770
             }
           ]
         }
       },
-      "elapsed_ms": 20.8
+      "elapsed_ms": 15.299
     },
     {
       "request": {
         "jsonrpc": "2.0",
-        "id": 11,
+        "id": 12,
         "method": "tools/call",
         "params": {
           "name": "click",
@@ -1438,23 +1469,23 @@
         }
       },
       "response": {
-        "id": 11,
         "jsonrpc": "2.0",
+        "id": 12,
         "result": {
           "content": [
             {
-              "text": "null",
-              "type": "text"
+              "type": "text",
+              "text": "null"
             }
           ]
         }
       },
-      "elapsed_ms": 1.917
+      "elapsed_ms": 2.018
     },
     {
       "request": {
         "jsonrpc": "2.0",
-        "id": 12,
+        "id": 13,
         "method": "tools/call",
         "params": {
           "name": "text",
@@ -1464,44 +1495,18 @@
         }
       },
       "response": {
-        "id": 12,
         "jsonrpc": "2.0",
+        "id": 13,
         "result": {
           "content": [
             {
-              "text": "Smoke test created for Bruster Ada Lovelace \u00b7 Form submission \u00b7 Screenshots: on",
-              "type": "text"
+              "type": "text",
+              "text": "03 / LAST SUBMISSION Smoke test created for Bruster Ada Lovelace \u00b7 Form submission \u00b7 Screenshots: on"
             }
           ]
         }
       },
-      "elapsed_ms": 9.42
-    },
-    {
-      "request": {
-        "jsonrpc": "2.0",
-        "id": 13,
-        "method": "tools/call",
-        "params": {
-          "name": "screenshot",
-          "arguments": {}
-        }
-      },
-      "response": {
-        "id": 13,
-        "jsonrpc": "2.0",
-        "result": {
-          "content": [
-            {
-              "mimeType": "image/png",
-              "type": "image",
-              "image_sha256": "019fabe2142b7a08d95e1c9c9ea1001c33b822612a903e734f3f18dd035e7123",
-              "image_bytes": 46979
-            }
-          ]
-        }
-      },
-      "elapsed_ms": 24.829
+      "elapsed_ms": 7.289
     },
     {
       "request": {
@@ -1521,13 +1526,39 @@
             {
               "mimeType": "image/png",
               "type": "image",
-              "image_sha256": "019fabe2142b7a08d95e1c9c9ea1001c33b822612a903e734f3f18dd035e7123",
-              "image_bytes": 46979
+              "image_sha256": "ff393656c9f9963b4bcae1db7664ea37950d34e31ee359a970a52eddf4420a9f",
+              "image_bytes": 55221
             }
           ]
         }
       },
-      "elapsed_ms": 22.172
+      "elapsed_ms": 12.089
+    },
+    {
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 15,
+        "method": "tools/call",
+        "params": {
+          "name": "screenshot",
+          "arguments": {}
+        }
+      },
+      "response": {
+        "id": 15,
+        "jsonrpc": "2.0",
+        "result": {
+          "content": [
+            {
+              "mimeType": "image/png",
+              "type": "image",
+              "image_sha256": "ff393656c9f9963b4bcae1db7664ea37950d34e31ee359a970a52eddf4420a9f",
+              "image_bytes": 55221
+            }
+          ]
+        }
+      },
+      "elapsed_ms": 12.593
     }
   ]
 }

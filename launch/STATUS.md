@@ -1,6 +1,6 @@
 # Promotion status
 
-Last updated: 2026-10-28.
+Last updated: 2026-11-04.
 
 | Channel | Status | Link / next step |
 |---|---|---|
@@ -15,6 +15,7 @@ Last updated: 2026-10-28.
 | r/rust | Technical outline prepared | [Implementation sources](../src/) |
 | This Week in Rust | Needs a public human-authored technical article; project-update PRs are closed | [Contributor rules](https://github.com/rust-lang/this-week-in-rust#llm-written-articles) |
 
-The demo and benchmark chart describe different builds: v0.3.2 for the demo,
+The demo and benchmark chart describe different builds: source commit
+`45ab24704945` for the refreshed demo,
 commit `852486658ea5` for benchmark run #12. The benchmark chart retains its
 source data and methodology so posts can cite the measured configuration.

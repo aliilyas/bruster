@@ -36,7 +36,7 @@ For AI tools: [documentation index](https://aliilyas.github.io/bruster/llms.txt)
 
 ![Bruster filling a form and taking a screenshot through MCP](launch/assets/demo/demo.gif)
 
-Scripted MCP session. [Try the demo](launch/README.md#try-the-demo).
+Scripted MCP session with real WebKitGTK captures. [Try the demo](launch/README.md#try-the-demo).
 
 ## Install
 

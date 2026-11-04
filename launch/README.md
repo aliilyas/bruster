@@ -9,20 +9,23 @@ MCP Registry name: `io.github.aliilyas/bruster`
 
 ## Media
 
-- [30-second MP4](https://github.com/aliilyas/bruster/releases/download/v0.3.2/bruster-mcp-demo.mp4)
 - [Animated demo](assets/demo/demo.gif)
 - [Final screenshot](assets/demo/frame-06.png)
 - [MCP transcript](assets/demo/transcript.json) (image payloads replaced by hashes and byte counts)
+- [Original v0.3.2 MP4](https://github.com/aliilyas/bruster/releases/download/v0.3.2/bruster-mcp-demo.mp4)
 - [Benchmark chart](assets/benchmark.png) and [the JSON it was generated from](assets/benchmark-data.json)
 
-The demo uses the published **v0.3.2** native executable through its MCP bundle
-on Ubuntu with WebKitGTK/Xvfb. A scripted client navigates a local fixture,
-inspects it, fills fields, checks an option, submits, verifies the resulting
-text, and receives PNG image content. Each actual capture is held for five
-seconds. This is a reproducible protocol demo, not an LLM recording or a timing
-benchmark.
+The GIF and PNG frames use Bruster built from source commit
+[`45ab24704945`](https://github.com/aliilyas/bruster/commit/45ab247049458deabda7c7d4795281184af71119)
+(v0.3.5, including the performance changes merged in `0c2bbcb`) on Ubuntu 24.04 with
+WebKitGTK/Xvfb. A scripted MCP client navigates the local fixture, inspects its
+controls, fills fields, checks an option, verifies the live JSON state, submits,
+checks the resulting text, and receives PNG image content. Each actual capture
+is held for five seconds. This is a reproducible protocol demo, not an LLM
+recording or a timing benchmark. The transcript records the source revision,
+capture timestamp, and fixture hash.
 
-Final media capture: [run 40687424772](https://github.com/aliilyas/bruster/actions/runs/40687424772).
+Native tests and media capture: [run 41922741793](https://github.com/aliilyas/bruster/actions/runs/41922741793).
 
 ## Try the demo
 
@@ -82,17 +85,21 @@ you want the native browser window on screen.
 
 ### Scripted capture
 
-From a checkout, with Pillow installed and Bruster on PATH:
+From a checkout, with Rust, the native build dependencies, and Pillow installed:
 
 ```sh
-python3 scripts/launch_media.py demo --output /tmp/opencode/bruster-demo bruster
+cargo build --release --locked
+python3 scripts/launch_media.py demo --output /tmp/opencode/bruster-demo \
+  --source-revision "$(git rev-parse HEAD)" target/release/bruster
 ```
 
 On a Linux server, prefix this with `xvfb-run -a`. Optional MP4 export needs
 `ffmpeg` or the `imageio-ffmpeg` Python package. The script starts its own local
 fixture server and temporary browser profile; no model or API key is involved.
-The [launch-assets workflow](../.github/workflows/launch-assets.yml) performs the
-same capture and exercises the packaged MCP launcher.
+The [launch-assets workflow](../.github/workflows/launch-assets.yml) builds and
+tests the selected checkout before performing the same capture. Select
+`source: release` and a published `version` to exercise the packaged MCP launcher
+instead.
 
 ## Benchmark chart
 
@@ -108,8 +115,8 @@ show medians. PSS includes browser helper processes and Bruster's Xvfb server.
 The chart includes large-page navigation, where Bruster does not beat every
 configuration. See the complete report for extraction, variability, installed
 runtime files, and fault probes; these are workload-specific results across
-different browser engines. The benchmark commit is newer than the v0.3.2 demo
-binary.
+different browser engines. The chart retains its original benchmark source;
+the refreshed demo uses the source revision listed above.
 
 Regenerate the chart from its checked-in data:
 
