@@ -40,6 +40,9 @@ mod navigation_macos;
 #[cfg(target_os = "windows")]
 mod navigation_windows;
 mod screenshot;
+mod timing;
+#[cfg(target_os = "linux")]
+mod webkit_compat;
 mod window_state;
 
 use screenshot::{Clip, Region};
@@ -664,6 +667,7 @@ fn parse_viewport(s: &str) -> Option<(u32, u32)> {
 }
 
 fn main() -> wry::Result<()> {
+    let startup = timing::Span::new("startup_to_ready");
     let args: Vec<String> = std::env::args().collect();
     let has = |flag: &str| args.iter().any(|a| a == flag);
     ensure_display(&args[1..]);
@@ -715,7 +719,10 @@ fn main() -> wry::Result<()> {
         }
     }
 
-    let event_loop = EventLoopBuilder::<UserEvent>::with_user_event().build();
+    let event_loop = {
+        let _timing = timing::Span::new("event_loop_init");
+        EventLoopBuilder::<UserEvent>::with_user_event().build()
+    };
     spawn_stdin_reader(event_loop.create_proxy());
 
     // Without a profile: the shared cache directory when no other bruster
@@ -745,7 +752,10 @@ fn main() -> wry::Result<()> {
         tabs: HashMap::new(),
         next_tab: 1,
         current: 1,
-        context: WebContext::new(Some(dir)),
+        context: {
+            let _timing = timing::Span::new("web_context_init");
+            WebContext::new(Some(dir))
+        },
         scratch,
         last_load: std::time::Instant::now() - CACHE_FLUSH_DELAY,
         opts,
@@ -763,6 +773,7 @@ fn main() -> wry::Result<()> {
     }
 
     emit(json!({ "event": "ready" }));
+    drop(startup);
 
     event_loop.run(move |event, target, control_flow| {
         *control_flow = ControlFlow::Wait;
@@ -1075,7 +1086,10 @@ impl App {
                 .with_position(tao::dpi::LogicalPosition::new(OFFSCREEN, OFFSCREEN))
                 .with_decorations(false);
         }
-        let window = builder.build(target).expect("window");
+        let window = {
+            let _timing = timing::Span::new("window_init");
+            builder.build(target).expect("window")
+        };
         if !self.opts.hidden {
             self.window_state.state.apply(&window);
         }
@@ -1086,6 +1100,7 @@ impl App {
         if url.is_some() {
             pending.borrow_mut().begin_navigation();
         }
+        let webview_timing = timing::Span::new("webview_init");
         let webview = build_webview(
             &window,
             id,
@@ -1095,6 +1110,7 @@ impl App {
             &self.opts,
             &mut self.context,
         )?;
+        drop(webview_timing);
         #[cfg(target_os = "macos")]
         let navigation =
             navigation_macos::observe(&webview, id, pending.clone(), self.proxy.clone());
@@ -1595,31 +1611,33 @@ fn build_webview(
         .with_initialization_script(color_scheme_script(opts.dark))
         .with_initialization_script(RUNTIME_JS)
         .with_ipc_handler(move |req| {
-            if !mcp::enabled() {
-                if let Ok(body) = serde_json::from_str::<PageReply>(req.body()) {
-                    // Raw JSON may contain whitespace supplied by page code.
-                    // Preserve the one-line protocol even for custom IPC.
-                    if !body.result.get().contains(['\n', '\r']) {
-                        let mut p = ipc_pending.borrow_mut();
-                        if !p.take_page_reply(body.id, Some(body.document), Some(body.attempt)) {
-                            return;
-                        }
-                        if body.navigating && !p.loading {
-                            p.begin_navigation();
-                            p.hinted = Some(body.id);
-                            trace_navigation("hint", tab, &p, "");
-                        }
-                        #[derive(serde::Serialize)]
-                        struct Reply<'a> {
-                            id: u64,
-                            result: &'a serde_json::value::RawValue,
-                        }
+            if let Ok(body) = serde_json::from_str::<PageReply>(req.body()) {
+                // Raw JSON may contain whitespace supplied by page code.
+                // Preserve the one-line protocol even for custom IPC.
+                if !body.result.get().contains(['\n', '\r']) {
+                    let mut p = ipc_pending.borrow_mut();
+                    if !p.take_page_reply(body.id, Some(body.document), Some(body.attempt)) {
+                        return;
+                    }
+                    if body.navigating && !p.loading {
+                        p.begin_navigation();
+                        p.hinted = Some(body.id);
+                        trace_navigation("hint", tab, &p, "");
+                    }
+                    #[derive(serde::Serialize)]
+                    struct Reply<'a> {
+                        id: u64,
+                        result: &'a serde_json::value::RawValue,
+                    }
+                    if mcp::enabled() {
+                        mcp::raw_reply(body.id, body.result);
+                    } else {
                         write_json(&Reply {
                             id: body.id,
                             result: body.result,
                         });
-                        return;
                     }
+                    return;
                 }
             }
             // runtime.js answers with {"id":..,"result":..} or {"id":..,"error":..},
@@ -2254,6 +2272,7 @@ fn trim_webkit(
         inner.connect_draw(|_, _| glib::Propagation::Stop);
     }
     if let Some(s) = inner.settings() {
+        webkit_compat::configure(&s);
         s.set_hardware_acceleration_policy(HardwareAccelerationPolicy::Never);
         s.set_enable_page_cache(false);
         s.set_enable_webgl(false);

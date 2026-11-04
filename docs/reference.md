@@ -79,6 +79,20 @@ Automatic Xvfb launches disable GLX. `BRUSTER_XVFB_ARGS` overrides the server
 arguments (default: `-screen 0 1280x1024x24 -nolisten tcp -extension GLX`). Set
 `BRUSTER_NO_XVFB=1` to prevent automatic Xvfb startup.
 
+### Performance diagnostics
+
+Set `BRUSTER_TRACE_PERF=1` to write startup and screenshot stage timings to
+stderr. Startup separates event-loop, window, WebContext and WebView construction;
+Linux/macOS screenshots separate native capture from PNG conversion/encoding.
+These spans
+can overlap (pixel conversion is part of PNG time). Leave tracing off for latency
+comparisons, and omit `--quiet` when collecting diagnostics.
+
+Keep one process running for a sequence of operations to amortize startup. Reuse
+snapshot refs, scope snapshots with `selector`/`max`, and use `fill_form` for
+multiple fields. `navigate` with `until: "dom"` can finish earlier when the task
+only needs parsed HTML; use `load` or `idle` when those later milestones matter.
+
 ## MCP
 
 With `--mcp`, every native method becomes an MCP tool. Screenshots return as
@@ -159,7 +173,7 @@ supported.
 | `count` | `selector` | number |
 | `wait_for` | `selector`/`ref` + `state?` (visible, attached, hidden), `text`, `textGone`, `url`, `idle`, `time` ms; `timeout?` ms | `null` |
 | `network` | `clear?` | fetch/XHR entries with index, method and status where available, plus resource timing entries |
-| `network_request` | `index` | one entry with `req_headers`, `res_headers`, and `body` (first 16 KB) |
+| `network_request` | `index` | one entry with `req_headers`, `res_headers`, and `body` (up to 16,384 UTF-16 code units) |
 | `console` | `clear?` | `[{level,text,ms}]` console output and uncaught errors |
 | `dialog` | `accept?`, `text?`, `clear?` | dialogs seen. Sets the answer for the next dialogs |
 | `cookies` | none | list |
@@ -178,6 +192,7 @@ supported.
 
 - Input uses synthetic DOM events (`isTrusted` is false). You do not get `:hover` styles, native `<select>` popups, or OS-level shortcuts.
 - Network and console logs are patched in the page and reset on navigation. Network entries for fetch/XHR include status and an index; other resources use performance timings and may lack status or method. The document request is not included. Logs contain no request bodies. Use `--proxy` for real interception.
+- Fetch body prefixes become available when the limit is reached or the response ends. On WebKitGTK 2.52.0–2.52.6, a [streaming compatibility fallback](../benchmarks/optimizations.md#webkitgtk-streaming-compatibility) uses ordinary readers; fetch-response BYOB readers are unavailable.
 - Cross-origin iframes are out of reach. Same-origin iframes and open shadow roots work.
 - Use HTTP(S) URLs for navigation. `data:` and `file:` URLs are unsupported; serve local pages over localhost instead.
 - bruster does not intercept native file choosers. Use `upload` instead of a click on a file input.

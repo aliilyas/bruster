@@ -614,6 +614,96 @@ fn input_extras() {
 }
 
 #[test]
+fn network_body_capture_is_bounded_and_preserves_the_response() {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!("http://{}/stream", listener.local_addr().unwrap());
+    // More than BODY_MAX UTF-16 code units, with EOF held until capture finishes.
+    // A small response also catches WebKit's buffered-stream pull regression.
+    let prefix = "雪😀a".repeat(5000);
+    let whole = prefix.clone() + "tail";
+    let (release, released) = std::sync::mpsc::channel();
+    let server = std::thread::spawn(move || {
+        let (mut stream, _) = listener.accept().unwrap();
+        let mut head = String::new();
+        BufReader::new(&stream).read_line(&mut head).unwrap();
+        write!(stream, "HTTP/1.1 200 OK\r\nAccess-Control-Allow-Origin: *\r\nContent-Type: text/plain\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{prefix}", prefix.len() + 4).unwrap();
+        stream.flush().unwrap();
+        // Only the assertion below can release EOF. Dropping the sender on a
+        // test failure also lets the server exit, without a competing timeout.
+        if released.recv().is_ok() {
+            stream.write_all(b"tail").unwrap();
+        }
+    });
+    let mut b = Browser::spawn();
+    b.open(&format!("{}/other", serve()));
+    b.ok("eval", json!({ "expression": format!("window.bodyDone = false; fetch({}).then(r => r.text()).then(t => {{ window.bodyReceived = t; window.bodyDone = true; }}); true", json!(url)) }));
+    let start = Instant::now();
+    loop {
+        let request = b.ok("network_request", json!({ "index": 0 }));
+        if let Some(body) = request.get("body") {
+            assert_eq!(body, &json!("雪😀a".repeat(4096)));
+            break;
+        }
+        assert!(start.elapsed() < REPLY_TIMEOUT, "prefix waited for end of stream");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert_eq!(b.ok("eval", json!({ "expression": "bodyDone" })), false);
+    release.send(()).unwrap();
+    server.join().unwrap();
+    b.wait_js("bodyDone", json!(true));
+    assert_eq!(b.ok("eval", json!({ "expression": "bodyReceived" })), whole);
+
+    b.ok("network", json!({ "clear": true }));
+    b.ok("eval", json!({ "expression": r#"(async () => {
+        window.decodeSizes = [];
+        const decode = TextDecoder.prototype.decode;
+        TextDecoder.prototype.decode = function(bytes, options) {
+            if (bytes) decodeSizes.push(bytes.byteLength);
+            return decode.call(this, bytes, options);
+        };
+        const clone = Response.prototype.clone;
+        const text = '\ufeff' + '雪😀a'.repeat(100000);
+        // Force a single large chunk, independent of HTTP/engine buffering.
+        Response.prototype.clone = function() {
+            const bytes = new TextEncoder().encode(text);
+            return new Response(new ReadableStream({ start(c) { c.enqueue(bytes); c.close(); } }));
+        };
+        try {
+            if (await (await fetch('data:text/plain,original')).text() !== 'original') throw Error('response changed');
+        } finally {
+            Response.prototype.clone = clone;
+        }
+        return true;
+    })()"# }));
+    let start = Instant::now();
+    loop {
+        let request = b.ok("network_request", json!({ "index": 0 }));
+        if let Some(body) = request.get("body") {
+            assert_eq!(body, &json!("雪😀a".repeat(4096)));
+            break;
+        }
+        assert!(start.elapsed() < REPLY_TIMEOUT, "large chunk prefix missing");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let sizes = b.ok("eval", json!({ "expression": "decodeSizes" }));
+    let sizes = sizes.as_array().unwrap();
+    assert!(!sizes.is_empty());
+    assert!(sizes.iter().all(|size| size.as_u64().unwrap() <= 16384), "unbounded decoding: {sizes:?}");
+
+    b.ok("network", json!({ "clear": true }));
+    let clones = b.ok("eval", json!({ "expression": r#"(async () => {
+        let clones = 0;
+        const clone = Response.prototype.clone;
+        Response.prototype.clone = function() { clones++; return clone.call(this); };
+        for (let i = 0; i < 501; i++) {
+            if (await (await fetch('data:text/plain,ok#' + i)).text() !== 'ok') throw Error('response changed');
+        }
+        return clones;
+    })()"# }));
+    assert_eq!(clones, 500, "full logs must stop cloning responses");
+}
+
+#[test]
 fn snapshots_and_selectors_keep_nested_root_order() {
     let mut b = Browser::spawn();
     let base = serve();
@@ -632,6 +722,11 @@ fn snapshots_and_selectors_keep_nested_root_order() {
     })()"# }));
     assert_eq!(b.ok("text", json!({ "selector": ".target" })), "root first");
     assert_eq!(b.ok("count", json!({ "selector": ".target" })), 3);
+    assert_eq!(b.ok("text", json!({ "selector": ".targ\\65 t" })), "root first");
+    assert!(b.err("text", json!({ "selector": ":scope > .target" })).contains("no element matches"));
+    assert!(b.err("text", json!({ "selector": ":sco\\70 e > .target" })).contains("no element matches"));
+    b.err("text", json!({ "selector": "& > body" }));
+    b.err("text", json!({ "selector": "[broken" }));
 
     let expected = [
         "root first",
@@ -711,6 +806,11 @@ fn snapshot_visibility_with_and_without_native_checks() {
                 "summary"
             ]
         );
+        b.ok("eval", json!({ "expression": "document.querySelector('details').open = true; document.querySelector('details button').textContent = 'opened'; document.querySelector('button').setAttribute('aria-hidden', 'true')" }));
+        let fresh = b.ok("snapshot", json!({}));
+        let names: Vec<&str> = fresh["elements"].as_array().unwrap().iter()
+            .filter_map(|el| el["name"].as_str()).collect();
+        assert!(names.contains(&"opened") && !names.contains(&"shown"), "stale snapshot state: {names:?}");
     }
 }
 
@@ -1730,10 +1830,9 @@ fn speaks_mcp() {
         "{snap}"
     );
     let snap = rpc(call(json!("sj"), "snapshot", json!({ "format": "json" })));
-    assert!(snap["result"]["content"][0]["text"]
-        .as_str()
-        .unwrap()
-        .starts_with("{\"elements\""));
+    let snap: Value = serde_json::from_str(snap["result"]["content"][0]["text"].as_str().unwrap()).unwrap();
+    assert_eq!(snap["title"], "smoke");
+    assert!(!snap["elements"].as_array().unwrap().is_empty());
 
     // Screenshots are image content, null results remain distinguishable.
     let shot = rpc(call(json!(5), "screenshot", json!({})));

@@ -1,5 +1,9 @@
 # Continuous browser comparisons
 
+For same-tool optimization experiments, see
+[`optimizations.md`](optimizations.md): paired v0.3.5/candidate workloads through
+both JSONL and MCP, including dynamic waits, large responses and screenshot pixels.
+
 [`benchmarks.yml`](../.github/workflows/benchmarks.yml) runs after every push to
 `main` (including merged, squashed and rebased PRs), and through **Run workflow**
 on `main`. Each run builds that exact Bruster commit and resolves the **latest
