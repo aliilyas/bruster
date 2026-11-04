@@ -56,9 +56,11 @@ jobs:
           rustc -Vv > "$RUNNER_TEMP/performance/rustc.txt"
           if [ "$RUNNER_OS" = Linux ]; then dpkg-query -W > "$RUNNER_TEMP/performance/packages.txt"; fi
           git worktree add --detach "$RUNNER_TEMP/performance-baseline" "$BASELINE"
-          export CARGO_TARGET_DIR="$GITHUB_WORKSPACE/target"
-          cargo build --release --locked --manifest-path "$RUNNER_TEMP/performance-baseline/Cargo.toml"
-          cp target/release/bruster "$RUNNER_TEMP/baseline-bruster"
+          # Same-name/path-shaped packages can share Cargo fingerprints even
+          # across worktrees. Never build different sources into one target dir.
+          CARGO_TARGET_DIR="$RUNNER_TEMP/performance-baseline-target" \
+            cargo build --release --locked --manifest-path "$RUNNER_TEMP/performance-baseline/Cargo.toml"
+          cp "$RUNNER_TEMP/performance-baseline-target/release/bruster" "$RUNNER_TEMP/baseline-bruster"
           cargo build --release --locked
           cp target/release/bruster "$RUNNER_TEMP/candidate-bruster"
       - name: Native correctness checks
@@ -66,7 +68,9 @@ jobs:
           cargo test --release --locked --bin bruster
           if [ "$RUNNER_OS" = Linux ]; then set -- xvfb-run -a; else set --; fi
           "$@" cargo test --release --locked --no-fail-fast --test smoke --test edge -- --test-threads=1
-          "$@" python3 scripts/test_lab.py run --binary target/release/bruster --transport both --case 'screenshot-*' --output "$RUNNER_TEMP/performance/pixel-checks"
+          "$@" python3 scripts/test_lab.py run --binary target/release/bruster --transport both --case 'screenshot-*' \
+            --site-dir "$RUNNER_TEMP/performance/pixel-fixtures" --output "$RUNNER_TEMP/performance/pixel-checks"
+          cmp target/release/bruster "$RUNNER_TEMP/candidate-bruster"
       - name: Alternating JSONL and MCP workloads
         run: |
           if [ "$RUNNER_OS" = Linux ]; then set -- xvfb-run -a; else set --; fi

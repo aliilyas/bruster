@@ -53,7 +53,10 @@ characters and the maximum bytes passed to each decoder call.
 ## Reproduce
 
 Build baseline and candidate with the same Rust toolchain and release flags,
-freeze both executables, then on an otherwise idle Linux runner:
+using **separate Cargo target directories**, then freeze both executables. Cargo
+can reuse stale artifacts across same-name worktrees sharing a target directory;
+the workflow isolates the baseline build and checks that the measured candidate
+matches the correctness-tested executable. On an otherwise idle Linux runner:
 
 ```sh
 xvfb-run -a python3 scripts/bench_optimizations.py \
