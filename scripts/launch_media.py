@@ -6,6 +6,7 @@ The demo is a scripted MCP client, with screenshots held for five seconds each.
 """
 import argparse
 import base64
+from datetime import datetime, timezone
 from functools import partial
 import hashlib
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -106,30 +107,33 @@ def screenshot(client, path):
         assert image.width >= 800 and image.height >= 600, image.size
 
 
-def demo_frame(page_path, number, heading, command, response, version, response_title='Actual response'):
-    image = Image.new('RGB', (1280, 800), BG)
+def demo_frame(page_path, number, heading, command, response, version, response_title='Actual response', source_revision=None):
+    bg, panel, fg, muted, accent, line = '#1b1c19', '#22231f', '#e5e3d6', '#aaa99b', '#dfb775', '#45463d'
+    image = Image.new('RGB', (1280, 800), bg)
     draw = ImageDraw.Draw(image)
-    draw.text((24, 18), 'bruster', font=font(30, bold=True), fill=ACCENT)
-    draw.text((170, 27), f'Native-webview browser automation  /  v{version}', font=font(20), fill=FG)
-    draw.text((24, 68), f'{number}/6  {heading}', font=font(23, bold=True), fill=FG)
+    draw.text((24, 18), 'bruster', font=font(30, bold=True, mono=True), fill=accent)
+    source = f' / {source_revision[:12]}' if source_revision else ''
+    draw.text((180, 27), f'native browser lab / v{version}{source}', font=font(18, mono=True), fill=muted)
+    draw.line((24, 60, 1256, 60), fill=line)
+    draw.text((24, 76), f'{number:02}/06  {heading}', font=font(21, bold=True, mono=True), fill=fg)
     with Image.open(page_path) as page:
         page = page.convert('RGB')
         page.thumbnail((840, 620), Image.Resampling.LANCZOS)
         image.paste(page, (20, 116))
-    draw.rounded_rectangle((868, 116, 1260, 740), radius=12, fill=PANEL)
-    draw.text((886, 137), 'MCP  /  stdio', font=font(19, bold=True), fill=ACCENT)
+    draw.rectangle((868, 116, 1260, 740), fill=panel, outline=line)
+    draw.text((886, 137), 'MCP / stdio', font=font(18, bold=True, mono=True), fill=accent)
     y = 180
     for line in textwrap.wrap(command, 34):
-        draw.text((886, y), line, font=font(17, mono=True), fill=FG)
+        draw.text((886, y), line, font=font(17, mono=True), fill=fg)
         y += 25
-    draw.text((886, y + 20), response_title, font=font(17, bold=True), fill=ACCENT)
-    draw.text((24, 765), 'Scripted MCP client · actual WebKitGTK captures · 5 s per step; not a speed test', font=font(17), fill=MUTED)
+    draw.text((886, y + 20), response_title, font=font(17, bold=True, mono=True), fill=accent)
+    draw.text((24, 765), 'Scripted MCP client / real WebKitGTK captures / 5 s per step / not a speed test', font=font(16, mono=True), fill=muted)
     y += 58
     for source in response.splitlines():
         for line in textwrap.wrap(source, 36) or ['']:
             if y > 702:
                 return image
-            draw.text((886, y), line, font=font(16, mono=True), fill=MUTED)
+            draw.text((886, y), line, font=font(16, mono=True), fill=muted)
             y += 23
     return image
 
@@ -160,28 +164,30 @@ def demo(args):
                 def capture(number, heading, command, response, response_title='Actual response'):
                     page = out / f'page-{number:02}.png'
                     screenshot(client, page)
-                    frame = demo_frame(page, number, heading, command, response, version, response_title)
+                    frame = demo_frame(page, number, heading, command, response, version, response_title, args.source_revision)
                     frame.save(out / f'frame-{number:02}.png')
                     frames.append(frame)
 
                 url = f'http://127.0.0.1:{server.server_port}/'
                 result = client.tool('navigate', url=url)
-                capture(1, 'Navigate to a local web app', 'navigate({url: localhost})', text(result))
-                result = client.tool('snapshot')
-                capture(2, 'Read the page and its controls', 'snapshot()', text(result))
+                capture(1, 'Open the local fixture', 'navigate({url: localhost})', text(result))
+                result = client.tool('snapshot', selector='#test-form')
+                capture(2, 'Inspect the form controls', 'snapshot({selector: "#test-form"})', text(result))
                 fields = [{'selector': '#name', 'value': 'Ada Lovelace'}, {'selector': '#project', 'value': 'Bruster'}]
                 result = client.tool('fill_form', fields=fields)
-                capture(3, 'Fill the form', 'fill_form(name="Ada Lovelace", project="Bruster")', text(result))
+                capture(3, 'Fill the text inputs', 'fill_form(name="Ada Lovelace", project="Bruster")', text(result))
                 fields = [{'selector': '#workflow', 'value': 'forms'}, {'selector': '#screenshots', 'value': True}]
                 result = client.tool('fill_form', fields=fields)
-                capture(4, 'Select a workflow and check an option', 'fill_form(workflow="forms", screenshots=true)', text(result))
+                preview = json.loads(text(client.tool('text', selector='#payload')))
+                assert preview == {'name': 'Ada Lovelace', 'project': 'Bruster', 'workflow': 'forms', 'screenshots': True}, preview
+                capture(4, 'Select the workflow and enable screenshots', 'fill_form(workflow="forms", screenshots=true)', text(result))
                 client.tool('click', selector='button[type=submit]')
                 result = client.tool('text', selector='#result')
                 confirmed = text(result)
                 assert 'Smoke test created for Bruster' in confirmed
                 assert 'Ada Lovelace' in confirmed and 'Screenshots: on' in confirmed
-                capture(5, 'Submit and verify the result', 'click(button); text(#result)', confirmed)
-                capture(6, 'Return a native PNG through MCP', 'screenshot()', 'MCP image content\nimage/png\n\nForm submission verified.\nNo Node.js runtime needed.', 'Verified capture')
+                capture(5, 'Submit and check #result', 'click(button); text(#result)', confirmed)
+                capture(6, 'Capture the native browser', 'screenshot()', 'MCP image content\nimage/png\n\nForm submission verified.\nLive JSON state verified.', 'Verified capture')
             finally:
                 client.stop()
     finally:
@@ -200,7 +206,14 @@ def demo(args):
         subprocess.run([ffmpeg, '-y', '-loglevel', 'error', '-framerate', '1/5', '-i', str(out / 'frame-%02d.png'),
                         '-t', '30', '-r', '24', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-movflags', '+faststart',
                         str(out / 'demo.mp4')], check=True)
-    (out / 'transcript.json').write_text(json.dumps({'server': info['serverInfo'], 'presentation': 'Six actual screenshots, each held for five seconds. Scripted MCP client, not an LLM recording or a timing benchmark.', 'calls': log}, indent=2) + '\n')
+    (out / 'transcript.json').write_text(json.dumps({
+        'server': info['serverInfo'],
+        'capturedUtc': datetime.now(timezone.utc).isoformat(),
+        'sourceRevision': args.source_revision,
+        'fixtureSha256': hashlib.sha256((ROOT / 'examples/launch-demo/index.html').read_bytes()).hexdigest(),
+        'presentation': 'Six actual screenshots, each held for five seconds. Scripted MCP client, not an LLM recording or a timing benchmark.',
+        'calls': log,
+    }, indent=2) + '\n')
     print(f'PASS: MCP form workflow verified; media written to {out}')
 
 
@@ -250,6 +263,7 @@ def main():
     commands = parser.add_subparsers(dest='mode', required=True)
     capture = commands.add_parser('demo')
     capture.add_argument('--output', type=Path, required=True)
+    capture.add_argument('--source-revision', help='Source commit of the Bruster executable being recorded')
     capture.add_argument('command', nargs=argparse.REMAINDER, help='Bruster executable (and optional launcher); put it last')
     plot = commands.add_parser('chart')
     plot.add_argument('--input', type=Path, required=True)
