@@ -38,12 +38,15 @@
     .field-label { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
     .field-label code { color: var(--muted); font-size: 10px; }
     input[type=text], select { width: 100%; min-width: 0; margin: 6px 0 14px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 0; background: var(--bg); color: var(--text); font: inherit; font-size: 13px; }
+    select { appearance: none; -webkit-appearance: none; padding-right: 32px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='m2 2 4 4 4-4' fill='none' stroke='%23aaa99b' stroke-width='1.5'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; }
     input::placeholder { color: #8f9084; opacity: 1; }
     input, select { accent-color: var(--accent); }
     input:hover, select:hover { border-color: var(--muted); }
     :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
     .check { display: flex; gap: 9px; align-items: center; width: fit-content; min-height: 30px; margin-bottom: 12px; cursor: pointer; }
-    .check input { width: 15px; height: 15px; margin: 0; }
+    .check input { appearance: none; -webkit-appearance: none; display: grid; place-content: center; width: 15px; height: 15px; margin: 0; border: 1px solid var(--muted); border-radius: 0; background: var(--bg); }
+    .check input:checked { border-color: var(--accent); background: var(--accent); }
+    .check input:checked::after { content: ""; width: 7px; height: 4px; margin-top: -2px; border-left: 2px solid var(--bg); border-bottom: 2px solid var(--bg); transform: rotate(-45deg); }
     button { display: inline-flex; align-items: center; gap: 24px; padding: 9px 12px; border: 1px solid var(--accent); border-radius: 0; background: var(--accent); color: var(--bg); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
     button:hover { background: #edc78b; border-color: #edc78b; }
     button:active { background: #cba266; }
@@ -85,7 +88,7 @@
     </div>
     <div class="workbench">
       <form id="test-form">
-        <div class="panel-heading"><h2><span>01</span>Input</h2><code>#test-form</code></div>
+        <div class="panel-heading"><h2><span>01</span> Input</h2><code>#test-form</code></div>
         <div class="fields">
           <div class="row">
             <label><span class="field-label">Your name <code aria-hidden="true">#name</code></span><input id="name" name="name" type="text" placeholder="Ada Lovelace" required></label>
@@ -103,7 +106,7 @@
         </div>
       </form>
       <aside class="inspector" aria-labelledby="payload-title">
-        <div class="panel-heading"><h2 id="payload-title"><span>02</span>Form state</h2><code>live / json</code></div>
+        <div class="panel-heading"><h2 id="payload-title"><span>02</span> Form state</h2><code>live / json</code></div>
         <pre><code id="payload">{
   "name": "",
   "project": "",
