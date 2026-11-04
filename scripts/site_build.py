@@ -121,6 +121,8 @@ def build(output, measurements=None, base_url=SITE_URL):
             shutil.copyfile(measurements / 'CNAME', output / 'CNAME')
     history = render_reports(output / 'benchmarks', base_url=base_url)
     shutil.copytree(SITE / 'assets', output / 'assets', dirs_exist_ok=True)
+    for verification in SITE.glob('google*.html'):
+        shutil.copyfile(verification, output / verification.name)
     for name in ('logo.svg', 'wordmark.svg', 'favicon.svg', 'favicon.ico',
                  'favicon-32.png', 'apple-touch-icon.png'):
         shutil.copyfile(ROOT / 'assets' / name, output / 'assets' / name)

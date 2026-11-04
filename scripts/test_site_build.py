@@ -83,8 +83,11 @@ class SiteBuild(unittest.TestCase):
             return site_build.build(output, measurements, base_url)
 
     def assert_site_links(self, output, base_url):
+        verifications = {path.name: path.read_bytes() for path in SITE.glob('google*.html')}
+        for name, content in verifications.items():
+            self.assertEqual((output / name).read_bytes(), content, 'Verification file was altered')
         documents = {path.relative_to(output).as_posix(): Document(path.read_text())
-                     for path in output.rglob('*.html')}
+                     for path in output.rglob('*.html') if path.relative_to(output).as_posix() not in verifications}
         origin = urlsplit(base_url)
 
         def assert_link(name, link, page_url):
@@ -200,7 +203,8 @@ class SiteBuild(unittest.TestCase):
                 self.assertIn('Browser automation.<br>', home)
                 self.assertEqual(Document(home).canonical, [base_url])
                 for name in ('docs/index.html', 'benchmarks/latest.json', 'benchmarks/history.json',
-                             'llms.txt', 'llms-full.txt', 'docs/reference.md'):
+                             'llms.txt', 'llms-full.txt', 'docs/reference.md',
+                             *(path.name for path in SITE.glob('google*.html'))):
                     self.assertEqual((published / name).read_bytes(), (output / name).read_bytes())
                 original = [item.text for item in ET.parse(output / 'sitemap.xml').findall('.//{*}loc')]
                 locations = [item.text for item in ET.parse(published / 'sitemap.xml').findall('.//{*}loc')]

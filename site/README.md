@@ -77,6 +77,9 @@ The sitemap is at `https://aliilyas.github.io/bruster/sitemap.xml`. Submit it in
 verified Google Search Console URL-prefix property and Bing Webmaster Tools after
 deployment. Verification requires the site owner's account.
 
+Google verification files matching `site/google*.html` are copied verbatim to the
+published site root. Keep them in place after ownership verification succeeds.
+
 For a project site, search engines only honor robots rules at
 `https://aliilyas.github.io/robots.txt`, which belongs to the account-level site.
 This project therefore uses HTML indexing directives and a project sitemap. A
