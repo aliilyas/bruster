@@ -654,6 +654,43 @@ fn network_body_capture_is_bounded_and_preserves_the_response() {
     assert_eq!(b.ok("eval", json!({ "expression": "bodyReceived" })), whole);
 
     b.ok("network", json!({ "clear": true }));
+    b.ok("eval", json!({ "expression": r#"(async () => {
+        window.decodeSizes = [];
+        const decode = TextDecoder.prototype.decode;
+        TextDecoder.prototype.decode = function(bytes, options) {
+            if (bytes) decodeSizes.push(bytes.byteLength);
+            return decode.call(this, bytes, options);
+        };
+        const clone = Response.prototype.clone;
+        const text = '\ufeff' + '雪😀a'.repeat(100000);
+        // Force a single large chunk, independent of HTTP/engine buffering.
+        Response.prototype.clone = function() {
+            const bytes = new TextEncoder().encode(text);
+            return new Response(new ReadableStream({ start(c) { c.enqueue(bytes); c.close(); } }));
+        };
+        try {
+            if (await (await fetch('data:text/plain,original')).text() !== 'original') throw Error('response changed');
+        } finally {
+            Response.prototype.clone = clone;
+        }
+        return true;
+    })()"# }));
+    let start = Instant::now();
+    loop {
+        let request = b.ok("network_request", json!({ "index": 0 }));
+        if let Some(body) = request.get("body") {
+            assert_eq!(body, &json!("雪😀a".repeat(4096)));
+            break;
+        }
+        assert!(start.elapsed() < REPLY_TIMEOUT, "large chunk prefix missing");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let sizes = b.ok("eval", json!({ "expression": "decodeSizes" }));
+    let sizes = sizes.as_array().unwrap();
+    assert!(!sizes.is_empty());
+    assert!(sizes.iter().all(|size| size.as_u64().unwrap() <= 16384), "unbounded decoding: {sizes:?}");
+
+    b.ok("network", json!({ "clear": true }));
     let clones = b.ok("eval", json!({ "expression": r#"(async () => {
         let clones = 0;
         const clone = Response.prototype.clone;

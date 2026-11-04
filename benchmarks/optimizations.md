@@ -11,7 +11,9 @@ The candidate targets these costs, with each stage checked before proceeding:
    their existing meanings.
 3. **Network logging:** decode a bounded UTF-8 response prefix, cancel just the
    cloned stream branch, and stop cloning responses when the log fills. The
-   page's original response and request-idle accounting remain intact.
+   decoder also slices oversized native chunks before decoding; a cached body
+   cannot turn a prefix read into a full-body string allocation. The page's
+   original response and request-idle accounting remain intact.
 4. **Dynamic waits:** temporary mutation observers wake pending commands, with
    timer fallback for CSSOM edits, animations and new embedded roots. Observers
    are disconnected on every wake; idle pages have no extra permanent observer.
@@ -45,6 +47,8 @@ feature API is resolved dynamically to retain the existing 2.38 library minimum.
 The regression retains gated EOF and full response equality, using a 40 KB
 multibyte payload. The page must remain unfinished when the 16,384-code-unit
 log prefix becomes available.
+An additional single-chunk fixture checks BOM handling, split multibyte
+characters and the maximum bytes passed to each decoder call.
 
 ## Reproduce
 

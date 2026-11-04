@@ -102,9 +102,16 @@
     try {
       while (text.length < BODY_MAX) {
         const { value, done } = await reader.read();
-        const chunk = done ? decoder.decode() : decoder.decode(value, { stream: true });
-        text += chunk.slice(0, BODY_MAX - text.length);
-        if (done) break;
+        if (done) {
+          text += decoder.decode().slice(0, BODY_MAX - text.length);
+          break;
+        }
+        // A cached response can arrive as one enormous chunk. Bound decoding
+        // as well as retained text, including UTF-8 split between these slices.
+        for (let at = 0; at < value.length && text.length < BODY_MAX; at += BODY_MAX) {
+          const chunk = decoder.decode(value.subarray(at, at + BODY_MAX), { stream: true });
+          text += chunk.slice(0, BODY_MAX - text.length);
+        }
       }
       return text;
     } finally {
