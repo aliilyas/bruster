@@ -79,6 +79,19 @@ Automatic Xvfb launches disable GLX. `BRUSTER_XVFB_ARGS` overrides the server
 arguments (default: `-screen 0 1280x1024x24 -nolisten tcp -extension GLX`). Set
 `BRUSTER_NO_XVFB=1` to prevent automatic Xvfb startup.
 
+### Performance diagnostics
+
+Set `BRUSTER_TRACE_PERF=1` to write startup and screenshot stage timings to
+stderr. Startup separates event-loop, window, WebContext and WebView construction;
+screenshots separate native capture from PNG conversion/encoding. These spans
+can overlap (pixel conversion is part of PNG time). Leave tracing off for latency
+comparisons, and omit `--quiet` when collecting diagnostics.
+
+Keep one process running for a sequence of operations to amortize startup. Reuse
+snapshot refs, scope snapshots with `selector`/`max`, and use `fill_form` for
+multiple fields. `navigate` with `until: "dom"` can finish earlier when the task
+only needs parsed HTML; use `load` or `idle` when those later milestones matter.
+
 ## MCP
 
 With `--mcp`, every native method becomes an MCP tool. Screenshots return as

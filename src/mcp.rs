@@ -12,9 +12,10 @@
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 
-use serde_json::{json, Value};
+use serde::{Deserialize, Serialize};
+use serde_json::{json, value::RawValue, Value};
 
 use crate::Request;
 
@@ -184,6 +185,84 @@ pub fn outgoing(v: Value) -> Option<Value> {
     Some(json!({ "jsonrpc": JSONRPC, "id": rpc_id, "result": result }))
 }
 
+#[derive(Serialize)]
+#[serde(untagged)]
+enum BorrowedText<'a> {
+    // Page strings are already JSON-escaped. Objects/scalars become JSON text
+    // inside the MCP string, without building and serializing a Value tree.
+    String(&'a RawValue),
+    Json(&'a str),
+}
+
+#[derive(Serialize)]
+#[serde(tag = "type", rename_all = "lowercase")]
+enum BorrowedContent<'a> {
+    Text {
+        text: BorrowedText<'a>,
+    },
+    Image {
+        data: &'a RawValue,
+        #[serde(rename = "mimeType")]
+        mime_type: &'static str,
+    },
+}
+
+fn borrowed_content(result: &RawValue) -> BorrowedContent<'_> {
+    let raw = result.get();
+    if raw.starts_with('{') {
+        #[derive(Deserialize)]
+        struct Image<'a> {
+            #[serde(borrow)]
+            png_base64: Option<&'a RawValue>,
+        }
+        // eval can return an image too. Skip other fields without allocating
+        // them, and keep the same image detection as the normal result path.
+        if let Ok(Image {
+            png_base64: Some(data),
+        }) = serde_json::from_str(raw) {
+            if data.get().starts_with('"') {
+                return BorrowedContent::Image {
+                    data,
+                    mime_type: "image/png",
+                };
+            }
+        }
+    }
+    BorrowedContent::Text {
+        text: if raw.starts_with('"') {
+            BorrowedText::String(result)
+        } else {
+            BorrowedText::Json(raw)
+        },
+    }
+}
+
+/// The page envelope has already passed document/attempt validation. Consume
+/// the ID under the stdout lock, as outgoing() does, including cancellations.
+pub fn raw_reply(internal: u64, result: &RawValue) {
+    #[derive(Serialize)]
+    struct Content<'a> {
+        content: [BorrowedContent<'a>; 1],
+    }
+    #[derive(Serialize)]
+    struct Reply<'a> {
+        jsonrpc: &'static str,
+        id: Value,
+        result: Content<'a>,
+    }
+    let out = std::io::stdout().lock();
+    let Some(id) = IN_FLIGHT.lock().unwrap().as_mut().and_then(|m| m.remove(&internal)) else {
+        return;
+    };
+    crate::write_json_to(out, &Reply {
+        jsonrpc: JSONRPC,
+        id,
+        result: Content {
+            content: [borrowed_content(result)],
+        },
+    });
+}
+
 /// Browser events become log notifications. Nothing goes out before the
 /// client says it is initialized, or above the level it asked for.
 fn event_notification(v: Value) -> Option<Value> {
@@ -217,7 +296,12 @@ fn content(result: &Value) -> Value {
 }
 
 /// Tool definitions. Target tools accept `selector` or `ref` (from snapshot).
-fn tools() -> Vec<Value> {
+fn tools() -> &'static [Value] {
+    static TOOLS: OnceLock<Vec<Value>> = OnceLock::new();
+    TOOLS.get_or_init(build_tools)
+}
+
+fn build_tools() -> Vec<Value> {
     const TARGET: &str = "target";
     let specs: &[(&str, &str, &str, &[&str])] = &[
         ("navigate", "Open a URL and wait for it. until: load (default), dom (DOMContentLoaded, fastest, fine for server-rendered pages) or idle (load plus a quiet network).", "url,until,timeout", &["url"]),
@@ -335,6 +419,30 @@ fn prop_schema(name: &str) -> Value {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn borrowed_results_preserve_mcp_content() {
+        use serde_json::{json, value::RawValue, Value};
+        for source in [
+            r#""quote\"\\\r\n雪""#,
+            r#""\uD83D\uDE00""#,
+            "null", "true", "42", "-1.25",
+            r#"{"z":[1,null,false],"a":"line\nend"}"#,
+            r#"{"png_base64":"YWJj","other":[1,2]}"#,
+            r#"{"png_base64":false}"#,
+        ] {
+            let raw: &RawValue = serde_json::from_str(source).unwrap();
+            let value: Value = serde_json::from_str(source).unwrap();
+            let actual = serde_json::to_value(super::borrowed_content(raw)).unwrap();
+            let expected = super::content(&value);
+            if value.is_string() || actual["type"] == "image" {
+                assert_eq!(actual, expected);
+            } else {
+                assert_eq!(actual["type"], json!("text"));
+                assert_eq!(serde_json::from_str::<Value>(actual["text"].as_str().unwrap()).unwrap(), value);
+            }
+        }
+    }
+
     #[test]
     fn window_controls_are_exposed() {
         let tools = super::tools();

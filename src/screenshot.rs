@@ -38,11 +38,13 @@ pub fn capture(wv: &WebView, region: Region, cb: Done) {
         _ => None,
     };
 
+    let capture = crate::timing::Span::new("screenshot_capture");
     wv.webview().snapshot(
         gtk_region,
         SnapshotOptions::NONE,
         None::<&gio::Cancellable>,
         move |res| {
+            drop(capture);
             let png = res
                 .map_err(|e| e.to_string())
                 .and_then(|surface| match clip {
@@ -56,6 +58,40 @@ pub fn capture(wv: &WebView, region: Region, cb: Done) {
 
 #[cfg(target_os = "linux")]
 fn to_png(surface: &cairo::Surface) -> Result<Vec<u8>, String> {
+    let _encoding = crate::timing::Span::new("screenshot_png");
+    if let Ok(image) = cairo::ImageSurface::try_from(surface.clone()) {
+        // Most pages are opaque. Strip only a proven-opaque alpha channel;
+        // encoding RGBA needlessly increases both compression and pipe work.
+        let conversion = crate::timing::Span::new("screenshot_pixel_conversion");
+        let mut rgb = None;
+        if matches!(image.format(), cairo::Format::ARgb32 | cairo::Format::Rgb24)
+            && image.width() > 0 && image.height() > 0 {
+            image.with_data(|data| {
+                let rows = || data.chunks(image.stride() as usize)
+                    .map(|row| &row[..image.width() as usize * 4]);
+                let opaque = image.format() == cairo::Format::Rgb24 || rows().all(|row|
+                    row.chunks_exact(4).all(|p| u32::from_ne_bytes(p.try_into().unwrap()) >> 24 == 255));
+                if opaque {
+                    let mut pixels = Vec::with_capacity(image.width() as usize * image.height() as usize * 3);
+                    for row in rows() {
+                        for p in row.chunks_exact(4) {
+                            let pixel = u32::from_ne_bytes(p.try_into().unwrap());
+                            pixels.extend_from_slice(&[(pixel >> 16) as u8, (pixel >> 8) as u8, pixel as u8]);
+                        }
+                    }
+                    rgb = Some(pixels);
+                }
+            }).map_err(|e| e.to_string())?;
+        }
+        drop(conversion);
+        if let Some(rgb) = rgb {
+            let pixels = gtk::gdk_pixbuf::Pixbuf::from_mut_slice(rgb, gtk::gdk_pixbuf::Colorspace::Rgb,
+                false, 8, image.width(), image.height(), image.width() * 3);
+            return pixels.save_to_bufferv("png", &[("compression", "3")]).map_err(|e| e.to_string());
+        }
+    }
+    // Cairo preserves alpha/premultiplication for transparent captures and also
+    // supports non-image surfaces returned by other WebKit versions.
     let mut buf = Vec::new();
     surface.write_to_png(&mut buf).map_err(|e| e.to_string())?;
     Ok(buf)
@@ -80,12 +116,14 @@ pub fn capture(wv: &WebView, region: Region, cb: Done) {
     use std::cell::RefCell;
 
     use block2::RcBlock;
+    use objc2::AnyThread;
     use objc2_app_kit::{NSBitmapImageFileType, NSBitmapImageRep, NSImage};
     use objc2_foundation::{NSDictionary, NSError, NSPoint, NSRect, NSSize};
     use objc2_web_kit::WKSnapshotConfiguration;
     use wry::WebViewExtMacOS;
 
     fn png_from(img: *mut NSImage, err: *mut NSError) -> Result<Vec<u8>, String> {
+        let _encoding = crate::timing::Span::new("screenshot_png");
         if img.is_null() {
             let msg = unsafe { err.as_ref() }
                 .map(|e| e.localizedDescription().to_string())
@@ -94,8 +132,11 @@ pub fn capture(wv: &WebView, region: Region, cb: Done) {
         }
 
         let img = unsafe { &*img };
-        let tiff = img.TIFFRepresentation().ok_or("no TIFF representation")?;
-        let rep = NSBitmapImageRep::imageRepWithData(&tiff).ok_or("bitmap decode failed")?;
+        // Preserve the native backing resolution without encoding and decoding
+        // an intermediate TIFF. WKWebView's snapshot already owns the pixels.
+        let pixels = unsafe { img.CGImageForProposedRect_context_hints(std::ptr::null_mut(), None, None) }
+            .ok_or("no snapshot bitmap")?;
+        let rep = NSBitmapImageRep::initWithCGImage(NSBitmapImageRep::alloc(), &pixels);
         let png = unsafe {
             rep.representationUsingType_properties(NSBitmapImageFileType::PNG, &NSDictionary::new())
         }
@@ -112,9 +153,10 @@ pub fn capture(wv: &WebView, region: Region, cb: Done) {
     }
 
     // ObjC blocks are Fn; the completion fires once, so hand the FnOnce over through a cell.
-    let cb = RefCell::new(Some(cb));
+    let cb = RefCell::new(Some((crate::timing::Span::new("screenshot_capture"), cb)));
     let block = RcBlock::new(move |img: *mut NSImage, err: *mut NSError| {
-        if let Some(cb) = cb.borrow_mut().take() {
+        if let Some((capture, cb)) = cb.borrow_mut().take() {
+            drop(capture);
             cb(png_from(img, err));
         }
     });
@@ -221,6 +263,36 @@ pub fn base64(data: &[u8]) -> String {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn png_preserves_pixels_alpha_stride_and_backing_scale() {
+        use cairo::{Context, Format, ImageSurface};
+        for transparent in [false, true] {
+            for scale in [1.0, 2.0] {
+                let surface = ImageSurface::create(Format::ARgb32, 37, 19).unwrap();
+                let context = Context::new(&surface).unwrap();
+                for x in 0..37 {
+                    context.set_source_rgba(x as f64 / 37.0, 0.4, 0.7,
+                        if transparent { x as f64 / 37.0 } else { 1.0 });
+                    context.rectangle(x as f64, 0.0, 1.0, 19.0);
+                    context.fill().unwrap();
+                }
+                surface.set_device_scale(scale, scale);
+                let mut original = Vec::new();
+                surface.write_to_png(&mut original).unwrap();
+                let optimized = super::to_png(&surface).unwrap();
+                let decode = |png: &[u8]| {
+                    let image = ImageSurface::create_from_png(&mut std::io::Cursor::new(png)).unwrap();
+                    assert_eq!((image.width(), image.height()), (37, 19));
+                    let mut pixels = Vec::new();
+                    image.with_data(|data| pixels.extend_from_slice(data)).unwrap();
+                    pixels
+                };
+                assert_eq!(decode(&optimized), decode(&original));
+            }
+        }
+    }
+
     #[test]
     fn base64_matches_rfc() {
         assert_eq!(super::base64(b""), "");

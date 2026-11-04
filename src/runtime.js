@@ -50,11 +50,34 @@
 
   // Pages can replace JSON.stringify after injection; IPC must still work.
   const stringify = JSON.stringify.bind(JSON);
+  const documentQuery = Document.prototype.querySelector;
+  const elementQuery = Element.prototype.querySelector;
+  const fragmentQuery = DocumentFragment.prototype.querySelector;
   const documentId = `${performance.timeOrigin}:${Math.random()}`;
   let generation = 0;
   const post = (msg) => window.ipc.postMessage(stringify({ ...msg, document: documentId, generation }));
   const trunc = (s, n) => (s = (s || '').replace(/\s+/g, ' ').trim()).length > n ? s.slice(0, n) + '…' : s;
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  // Subscribe only while a command is waiting. DOM mutations wake it promptly;
+  // the timer still covers CSSOM edits, animations and newly attached roots.
+  function changed(el) {
+    return new Promise(resolve => {
+      const roots = new Set([document, el?.getRootNode()].filter(Boolean));
+      const observer = new MutationObserver(done);
+      const timer = setTimeout(done, POLL_MS);
+      function done() {
+        clearTimeout(timer);
+        observer.disconnect();
+        for (const root of roots) root.removeEventListener('load', done, true);
+        resolve();
+      }
+      for (const root of roots) {
+        observer.observe(root, { subtree: true, childList: true, attributes: true, characterData: true });
+        root.addEventListener('load', done, true);
+      }
+    });
+  }
   const fmt = (v) => {
     if (typeof v === 'string') return v;
     if (v instanceof Error) {
@@ -70,28 +93,51 @@
   // Cleared on navigation by virtue of living in the page.
   const net = [];
   let inflight = 0;
-  const logNet = (e) => { if (net.length < NET_MAX) net.push(e); };
   const headersOf = (h) => { try { return Object.fromEntries(new Headers(h)); } catch { return {}; } };
+
+  async function bodyPrefix(res) {
+    if (!res.body) return '';
+    const reader = res.body.getReader(), decoder = new TextDecoder();
+    let text = '';
+    try {
+      while (text.length < BODY_MAX) {
+        const { value, done } = await reader.read();
+        const chunk = done ? decoder.decode() : decoder.decode(value, { stream: true });
+        text += chunk.slice(0, BODY_MAX - text.length);
+        if (done) break;
+      }
+      return text;
+    } finally {
+      // Cancel only the cloned tee branch. Awaiting cancellation would wait
+      // for the page's branch too, defeating the prefix bound on live streams.
+      reader.cancel().catch(() => {});
+      reader.releaseLock();
+    }
+  }
 
   const origFetch = window.fetch;
   window.fetch = async function (input, init) {
     const url = typeof input === 'string' ? input : input.url;
-    const entry = {
+    const entry = net.length < NET_MAX ? {
       type: 'fetch', method: (init && init.method) || (input && input.method) || 'GET', url: new URL(url, location.href).href,
       start: performance.now(), req_headers: headersOf((init && init.headers) || (input && input.headers)),
-    };
-    logNet(entry);
+    } : null;
+    if (entry) net.push(entry);
     inflight++;
     try {
       const res = await origFetch.apply(this, arguments);
-      entry.status = res.status;
-      entry.ms = Math.round(performance.now() - entry.start);
-      entry.res_headers = Object.fromEntries(res.headers);
-      res.clone().text().then((t) => { entry.body = t.slice(0, BODY_MAX); }).catch(() => {});
+      if (entry) {
+        entry.status = res.status;
+        entry.ms = Math.round(performance.now() - entry.start);
+        entry.res_headers = Object.fromEntries(res.headers);
+        bodyPrefix(res.clone()).then((t) => { entry.body = t; }).catch(() => {});
+      }
       return res;
     } catch (e) {
-      entry.error = String(e);
-      entry.ms = Math.round(performance.now() - entry.start);
+      if (entry) {
+        entry.error = String(e);
+        entry.ms = Math.round(performance.now() - entry.start);
+      }
       throw e;
     } finally {
       inflight--;
@@ -102,8 +148,9 @@
   const xhrOpen = XMLHttpRequest.prototype.open;
   const xhrSend = XMLHttpRequest.prototype.send;
   XMLHttpRequest.prototype.open = function (method, url) {
+    if (net.length >= NET_MAX) return xhrOpen.apply(this, arguments);
     const entry = { type: 'xhr', method, url: new URL(url, location.href).href, start: performance.now() };
-    logNet(entry);
+    net.push(entry);
     this.addEventListener('loadend', () => {
       entry.status = this.status;
       entry.ms = Math.round(performance.now() - entry.start);
@@ -223,7 +270,30 @@
   }
 
   const composedParent = (el) => el.assignedSlot || el.parentElement || el.getRootNode().host;
-  function visible(el) {
+  const domParent = (el) => el.parentElement;
+  const ariaHidden = (el) => el.getAttribute('aria-hidden') === 'true';
+  const closedDetails = (el) => {
+    const parent = composedParent(el);
+    return parent?.tagName === 'DETAILS' && !parent.open
+      && el !== [...parent.children].find(node => node.tagName === 'SUMMARY');
+  };
+
+  // Snapshot-local memoization: no retained nodes or stale state after a page
+  // mutation. Iterative so deeply nested documents cannot exhaust the JS stack.
+  function ancestorFlag(el, parentOf, test, cache) {
+    const path = cache && [];
+    let flag = false;
+    for (let node = el; node; node = parentOf(node)) {
+      const known = cache?.get(node);
+      if (known !== undefined) { flag = known; break; }
+      if (path) path.push(node);
+      if (test(node)) { flag = true; break; }
+    }
+    if (path) for (const node of path) cache.set(node, flag);
+    return flag;
+  }
+
+  function visible(el, detailsCache) {
     // Opacity-zero targets still receive pointer events. visibility:hidden does
     // not, unless a descendant explicitly overrides the inherited visibility.
     const hasVisibilityCheck = !!el.checkVisibility;
@@ -234,10 +304,7 @@
     } else if (getComputedStyle(el).visibility !== 'visible') return false;
     // Older WKWebView versions report layout boxes for closed details content.
     // Only the first summary (and its composed descendants) is rendered there.
-    for (let child = el, parent = composedParent(child); parent; child = parent, parent = composedParent(child)) {
-      if (parent.tagName === 'DETAILS' && !parent.open
-          && child !== [...parent.children].find(node => node.tagName === 'SUMMARY')) return false;
-    }
+    if (ancestorFlag(el, composedParent, closedDetails, detailsCache)) return false;
     return hasVisibilityCheck || el.getClientRects().length > 0;
   }
   const describe = (el) => `<${el.tagName.toLowerCase()}${el.id ? '#' + el.id : ''}>`;
@@ -287,8 +354,25 @@
   function* matching(root, sel) {
     for (const el of nodesInRoots(root, NodeFilter.SHOW_ELEMENT)) if (el.matches(sel)) yield el;
   }
-  const queryAll = (root, sel) => [...matching(root, sel)];
   function query(root, sel) {
+    // Native lookup can stop at an indexed ID/class without visiting the page.
+    // :scope in matches() is relative to each candidate, unlike querySelector;
+    // escaped selectors may spell :scope too, so retain the walker for those.
+    if (typeof sel === 'string' && !/\\|:scope\b|:host\b/i.test(sel)) {
+      const select = root.nodeType === 9 ? documentQuery : root.nodeType === 11 ? fragmentQuery : elementQuery;
+      const found = select.call(root, sel);
+      if (found) return found;
+      // This root was searched completely; embedded roots follow depth-first,
+      // in the same order as nodesInRoots. No retained querySelectorAll list.
+      for (const el of elements(root)) {
+        const child = el.shadowRoot || el.contentDocument;
+        if (child) {
+          const found = query(child, sel);
+          if (found) return found;
+        }
+      }
+      return null;
+    }
     for (const el of matching(root, sel)) return el;
     return null;
   }
@@ -345,7 +429,7 @@
       const why = el ? (p.force ? null : blocker(el, needEnabled)) : `no element matches '${p.selector}'`;
       if (!why) return el;
       if (Date.now() > deadline) throw new Error(el ? `${describe(el)} is ${why}` : why);
-      await sleep(POLL_MS);
+      await changed(el);
     }
   }
 
@@ -359,17 +443,17 @@
     return TAG_ROLE[tag] || 'generic';
   }
 
-  function nameOf(el) {
+  function nameOf(el, readText) {
     const aria = el.getAttribute('aria-label');
     if (aria) return trunc(aria, NAME_MAX);
     const labelled = el.getAttribute('aria-labelledby');
     // ID references stay in the control's tree, even when it is slotted.
-    if (labelled) return trunc(el.getRootNode().getElementById(labelled)?.innerText, NAME_MAX);
-    if (el.labels && el.labels.length) return trunc(el.labels[0].innerText, NAME_MAX);
+    if (labelled) return trunc(readText(el.getRootNode().getElementById(labelled)), NAME_MAX);
+    if (el.labels && el.labels.length) return trunc(readText(el.labels[0]), NAME_MAX);
     // An image link is named by its alt. A value is only a name on button-like inputs.
     const img = el.tagName === 'A' && el.querySelector('img[alt]');
     const buttonValue = INPUT_ROLE[el.type] === 'button' && el.value;
-    return trunc(el.alt || el.placeholder || el.title || el.innerText || (img && img.alt) || buttonValue, NAME_MAX);
+    return trunc(el.alt || el.placeholder || el.title || readText(el) || (img && img.alt) || buttonValue, NAME_MAX);
   }
 
   const editable = (el) => el.isContentEditable || el.matches('input,textarea');
@@ -382,7 +466,7 @@
     while (!document.body) {
       if (document.readyState !== 'loading') return document.documentElement;
       if (Date.now() > deadline) throw new Error('page has no body yet, still loading');
-      await sleep(POLL_MS);
+      await changed();
     }
     return document.body;
   }
@@ -486,26 +570,36 @@
     refs = new Map();
     const max = p.max ?? SNAPSHOT_MAX;
     const out = [];
+    const details = new WeakMap(), hidden = new WeakMap(), texts = new WeakMap();
+    const readText = (el) => {
+      if (!el) return '';
+      let value = texts.get(el);
+      if (value === undefined) { value = el.innerText || ''; texts.set(el, value); }
+      return value;
+    };
     let n = 0;
     let truncated = false;
 
     for (const { el, text } of nodes(root)) {
-      if (!visible(el) || el.closest('[aria-hidden="true"]')) continue;
+      if (!visible(el, details) || ancestorFlag(el, domParent, ariaHidden, hidden)) continue;
 
-      const item = text ? { ref: `e${n + 1}`, role: 'text', text: trunc(text, TEXT_MAX) } : { ref: `e${n + 1}`, role: roleOf(el), name: nameOf(el) };
+      const role = text ? 'text' : roleOf(el);
+      const textRole = role === 'text' || role === 'listitem' || role === 'cell';
+      const item = { ref: `e${n + 1}`, role };
+      if (text) item.text = trunc(text, TEXT_MAX);
+      else if (!textRole) item.name = nameOf(el, readText);
       const tag = el.tagName.toLowerCase();
       if (!text) {
         if (tag === 'a' && el.href) item.href = el.href;
         if ('value' in el && el.value && tag !== 'button') item.value = trunc(el.value, NAME_MAX);
         if (el.type === 'checkbox' || el.type === 'radio') item.checked = el.checked;
         if (el.matches(':disabled')) item.disabled = true;
-        if (item.role === 'text' || item.role === 'listitem' || item.role === 'cell') {
-          item.text = trunc(el.innerText, TEXT_MAX);
-          delete item.name;
+        if (textRole) {
+          item.text = trunc(readText(el), TEXT_MAX);
           if (!item.text) continue;
           // <li><a>Docs</a></li>: the link carries the text, listing the li
           // too would put a non-clickable twin first in the results.
-          if (wrapsOne(el)) continue;
+          if (wrapsOne(el, readText)) continue;
         }
       }
       if (match && !match(item)) continue;
@@ -538,14 +632,14 @@
     if (hosts.size) post({ prefetch: [...hosts] });
   }
 
-  function wrapsOne(el) {
+  function wrapsOne(el, readText) {
     let only = null;
     for (const kid of elements(el)) {
       if (!kid.matches(SNAPSHOT_TAGS)) continue;
       if (only) return false;
       only = kid;
     }
-    return !!only && only.innerText.trim() === el.innerText.trim();
+    return !!only && readText(only).trim() === readText(el).trim();
   }
 
   // One line per element, about 40% fewer bytes than JSON and the form the
@@ -595,7 +689,9 @@
     },
 
     count({ selector }) {
-      return queryAll(document, selector).length;
+      let count = 0;
+      for (const el of matching(document, selector)) count++;
+      return count;
     },
 
     // Viewport-relative box, for screenshot clips.
@@ -779,6 +875,7 @@
       const state = p.state || 'visible';
       const deadline = Date.now() + timeout;
       let idleSince = null;
+      let target = null;
       const pageText = () => (document.body ? document.body.innerText : '');
 
       const check = () => {
@@ -790,7 +887,7 @@
           idleSince = idleSince || Date.now();
           return Date.now() - idleSince >= IDLE_MS;
         }
-        const el = p.ref ? refs.get(p.ref) : query(document, p.selector);
+        const el = target = p.ref ? refs.get(p.ref) : query(document, p.selector);
         const attached = connected(el);
         if (state === 'attached') return attached;
         if (state === 'hidden') return !attached || !visible(el);
@@ -799,7 +896,8 @@
 
       while (!check()) {
         if (Date.now() > deadline) throw new Error(`wait_for timed out after ${timeout}ms: ${stringify(p)}`);
-        await sleep(POLL_MS);
+        if (p.idle || p.url !== undefined) await sleep(POLL_MS);
+        else await changed(target);
       }
       return null;
     },

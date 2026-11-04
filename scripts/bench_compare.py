@@ -248,14 +248,14 @@ def background_work(exclude=(), *, before=None):
             # /proc/comm truncates names to 15 bytes, including frozen builds
             # and engine helpers. Other browser benchmarks can share library
             # pages (changing PSS) even when their controller is mostly idle.
-            competing = name in ('cargo', 'rustc', 'node', 'node-MainThread', 'bilobad', 'rustwright-mcp') or name.startswith((
+            competing = name in ('cargo', 'rustc', 'node', 'node-MainThread', 'bilobad', 'rustwright-mcp', 'xscreensaver') or name.startswith((
                     'bruster', 'baseline-brust', 'candidate-brust', 'WebKit',
-                    'chrome', 'headless_shell', 'agent-browser', 'smoke-', 'edge-', 'e2e-'))
+                    'chrome', 'headless_shell', 'agent-browser', 'smoke-', 'edge-', 'e2e-', 'firefox'))
             if name.startswith('python'):
                 # Controllers remain competitors between their browser sessions.
                 argv = (path / 'cmdline').read_bytes().decode(errors='replace').split('\0')
                 competing = any(Path(arg).name in (
-                    'site_compare.py', 'site_campaign.py', 'bench_compare.py', 'bench_performance.py', 'bench_audit.py'
+                    'site_compare.py', 'site_campaign.py', 'bench_compare.py', 'bench_performance.py', 'bench_audit.py', 'bench_optimizations.py'
                 ) for arg in argv)
             fields = (path / 'stat').read_text().rsplit(')', 1)[1].split()
             if competing and fields[0] != 'Z' and fields[19] == process['start']:
