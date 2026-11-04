@@ -41,6 +41,8 @@ mod navigation_macos;
 mod navigation_windows;
 mod screenshot;
 mod timing;
+#[cfg(target_os = "linux")]
+mod webkit_compat;
 mod window_state;
 
 use screenshot::{Clip, Region};
@@ -2270,6 +2272,7 @@ fn trim_webkit(
         inner.connect_draw(|_, _| glib::Propagation::Stop);
     }
     if let Some(s) = inner.settings() {
+        webkit_compat::configure(&s);
         s.set_hardware_acceleration_policy(HardwareAccelerationPolicy::Never);
         s.set_enable_page_cache(false);
         s.set_enable_webgl(false);

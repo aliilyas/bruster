@@ -73,6 +73,21 @@ def equal(actual, expected):
     assert actual == expected, (actual, expected)
 
 
+PIXEL_HASHES = {}
+
+
+def image_digest(data):
+    # The fixture is static. Identical PNG bytes prove identical pixels, so
+    # decode each distinct encoding once, outside timing. Repeated pure-Python
+    # pixel decoding would otherwise dominate the run and heat the runner.
+    key = hashlib.sha256(data).digest()
+    if key not in PIXEL_HASHES:
+        width, height, pixel = png_pixels(data)
+        pixels = bytes(channel for y in range(height) for x in range(width) for channel in pixel(x, y))
+        PIXEL_HASHES[key] = width, height, hashlib.sha256(pixels).hexdigest()
+    return PIXEL_HASHES[key]
+
+
 def measure(args, base, binary, transport, round_, label):
     linux = sys.platform.startswith('linux')
     before = compare.process_table() if linux else {}
@@ -135,12 +150,11 @@ def measure(args, base, binary, transport, round_, label):
                     if i >= 2:
                         samples.append(ms)
                     if i == 0:
-                        width, height, pixel = png_pixels(data)
+                        width, height, pixel_hash = image_digest(data)
                         assert (width, height) == (1280 * dpr, 800 * dpr)
                         # Full RGB equality on this opaque fixture, not PNG byte
                         # equality: compression and RGB/RGBA encoding may differ.
-                        pixels = bytes(channel for y in range(height) for x in range(width) for channel in pixel(x, y))
-                        row['correctness']['screenshot_' + mode] = hashlib.sha256(pixels).hexdigest()
+                        row['correctness']['screenshot_' + mode] = pixel_hash
                         row['screenshot_' + mode + '_bytes'] = len(data)
                 row['timings']['screenshot_' + mode + '_ms'] = samples
 
@@ -261,7 +275,11 @@ def main():
         'args': {k: str(v) for k, v in vars(args).items()},
         'binary_sha256': {name: hashlib.sha256(getattr(args, name).read_bytes()).hexdigest() for name in ('baseline', 'candidate')},
         'harness_sha256': {str(p.relative_to(harness)): hashlib.sha256(p.read_bytes()).hexdigest() for p in harness.rglob('*.py')},
-        'environment': {k:v for k,v in os.environ.items() if k.startswith(('BRUSTER_', 'WEBKIT_', 'GITHUB_', 'Image')) or k == 'DISPLAY'},
+        'environment': {k:v for k,v in os.environ.items() if k in (
+            'DISPLAY', 'BRUSTER_TRACE_PERF', 'BRUSTER_USE_SESSION_BUS', 'BRUSTER_PAINT_HIDDEN',
+            'WEBKIT_DISABLE_COMPOSITING_MODE', 'WEBKIT_DISABLE_DMABUF_RENDERER',
+            'GITHUB_RUN_ID', 'GITHUB_RUN_ATTEMPT', 'GITHUB_SHA', 'GITHUB_REF',
+            'GITHUB_WORKFLOW', 'GITHUB_REPOSITORY', 'ImageOS', 'ImageVersion')},
         'cpu': Path('/proc/cpuinfo').read_text() if sys.platform.startswith('linux') else subprocess.check_output(['sysctl','-n','machdep.cpu.brand_string'], text=True).strip(),
     }, 'samples': []}
     server = audit.ThreadingHTTPServer(('127.0.0.1', 0), Fixtures)

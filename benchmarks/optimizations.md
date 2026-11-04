@@ -27,6 +27,25 @@ The candidate targets these costs, with each stage checked before proceeding:
    controller work. Measure launch-to-first-page, including blank-page warmup,
    as well as the ready event. Existing sessions amortize engine startup.
 
+### WebKitGTK streaming compatibility
+
+The gated streaming regression exposed a WebKitGTK 2.52.0–2.52.6 bug:
+`FetchBodySource::pull()` in the byte-stream source does not drain already
+buffered bytes. A response can stall until another network chunk or EOF arrives,
+even while the page and logger are both reading. Materializing `response.body`
+before cloning and increasing the response size did not reliably resolve it.
+
+On those versions, `src/webkit_compat.rs` disables
+`ReadableByteStreamFetchSource`, selecting WebKit's existing non-byte source,
+whose pull method drains buffered bytes. Fetch still exposes a readable stream;
+BYOB readers on fetch responses are unavailable with this fallback. Other
+WebKitGTK versions and platforms keep their native defaults. The optional
+feature API is resolved dynamically to retain the existing 2.38 library minimum.
+
+The regression retains gated EOF and full response equality, using a 40 KB
+multibyte payload. The page must remain unfinished when the 16,384-code-unit
+log prefix becomes available.
+
 ## Reproduce
 
 Build baseline and candidate with the same Rust toolchain and release flags,

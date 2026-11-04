@@ -83,7 +83,8 @@ arguments (default: `-screen 0 1280x1024x24 -nolisten tcp -extension GLX`). Set
 
 Set `BRUSTER_TRACE_PERF=1` to write startup and screenshot stage timings to
 stderr. Startup separates event-loop, window, WebContext and WebView construction;
-Linux/macOS screenshots separate native capture from PNG conversion/encoding. These spans
+Linux/macOS screenshots separate native capture from PNG conversion/encoding.
+These spans
 can overlap (pixel conversion is part of PNG time). Leave tracing off for latency
 comparisons, and omit `--quiet` when collecting diagnostics.
 

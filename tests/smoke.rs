@@ -617,8 +617,9 @@ fn input_extras() {
 fn network_body_capture_is_bounded_and_preserves_the_response() {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let url = format!("http://{}/stream", listener.local_addr().unwrap());
-    // Exceed native HTTP coalescing buffers while keeping EOF gated.
-    let prefix = "雪😀a".repeat(50000);
+    // More than BODY_MAX UTF-16 code units, with EOF held until capture finishes.
+    // A small response also catches WebKit's buffered-stream pull regression.
+    let prefix = "雪😀a".repeat(5000);
     let whole = prefix.clone() + "tail";
     let (release, released) = std::sync::mpsc::channel();
     let server = std::thread::spawn(move || {
@@ -627,8 +628,11 @@ fn network_body_capture_is_bounded_and_preserves_the_response() {
         BufReader::new(&stream).read_line(&mut head).unwrap();
         write!(stream, "HTTP/1.1 200 OK\r\nAccess-Control-Allow-Origin: *\r\nContent-Type: text/plain\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{prefix}", prefix.len() + 4).unwrap();
         stream.flush().unwrap();
-        released.recv_timeout(REPLY_TIMEOUT).unwrap();
-        stream.write_all(b"tail").unwrap();
+        // Only the assertion below can release EOF. Dropping the sender on a
+        // test failure also lets the server exit, without a competing timeout.
+        if released.recv().is_ok() {
+            stream.write_all(b"tail").unwrap();
+        }
     });
     let mut b = Browser::spawn();
     b.open(&format!("{}/other", serve()));
