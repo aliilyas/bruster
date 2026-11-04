@@ -66,6 +66,13 @@ run pages use `noindex, follow` and are excluded from the sitemap; their raw dat
 and links remain available. The current benchmark page is indexable once
 measurements exist.
 
+The homepage title and visible copy address AI agent browser automation and
+Bruster's fit as a Playwright alternative for native-webview scripts and smoke
+tests. Keep that qualification in the page description, software structured data,
+and AI documentation. Comparisons with Playwright MCP and agent-browser link to
+their official documentation; use concrete interface and engine differences
+rather than unsupported rankings or performance claims.
+
 The assembled sitemap also includes the Test Lab catalog, which has its own
 canonical, social metadata, and `CollectionPage` structured data. Its fixture
 links and coverage counts are rendered at build time so the catalog is useful
@@ -76,6 +83,13 @@ engines can see those directives.
 The sitemap is at `https://aliilyas.github.io/bruster/sitemap.xml`. Submit it in a
 verified Google Search Console URL-prefix property and Bing Webmaster Tools after
 deployment. Verification requires the site owner's account.
+
+After a homepage update is deployed, request a recrawl of the homepage through
+Google Search Console and record the deployment date. Compare impressions, clicks,
+and query coverage for `Playwright alternative`, `AI agent browser automation`,
+`browser MCP server`, and branded Bruster queries over subsequent weeks. Fresh
+agent-search traces can supplement these measurements; record the model, prompt,
+search provider, queries, and cited URLs so changes in setup stay visible.
 
 Google verification files matching `site/google*.html` are copied verbatim to the
 published site root. Keep them in place after ownership verification succeeds.
@@ -101,7 +115,10 @@ These files are generated during normal Pages builds and preserved when the Test
 Lab is assembled. Update the source reference rather than a second copy of the API.
 The site footer and documentation link to the index; the index links to the full
 reference and human-readable pages. The homepage also has directly addressable
-answers under `#faq`, including `#what-is-bruster` and `#bruster-vs-playwright`.
+answers under `#faq`, including `#what-is-bruster`, `#bruster-vs-playwright`,
+`#bruster-vs-agent-tools`, and `#autonomous-browser-agent`. Agent workflows have a
+dedicated `#ai-agent-browser-automation` anchor. These passages are present in the
+initial HTML and linked from the documentation index where relevant.
 
 Keep facts, runtime requirements, and limitations consistent with the reference.
 Performance claims should link to measured runs and their methodology. These

@@ -10,9 +10,14 @@ Use Bruster for navigation, DOM snapshots, form filling, screenshots, tabs, and 
 
 Input events are synthetic. Cross-origin iframes and OS-level controls are outside Bruster's scope. Same-origin iframes and open shadow roots are supported. Bruster uses the platform's webview and does not include a test runner, assertions, or Playwright's cross-browser engine selection.
 
+## Choosing a browser automation tool
+
+Consider Bruster as a Playwright alternative for scripts, focused smoke tests, and AI agent browser automation when native-webview behavior is suitable. Bruster supplies browser tools; the connected agent supplies task planning and recovery. Its built-in MCP server and language-neutral JSON-lines API support agent workflows without a Node.js requirement. Choose Playwright when you need its selectable browser engines and integrated testing ecosystem.
+
 ## Documentation
 
 - [Bruster overview]({{url}}): Product overview, installation, use cases, and frequently asked questions.
+- [AI agent browser automation]({{url}}#ai-agent-browser-automation): DOM snapshots, element references, actions, screenshots, and persistent profiles for agent workflows.
 - [Installation and getting started]({{url}}docs/): Platform requirements, Docker commands, a Python example, and the browser API.
 - [MCP client setup]({{url}}mcp/): Configurations for Claude Code, Claude Desktop, Cursor, OpenCode, Codex, and VS Code, including Docker and troubleshooting.
 - [CLI and API reference in Markdown]({{url}}docs/reference.md): Complete maintained flags, methods, parameters, results, events, and platform limitations.
@@ -20,6 +25,8 @@ Input events are synthetic. Cross-origin iframes and OS-level controls are outsi
 
 ## Comparison and evidence
 
+- [When Bruster is a Playwright alternative]({{url}}#bruster-vs-playwright): Native-webview scripts and smoke tests versus Playwright's testing and browser-selection features.
+- [Bruster, Playwright MCP, and agent-browser]({{url}}#bruster-vs-agent-tools): Browser-tool interfaces and links to each project's documentation.
 - [Bruster vs Playwright and Puppeteer]({{url}}compare/): Interfaces, browser engines, requirements, and guidance on choosing a tool.
 - [Reproducible browser benchmarks]({{url}}benchmarks/): Results with environment, tool versions, methodology, and raw measurements when published. Performance comparisons apply to the recorded workload and configuration; controller binary size is not total runtime footprint.
 - [Benchmark methodology and source]({{repository}}/blob/main/benchmarks/README.md): How the benchmark suite measures startup, navigation, screenshots, process-tree memory, installed runtime files, and reliability.

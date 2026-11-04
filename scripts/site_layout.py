@@ -11,9 +11,9 @@ SITE = ROOT / 'site'
 SITE_URL = 'https://aliilyas.github.io/bruster/'
 REPOSITORY = 'https://github.com/aliilyas/bruster'
 SOFTWARE_DESCRIPTION = (
-    'Bruster is an open-source Rust browser automation tool and MCP server. '
-    'Control native webviews on macOS, Linux, and Windows through JSON lines '
-    'or the Model Context Protocol.'
+    'Bruster is an open-source Rust browser automation tool and MCP server for AI agents. '
+    'It is a native-webview alternative to Playwright for scripts and smoke tests, '
+    'with JSON-lines control and no Node.js requirement.'
 )
 
 

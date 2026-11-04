@@ -14,9 +14,9 @@ from site_layout import REPOSITORY, ROOT, SITE, SITE_URL, project_version, rende
 
 
 PAGES = (
-    ('', 'Bruster — Rust Browser Automation & MCP Server',
-     'Bruster is an open-source Rust browser automation tool and MCP server for AI agents, '
-     'scripts, and tests. Native webviews on macOS, Linux, and Windows. No Node.js.', ''),
+    ('', 'Bruster — AI Agent Browser Automation & MCP Server',
+     'Open-source Rust browser automation for AI agents. A native-webview Playwright alternative '
+     'for scripts and smoke tests, with built-in MCP and no Node.js.', ''),
     ('docs/', 'Bruster Docs — Install, Docker, Python & Browser API',
      'Install Bruster or run its Docker image. Automate a browser with Python, JSON lines, '
      'or MCP. Platform setup, container commands, CLI options, and browser API.', 'Docs'),
