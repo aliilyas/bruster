@@ -1,0 +1,713 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bruster Benchmark Run #52 · attempt 1</title>
+  <meta name="description" content="Archived measurement from 2026-11-05T09:07:30.044154+00:00. Compare Bruster, Playwright, Puppeteer, agent-browser, Stagehand, browse.sh, Playwright MCP, Cypress, Ui.Vision MCP, Rustwright, Rustwright MCP, Biloba: startup, navigation, memory, runtime footprint, and reliability, with raw data and methodology.">
+  <meta name="robots" content="noindex, follow">
+  <link rel="canonical" href="https://aliilyas.github.io/bruster/benchmarks/runs/64a520214052e58cb26e652c01bc97c76e06bf6f-41995962393-1/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="bruster">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:title" content="Bruster Benchmark Run #52 · attempt 1">
+  <meta property="og:description" content="Archived measurement from 2026-11-05T09:07:30.044154+00:00. Compare Bruster, Playwright, Puppeteer, agent-browser, Stagehand, browse.sh, Playwright MCP, Cypress, Ui.Vision MCP, Rustwright, Rustwright MCP, Biloba: startup, navigation, memory, runtime footprint, and reliability, with raw data and methodology.">
+  <meta property="og:url" content="https://aliilyas.github.io/bruster/benchmarks/runs/64a520214052e58cb26e652c01bc97c76e06bf6f-41995962393-1/">
+  <meta property="og:image" content="https://aliilyas.github.io/bruster/assets/social.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="bruster — Browser automation. Native by design. Rust · JSON lines · MCP">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Bruster Benchmark Run #52 · attempt 1">
+  <meta name="twitter:description" content="Archived measurement from 2026-11-05T09:07:30.044154+00:00. Compare Bruster, Playwright, Puppeteer, agent-browser, Stagehand, browse.sh, Playwright MCP, Cypress, Ui.Vision MCP, Rustwright, Rustwright MCP, Biloba: startup, navigation, memory, runtime footprint, and reliability, with raw data and methodology.">
+  <meta name="twitter:image" content="https://aliilyas.github.io/bruster/assets/social.png">
+  <meta name="twitter:image:alt" content="bruster — Browser automation. Native by design. Rust · JSON lines · MCP">
+  <script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "@id": "https://aliilyas.github.io/bruster/#website", "name": "Bruster", "alternateName": "bruster", "url": "https://aliilyas.github.io/bruster/", "inLanguage": "en", "about": {"@id": "https://aliilyas.github.io/bruster/#software"}}, {"@type": "WebPage", "@id": "https://aliilyas.github.io/bruster/benchmarks/runs/64a520214052e58cb26e652c01bc97c76e06bf6f-41995962393-1/#webpage", "url": "https://aliilyas.github.io/bruster/benchmarks/runs/64a520214052e58cb26e652c01bc97c76e06bf6f-41995962393-1/", "name": "Bruster Benchmark Run #52 · attempt 1", "description": "Archived measurement from 2026-11-05T09:07:30.044154+00:00. Compare Bruster, Playwright, Puppeteer, agent-browser, Stagehand, browse.sh, Playwright MCP, Cypress, Ui.Vision MCP, Rustwright, Rustwright MCP, Biloba: startup, navigation, memory, runtime footprint, and reliability, with raw data and methodology.", "inLanguage": "en", "isPartOf": {"@id": "https://aliilyas.github.io/bruster/#website"}, "about": {"@id": "https://aliilyas.github.io/bruster/#software"}}]}</script>
+
+  <meta name="theme-color" content="#fafbf9">
+  <link rel="icon" href="/bruster/assets/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="/bruster/assets/favicon-32.png">
+  <link rel="icon" type="image/svg+xml" href="/bruster/assets/favicon.svg">
+  <link rel="apple-touch-icon" sizes="180x180" href="/bruster/assets/apple-touch-icon.png">
+  <script>document.documentElement.classList.add('js');</script>
+  <link rel="stylesheet" href="/bruster/assets/site.css">
+  <script src="/bruster/assets/site.js" defer></script>
+  <style>
+.benchmark-content { width: min(100% - 3rem, 1600px); padding-block: 3rem; }
+.benchmark-content > h1 { font-size: clamp(2.4rem, 4.2vw, 3.5rem); }
+.benchmark-page .section { margin-top: 3.5rem; }
+.benchmark-page h2 { font-size: 1.6rem; }
+.benchmark-page h3 { font-size: 1rem; }
+.run-meta { display: flex; align-items: center; flex-wrap: wrap; gap: .65rem 1.1rem; color: var(--muted); font-size: .8rem; margin-top: 1.5rem; }
+.run-meta a { text-decoration: none; }
+.run-meta a:hover { text-decoration: underline; }
+.run-meta .badge { white-space: normal; }
+.badge-blue { background: #e9f3e5; color: #2f6040; border-color: #d1e2cc; }
+.badge-neutral { background: #f1f4ed; color: #455a46; }
+.badge-warn { background: #fff1da; color: #834807; border-color: #eedbb6; }
+.facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 1.75rem 0 0; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); overflow: hidden; }
+.facts > div { padding: 1.25rem 1.4rem; }
+.facts > div + div { border-left: 1px solid var(--line); }
+.facts dt { font-size: .73rem; color: var(--muted); }
+.facts dd { margin: .35rem 0 0; font-size: 1.5rem; font-weight: 650; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+.section-nav { display: flex; gap: 1.6rem; margin: 1.5rem 0 2rem; padding: .2rem 0 .85rem; border-bottom: 1px solid var(--line); overflow-x: auto; }
+.section-nav a { flex: none; padding: .25rem 0; font-size: .8rem; font-weight: 550; text-decoration: none; }
+.section-nav a:hover { text-decoration: underline; }
+.section-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 1rem; margin-bottom: 1rem; }
+.section-head p { color: var(--muted); font-size: .84rem; margin-top: .5rem; max-width: 60rem; }
+.section-head > a { flex: none; font-size: .8rem; }
+.legend { color: var(--muted); font-size: .75rem; text-align: right; }
+.legend strong { color: var(--ink); }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+.benchmark-page .table-scroll { margin: 0; border: 0; border-radius: 0; }
+.benchmark-page .panel.table-scroll { border: 1px solid var(--line); border-radius: 9px; }
+.benchmark-page table { border-collapse: separate; border-spacing: 0; font-variant-numeric: tabular-nums; }
+.results-table { table-layout: fixed; }
+.results-table col:first-child { width: 160px; }
+.results-table th, .results-table td { text-align: right; vertical-align: middle; padding: .65rem .25rem; overflow-wrap: anywhere; }
+.results-table thead th { padding-block: .85rem; font-weight: 600; font-size: .72rem; line-height: 1.4; }
+.results-table thead th span { display: block; }
+.engine { display: block; color: var(--muted); font-size: .7rem; font-weight: 450; margin-top: .2rem; }
+.results-table .engine { font-size: .63rem; }
+.results-table th:first-child { text-align: left; padding-inline: .75rem; background: var(--surface); box-shadow: 1px 0 0 var(--line); }
+.results-table thead th:first-child { background: #f0f4ed; }
+.results-table tbody th { font-size: .75rem; font-weight: 450; line-height: 1.5; }
+.metric-unit { display: block; color: var(--muted); font-size: .65rem; }
+.cell-tool { display: none; }
+.results-table .group-row th { background: #f3f6f0; color: #4b6549; font: 550 .6rem/1.5 var(--mono); text-transform: uppercase; letter-spacing: .1em; padding: .4rem .75rem; box-shadow: none; }
+.results-table tbody tr:not(.group-row):hover > * { background: #f5f9f0; }
+.results-table td:nth-child(2), .results-table thead th:nth-child(2) { background: #f4f8ef; }
+.number { display: block; color: var(--ink); font-size: .8rem; font-weight: 600; line-height: 1.4; }
+.range { display: block; margin-top: .2rem; color: var(--muted); font-size: .63rem; line-height: 1.4; }
+.range > span { display: inline-block; white-space: nowrap; }
+.results-table tbody tr:last-child > * { border-bottom: 1px solid var(--line); }
+.results-table tbody:last-child tr:last-child > * { border-bottom: 0; }
+.table-note { border-top: 1px solid var(--line); padding: .8rem 1rem; color: var(--muted); font-size: .75rem; background: #fafcf7; }
+.scroll-hint { display: none; margin-bottom: .7rem; color: var(--muted); font-size: .75rem; }
+.environment-grid, .method-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.environment-card, .method-card { padding: 1.5rem; min-width: 0; }
+.environment-card h3 { margin-bottom: 1rem; }
+.detail-list { margin: 0; }
+.detail-list > div { display: grid; grid-template-columns: 8rem minmax(0, 1fr); gap: .75rem; padding: .55rem 0; border-top: 1px solid #e8ede3; font-size: .8rem; }
+.detail-list dt { color: var(--muted); }
+.detail-list dd { margin: 0; overflow-wrap: anywhere; }
+.method-card p { margin-top: .7rem; color: var(--muted); font-size: .82rem; }
+.reliability-table { min-width: 970px; font-size: .8rem; }
+.reliability-table th, .reliability-table td { text-align: left; vertical-align: top; }
+.reliability-table tbody th { font-weight: 550; min-width: 175px; }
+.reliability-table td { overflow-wrap: anywhere; }
+.probe-list { margin: 0; padding-left: 1rem; }
+.probe-list li + li { margin-top: .35rem; }
+.files { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .65rem; }
+.files a { display: flex; align-items: center; justify-content: space-between; gap: .75rem; min-height: 54px; height: 100%; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); padding: .75rem 1rem; text-decoration: none; }
+.files a:hover { background: #edf5e7; border-color: #adbf9e; }
+.files code { overflow-wrap: anywhere; }
+.files span { color: var(--muted); font-size: .7rem; }
+.provenance { margin-top: 1rem; }
+.provenance summary { padding: 1rem 1.3rem; cursor: pointer; font-size: .84rem; font-weight: 550; }
+.provenance[open] summary { border-bottom: 1px solid var(--line); }
+.provenance pre { margin: 0; max-height: 440px; overflow: auto; background: #f8faf5; padding: 1.3rem; font-size: .73rem; line-height: 1.7; tab-size: 2; }
+.history-list { list-style: none; padding: 0; margin: 0; }
+.history-list li + li { border-top: 1px solid var(--line); }
+.history-entry { display: grid; grid-template-columns: 13.5rem minmax(0, 1fr); gap: 1.5rem; padding: 1.1rem 1.4rem; }
+.history-entry a { font-weight: 550; font-size: .84rem; }
+.history-entry code { display: block; margin-top: .3rem; color: var(--muted); background: transparent; padding: 0; }
+.history-entry time { font-size: .8rem; font-weight: 550; }
+.history-entry p { font-size: .74rem; color: var(--muted); margin-top: .35rem; overflow-wrap: anywhere; }
+.history-entry .badge { margin-left: .4rem; }
+.back-link, .benchmark-source { margin-top: 2rem; font-size: .8rem; }
+@media (max-width: 1150px) {
+  .scroll-hint { display: block; }
+}
+@media screen and (max-width: 1023px) {
+  .results-table, .results-table tbody { display: block; }
+  .results-table colgroup { display: none; }
+  .results-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .results-table tr { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .results-table th:first-child { grid-column: 1 / -1; box-shadow: none; }
+  .results-table tbody th { font-size: .85rem; font-weight: 600; padding: .65rem .75rem; }
+  .results-table .metric-unit { display: inline; margin-left: .5rem; }
+  .results-table td { text-align: left; padding: .65rem .75rem; }
+  .cell-tool { display: block; min-height: 2.8rem; margin-bottom: .4rem; color: var(--ink); font-size: .75rem; font-weight: 550; }
+  .results-table .engine { font-size: .68rem; }
+  .results-table .number { font-size: .9rem; }
+  .results-table .range { font-size: .7rem; }
+}
+@media screen and (max-width: 640px) {
+  .results-table tr { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 760px) {
+  .benchmark-content { width: calc(100% - 2rem); padding-top: 2rem; }
+  .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .facts > div { padding: .9rem 1rem; }
+  .facts > div:nth-child(3) { border-left: 0; }
+  .facts > div:nth-child(n+3) { border-top: 1px solid var(--line); }
+  .section-nav { gap: 1.3rem; margin-bottom: 2rem; }
+  .section-head { align-items: flex-start; flex-direction: column; gap: .6rem; }
+  .legend { text-align: left; }
+  .environment-grid, .method-grid { grid-template-columns: 1fr; }
+  .files { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .history-entry { grid-template-columns: 1fr; gap: .65rem; }
+  .history-entry code { display: inline-block; margin-left: .75rem; }
+}
+@media (max-width: 420px) {
+  .files { grid-template-columns: 1fr; }
+  .detail-list > div { grid-template-columns: 7rem minmax(0, 1fr); }
+  .environment-card, .method-card { padding: 1.1rem; }
+}
+@media print {
+  .section-nav, .scroll-hint { display: none; }
+  .benchmark-page .table-scroll, .panel { overflow: visible; }
+  .results-table, .reliability-table { min-width: 0; }
+  .benchmark-content { width: 100%; }
+  .results-table th, .results-table td { padding: .4rem; }
+  .number { font-size: .8rem; }
+  .range { font-size: .6rem; white-space: normal; }
+  .section { break-inside: avoid; }
+}
+</style>
+</head>
+<body class="benchmark-page">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="/bruster/" aria-label="bruster home"><img src="/bruster/assets/wordmark.svg" alt="bruster" width="144" height="36"></a>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" hidden>Menu <span aria-hidden="true">☰</span></button>
+      <nav id="site-nav" class="site-nav" aria-label="Main navigation">
+        <a href="/bruster/docs/">Docs</a>
+<a href="/bruster/testing/">Testing</a>
+<a href="/bruster/benchmarks/" aria-current="page">Benchmarks</a>
+<a href="/bruster/compare/">Compare</a>
+        <a class="github-link" href="https://github.com/aliilyas/bruster">GitHub <span aria-hidden="true">↗</span></a>
+        <a class="button button-small" href="/bruster/docs/#install">Get started <span aria-hidden="true">↗</span></a>
+      </nav>
+    </div>
+  </header>
+  <main class="container benchmark-content" id="main">
+<p class="breadcrumbs"><a href="../../../">bruster</a><span>/</span>Benchmarks</p>
+<p class="eyebrow">Performance, with the context attached</p><h1>Browser benchmarks.</h1>
+<p class="lead">Compare timing, memory, runtime footprint, and reliability across 13 browser configurations.</p>
+<div class="run-meta">
+<span class="badge badge-blue">Archived measurement</span>
+<time datetime="2026-11-05T09:07:30.044154+00:00">05 Nov 2026 · 09:07 UTC</time>
+<a href="https://github.com/aliilyas/bruster/commit/64a520214052e58cb26e652c01bc97c76e06bf6f" title="64a520214052e58cb26e652c01bc97c76e06bf6f">Commit <code>64a520214052</code></a>
+<a href="https://github.com/aliilyas/bruster/actions/runs/41995962393">Workflow #52 ↗</a></div>
+<dl class="facts">
+<div><dt>Configurations</dt><dd>13</dd></div>
+<div><dt>Sessions / configuration</dt><dd>10</dd></div>
+<div><dt>Tiny iterations / session</dt><dd>10</dd></div>
+<div><dt>Viewport (px)</dt><dd>1280 × 800</dd></div></dl>
+<nav class="section-nav" aria-label="Benchmark sections">
+<a href="#results">Results</a><a href="#environment">Environment</a><a href="#method">Method</a>
+<a href="#reliability">Reliability</a><a href="#downloads">Downloads</a>
+<a href="../../#history">All measurements</a>
+</nav><section id="results" aria-labelledby="results-title">
+<div class="section-head"><div><h2 id="results-title">Performance results</h2>
+<p>Timings include controller round trips. Lower values mean less time, memory, or disk space.</p></div>
+<div class="legend"><strong>Median</strong><br>[observed min–max]</div></div>
+<div class="panel">
+<table class="results-table" role="table"><caption class="sr-only">Performance comparison. Values are medians with observed minimum and maximum beneath, except runtime footprint and failure counts.</caption>
+<colgroup><col><col><col><col><col><col><col><col><col><col><col><col><col><col></colgroup><thead role="rowgroup"><tr role="row"><th scope="col" role="columnheader">Metric / unit</th>
+<th scope="col" role="columnheader" id="tool-bruster" title="Bruster / WebKitGTK" aria-label="Bruster / WebKitGTK"><span>Bruster</span><span class="engine">WebKitGTK</span></th>
+<th scope="col" role="columnheader" id="tool-playwright-shell" title="Playwright / Headless Shell" aria-label="Playwright / Headless Shell"><span>Play<wbr>wright</span><span class="engine">Shell</span></th>
+<th scope="col" role="columnheader" id="tool-playwright" title="Playwright / full Chrome" aria-label="Playwright / full Chrome"><span>Play<wbr>wright</span><span class="engine">Chrome</span></th>
+<th scope="col" role="columnheader" id="tool-puppeteer" title="Puppeteer / full Chrome" aria-label="Puppeteer / full Chrome"><span>Puppe<wbr>teer</span><span class="engine">Chrome</span></th>
+<th scope="col" role="columnheader" id="tool-agent-browser" title="agent-browser / full Chrome" aria-label="agent-browser / full Chrome"><span>agent-browser</span><span class="engine">Chrome</span></th>
+<th scope="col" role="columnheader" id="tool-stagehand" title="Stagehand / full Chrome" aria-label="Stagehand / full Chrome"><span>Stage<wbr>hand</span><span class="engine">Chrome</span></th>
+<th scope="col" role="columnheader" id="tool-browse" title="browse.sh / full Chrome" aria-label="browse.sh / full Chrome"><span>browse.<wbr>sh</span><span class="engine">Chrome</span></th>
+<th scope="col" role="columnheader" id="tool-playwright-mcp" title="Playwright MCP / full Chrome" aria-label="Playwright MCP / full Chrome"><span>Play<wbr>wright MCP</span><span class="engine">Chrome</span></th>
+<th scope="col" role="columnheader" id="tool-cypress" title="Cypress / Chrome test runner" aria-label="Cypress / Chrome test runner"><span>Cypress</span><span class="engine">Chrome runner</span></th>
+<th scope="col" role="columnheader" id="tool-uivision" title="Ui.Vision MCP / browser extension" aria-label="Ui.Vision MCP / browser extension"><span>Ui.Vision MCP</span><span class="engine">Extension</span></th>
+<th scope="col" role="columnheader" id="tool-rustwright" title="Rustwright / full Chrome" aria-label="Rustwright / full Chrome"><span>Rust<wbr>wright</span><span class="engine">Chrome</span></th>
+<th scope="col" role="columnheader" id="tool-rustwright-mcp" title="Rustwright MCP / full Chrome" aria-label="Rustwright MCP / full Chrome"><span>Rust<wbr>wright MCP</span><span class="engine">Chrome</span></th>
+<th scope="col" role="columnheader" id="tool-biloba" title="Biloba / full Chrome" aria-label="Biloba / full Chrome"><span>Biloba</span><span class="engine">Chrome</span></th>
+</tr></thead>
+<tbody role="rowgroup"><tr class="group-row" role="row"><th scope="rowgroup" role="rowheader" colspan="14">Startup</th></tr>
+<tr role="row"><th scope="row" role="rowheader" id="metric-launch_to_first_page_ms" title="Launch → first loaded page (ms)" aria-label="Launch → first loaded page (ms)">Launch → page<span class="metric-unit">ms</span></th><td role="cell" headers="metric-launch_to_first_page_ms tool-bruster"><span class="cell-tool" aria-hidden="true"><span>Bruster</span><span class="engine">WebKitGTK</span></span><span class="number">220.8</span><span class="range"><span>[204.1–</span><wbr><span>338.7]</span></span></td><td role="cell" headers="metric-launch_to_first_page_ms tool-playwright-shell"><span class="cell-tool" aria-hidden="true"><span>Play<wbr>wright</span><span class="engine">Shell</span></span><span class="number">582.3</span><span class="range"><span>[576.2–</span><wbr><span>596.1]</span></span></td><td role="cell" headers="metric-launch_to_first_page_ms tool-playwright"><span class="cell-tool" aria-hidden="true"><span>Play<wbr>wright</span><span class="engine">Chrome</span></span><span class="number">799.6</span><span class="range"><span>[772.2–</span><wbr><span>832.9]</span></span></td><td role="cell" headers="metric-launch_to_first_page_ms tool-puppeteer"><span class="cell-tool" aria-hidden="true"><span>Puppe<wbr>teer</span><span class="engine">Chrome</span></span><span class="number">607.4</span><span class="range"><span>[591.1–</span><wbr><span>616.5]</span></span></td><td role="cell" headers="metric-launch_to_first_page_ms tool-agent-browser"><span class="cell-tool" aria-hidden="true"><span>agent-browser</span><span class="engine">Chrome</span></span><span class="number">1,077.6</span><span class="range"><span>[1,059.4–</span><wbr><span>1,159.5]</span></span></td><td role="cell" headers="metric-launch_to_first_page_ms tool-stagehand"><span class="cell-tool" aria-hidden="true"><span>Stage<wbr>hand</span><span class="engine">Chrome</span></span><span class="number">1,274.6</span><span class="range"><span>[1,224.1–</span><wbr><span>1,290.1]</span></span></td><td role="cell" headers="metric-launch_to_first_page_ms tool-browse"><span class="cell-tool" aria-hidden="true"><span>browse.<wbr>sh</span><span class="engine">Chrome</span></span><span class="number">2,727.8</span><span class="range"><span>[2,666.6–</span><wbr><span>2,769.5]</span></span></td><td role="cell" headers="metric-launch_to_first_page_ms tool-playwright-mcp"><span class="cell-tool" aria-hidden="true"><span>Play<wbr>wright MCP</span><span class="engine">Chrome</span></span><span class="number">2,153.3</span><span class="range"><span>[2,124.9–</span><wbr><span>2,178.0]</span></span></td><td role="cell" headers="metric-launch_to_first_page_ms tool-cypress"><span class="cell-tool" aria-hidden="true"><span>Cypress</span><span class="engine">Chrome runner</span></span><span class="number">5,243.5</span><span class="range"><span>[5,221.4–</span><wbr><span>13,417.9]</span></span></td><td role="cell" headers="metric-launch_to_first_page_ms tool-uivision"><span class="cell-tool" aria-hidden="true"><span>Ui.Vision MCP</span><span class="engine">Extension</span></span><span class="number">4,878.8</span><span class="range"><span>[3,268.2–</span><wbr><span>5,045.0]</span></span></td><td role="cell" headers="metric-launch_to_first_page_ms tool-rustwright"><span class="cell-tool" aria-hidden="true"><span>Rust<wbr>wright</span><span class="engine">Chrome</span></span><span class="number">803.9</span><span class="range"><span>[770.3–</span><wbr><span>832.1]</span></span></td><td role="cell" headers="metric-launch_to_first_page_ms tool-rustwright-mcp"><span class="cell-tool" aria-hidden="true"><span>Rust<wbr>wright MCP</span><span class="engine">Chrome</span></span><span class="number">870.4</span><span class="range"><span>[847.3–</span><wbr><span>947.4]</span></span></td><td role="cell" headers="metric-launch_to_first_page_ms tool-biloba"><span class="cell-tool" aria-hidden="true"><span>Biloba</span><span class="engine">Chrome</span></span><span class="number">880.8</span><span class="range"><span>[849.2–</span><wbr><span>922.5]</span></span></td></tr>
+<tr role="row"><th scope="row" role="rowheader" id="metric-startup_ms" title="Startup → ready / blank-page setup (ms)" aria-label="Startup → ready / blank-page setup (ms)">Startup / setup<span class="metric-unit">ms</span></th><td role="cell" headers="metric-startup_ms tool-bruster"><span class="cell-tool" aria-hidden="true"><span>Bruster</span><span class="engine">WebKitGTK</span></span><span class="number">105.3</span><span class="range"><span>[101.1–</span><wbr><span>235.4]</span></span></td><td role="cell" headers="metric-startup_ms tool-playwright-shell"><span class="cell-tool" aria-hidden="true"><span>Play<wbr>wright</span><span class="engine">Shell</span></span><span class="number">563.1</span><span class="range"><span>[558.2–</span><wbr><span>578.4]</span></span></td><td role="cell" headers="metric-startup_ms tool-playwright"><span class="cell-tool" aria-hidden="true"><span>Play<wbr>wright</span><span class="engine">Chrome</span></span><span class="number">754.4</span><span class="range"><span>[732.9–</span><wbr><span>778.1]</span></span></td><td role="cell" headers="metric-startup_ms tool-puppeteer"><span class="cell-tool" aria-hidden="true"><span>Puppe<wbr>teer</span><span class="engine">Chrome</span></span><span class="number">572.9</span><span class="range"><span>[554.3–</span><wbr><span>582.4]</span></span></td><td role="cell" headers="metric-startup_ms tool-agent-browser"><span class="cell-tool" aria-hidden="true"><span>agent-browser</span><span class="engine">Chrome</span></span><span class="number">1,022.9</span><span class="range"><span>[994.7–</span><wbr><span>1,105.8]</span></span></td><td role="cell" headers="metric-startup_ms tool-stagehand"><span class="cell-tool" aria-hidden="true"><span>Stage<wbr>hand</span><span class="engine">Chrome</span></span><span class="number">1,214.7</span><span class="range"><span>[1,166.6–</span><wbr><span>1,230.7]</span></span></td><td role="cell" headers="metric-startup_ms tool-browse"><span class="cell-tool" aria-hidden="true"><span>browse.<wbr>sh</span><span class="engine">Chrome</span></span><span class="number">2,249.1</span><span class="range"><span>[2,189.0–</span><wbr><span>2,294.8]</span></span></td><td role="cell" headers="metric-startup_ms tool-playwright-mcp"><span class="cell-tool" aria-hidden="true"><span>Play<wbr>wright MCP</span><span class="engine">Chrome</span></span><span class="number">1,600.7</span><span class="range"><span>[1,571.7–</span><wbr><span>1,625.7]</span></span></td><td role="cell" headers="metric-startup_ms tool-cypress"><span class="cell-tool" aria-hidden="true"><span>Cypress</span><span class="engine">Chrome runner</span></span><span class="number">5,067.2</span><span class="range"><span>[5,041.5–</span><wbr><span>13,245.9]</span></span></td><td role="cell" headers="metric-startup_ms tool-uivision"><span class="cell-tool" aria-hidden="true"><span>Ui.Vision MCP</span><span class="engine">Extension</span></span><span class="number">2,335.3</span><span class="range"><span>[2,155.8–</span><wbr><span>2,459.4]</span></span></td><td role="cell" headers="metric-startup_ms tool-rustwright"><span class="cell-tool" aria-hidden="true"><span>Rust<wbr>wright</span><span class="engine">Chrome</span></span><span class="number">743.8</span><span class="range"><span>[705.0–</span><wbr><span>786.7]</span></span></td><td role="cell" headers="metric-startup_ms tool-rustwright-mcp"><span class="cell-tool" aria-hidden="true"><span>Rust<wbr>wright MCP</span><span class="engine">Chrome</span></span><span class="number">784.2</span><span class="range"><span>[750.4–</span><wbr><span>847.4]</span></span></td><td role="cell" headers="metric-startup_ms tool-biloba"><span class="cell-tool" aria-hidden="true"><span>Biloba</span><span class="engine">Chrome</span></span><span class="number">800.1</span><span class="range"><span>[770.4–</span><wbr><span>832.6]</span></span></td></tr>
+<tr role="row"><th scope="row" role="rowheader" id="metric-first_navigation_ms" title="First navigation after setup (ms)" aria-label="First navigation after setup (ms)">First navigation<span class="metric-unit">ms</span></th><td role="cell" headers="metric-first_navigation_ms tool-bruster"><span class="cell-tool" aria-hidden="true"><span>Bruster</span><span class="engine">WebKitGTK</span></span><span class="number">109.5</span><span class="range"><span>[95.0–</span><wbr><span>123.4]</span></span></td><td role="cell" headers="metric-first_navigation_ms tool-playwright-shell"><span class="cell-tool" aria-hidden="true"><span>Play<wbr>wright</span><span class="engine">Shell</span></span><span class="number">18.4</span><span class="range"><span>[17.4–</span><wbr><span>19.8]</span></span></td><td role="cell" headers="metric-first_navigation_ms tool-playwright"><span class="cell-tool" aria-hidden="true"><span>Play<wbr>wright</span><span class="engine">Chrome</span></span><span class="number">43.7</span><span class="range"><span>[32.0–</span><wbr><span>59.7]</span></span></td><td role="cell" headers="metric-first_navigation_ms tool-puppeteer"><span class="cell-tool" aria-hidden="true"><span>Puppe<wbr>teer</span><span class="engine">Chrome</span></span><span class="number">34.2</span><span class="range"><span>[30.6–</span><wbr><span>36.5]</span></span></td><td role="cell" headers="metric-first_navigation_ms tool-agent-browser"><span class="cell-tool" aria-hidden="true"><span>agent-browser</span><span class="engine">Chrome</span></span><span class="number">54.9</span><span class="range"><span>[45.7–</span><wbr><span>64.6]</span></span></td><td role="cell" headers="metric-first_navigation_ms tool-stagehand"><span class="cell-tool" aria-hidden="true"><span>Stage<wbr>hand</span><span class="engine">Chrome</span></span><span class="number">59.7</span><span class="range"><span>[55.4–</span><wbr><span>67.3]</span></span></td><td role="cell" headers="metric-first_navigation_ms tool-browse"><span class="cell-tool" aria-hidden="true"><span>browse.<wbr>sh</span><span class="engine">Chrome</span></span><span class="number">469.3</span><span class="range"><span>[464.7–</span><wbr><span>482.6]</span></span></td><td role="cell" headers="metric-first_navigation_ms tool-playwright-mcp"><span class="cell-tool" aria-hidden="true"><span>Play<wbr>wright MCP</span><span class="engine">Chrome</span></span><span class="number">552.9</span><span class="range"><span>[551.5–</span><wbr><span>556.3]</span></span></td><td role="cell" headers="metric-first_navigation_ms tool-cypress"><span class="cell-tool" aria-hidden="true"><span>Cypress</span><span class="engine">Chrome runner</span></span><span class="number">165.6</span><span class="range"><span>[161.5–</span><wbr><span>223.1]</span></span></td><td role="cell" headers="metric-first_navigation_ms tool-uivision"><span class="cell-tool" aria-hidden="true"><span>Ui.Vision MCP</span><span class="engine">Extension</span></span><span class="number">2,581.2</span><span class="range"><span>[1,111.1–</span><wbr><span>2,646.2]</span></span></td><td role="cell" headers="metric-first_navigation_ms tool-rustwright"><span class="cell-tool" aria-hidden="true"><span>Rust<wbr>wright</span><span class="engine">Chrome</span></span><span class="number">58.6</span><span class="range"><span>[42.0–</span><wbr><span>64.5]</span></span></td><td role="cell" headers="metric-first_navigation_ms tool-rustwright-mcp"><span class="cell-tool" aria-hidden="true"><span>Rust<wbr>wright MCP</span><span class="engine">Chrome</span></span><span class="number">90.1</span><span class="range"><span>[78.4–</span><wbr><span>107.4]</span></span></td><td role="cell" headers="metric-first_navigation_ms tool-biloba"><span class="cell-tool" aria-hidden="true"><span>Biloba</span><span class="engine">Chrome</span></span><span class="number">77.9</span><span class="range"><span>[60.5–</span><wbr><span>97.4]</span></span></td></tr>
+</tbody>
+<tbody role="rowgroup"><tr class="group-row" role="row"><th scope="rowgroup" role="rowheader" colspan="14">Navigation</th></tr>
+<tr role="row"><th scope="row" role="rowheader" id="metric-tiny_navigation_ms" title="Warm tiny-page navigation (ms)" aria-label="Warm tiny-page navigation (ms)">Tiny page · warm<span class="metric-unit">ms</span></th><td role="cell" headers="metric-tiny_navigation_ms tool-bruster"><span class="cell-tool" aria-hidden="true"><span>Bruster</span><span class="engine">WebKitGTK</span></span><span class="number">6.5</span><span class="range"><span>[4.5–</span><wbr><span>12.4]</span></span></td><td role="cell" headers="metric-tiny_navigation_ms tool-playwright-shell"><span class="cell-tool" aria-hidden="true"><span>Play<wbr>wright</span><span class="engine">Shell</span></span><span class="number">11.1</span><span class="range"><span>[8.8–</span><wbr><span>16.8]</span></span></td><td role="cell" headers="metric-tiny_navigation_ms tool-playwright"><span class="cell-tool" aria-hidden="true"><span>Play<wbr>wright</span><span class="engine">Chrome</span></span><span class="number">19.2</span><span class="range"><span>[13.0–</span><wbr><span>40.9]</span></span></td><td role="cell" headers="metric-tiny_navigation_ms tool-puppeteer"><span class="cell-tool" aria-hidden="true"><span>Puppe<wbr>teer</span><span class="engine">Chrome</span></span><span class="number">19.7</span><span class="range"><span>[16.7–</span><wbr><span>34.3]</span></span></td><td role="cell" headers="metric-tiny_navigation_ms tool-agent-browser"><span class="cell-tool" aria-hidden="true"><span>agent-browser</span><span class="engine">Chrome</span></span><span class="number">29.7</span><span class="range"><span>[23.3–</span><wbr><span>60.5]</span></span></td><td role="cell" headers="metric-tiny_navigation_ms tool-stagehand"><span class="cell-tool" aria-hidden="true"><span>Stage<wbr>hand</span><span class="engine">Chrome</span></span><span class="number">29.8</span><span class="range"><span>[23.8–</span><wbr><span>48.8]</span></span></td><td role="cell" headers="metric-tiny_navigation_ms tool-browse"><span class="cell-tool" aria-hidden="true"><span>browse.<wbr>sh</span><span class="engine">Chrome</span></span><span class="number">454.0</span><span class="range"><span>[422.7–</span><wbr><span>485.8]</span></span></td><td role="cell" headers="metric-tiny_navigation_ms tool-playwright-mcp"><span class="cell-tool" aria-hidden="true"><span>Play<wbr>wright MCP</span><span class="engine">Chrome</span></span><span class="number">550.3</span><span class="range"><span>[546.7–</span><wbr><span>567.4]</span></span></td><td role="cell" headers="metric-tiny_navigation_ms tool-cypress"><span class="cell-tool" aria-hidden="true"><span>Cypress</span><span class="engine">Chrome runner</span></span><span class="number">56.8</span><span class="range"><span>[51.7–</span><wbr><span>84.1]</span></span></td><td role="cell" headers="metric-tiny_navigation_ms tool-uivision"><span class="cell-tool" aria-hidden="true"><span>Ui.Vision MCP</span><span class="engine">Extension</span></span><span class="number">796.4</span><span class="range"><span>[770.2–</span><wbr><span>859.6]</span></span></td><td role="cell" headers="metric-tiny_navigation_ms tool-rustwright"><span class="cell-tool" aria-hidden="true"><span>Rust<wbr>wright</span><span class="engine">Chrome</span></span><span class="number">34.3</span><span class="range"><span>[20.6–</span><wbr><span>53.0]</span></span></td><td role="cell" headers="metric-tiny_navigation_ms tool-rustwright-mcp"><span class="cell-tool" aria-hidden="true"><span>Rust<wbr>wright MCP</span><span class="engine">Chrome</span></span><span class="number">30.5</span><span class="range"><span>[24.4–</span><wbr><span>68.0]</span></span></td><td role="cell" headers="metric-tiny_navigation_ms tool-biloba"><span class="cell-tool" aria-hidden="true"><span>Biloba</span><span class="engine">Chrome</span></span><span class="number">33.9</span><span class="range"><span>[22.2–</span><wbr><span>82.6]</span></span></td></tr>
+<tr role="row"><th scope="row" role="rowheader" id="metric-large_navigation_ms" title="Large-page navigation (ms)" aria-label="Large-page navigation (ms)">Large page<span class="metric-unit">ms</span></th><td role="cell" headers="metric-large_navigation_ms tool-bruster"><span class="cell-tool" aria-hidden="true"><span>Bruster</span><span class="engine">WebKitGTK</span></span><span class="number">51.8</span><span class="range"><span>[49.2–</span><wbr><span>78.7]</span></span></td><td role="cell" headers="metric-large_navigation_ms tool-playwright-shell"><span class="cell-tool" aria-hidden="true"><span>Play<wbr>wright</span><span class="engine">Shell</span></span><span class="number">33.8</span><span class="range"><span>[22.0–</span><wbr><span>35.9]</span></span></td><td role="cell" headers="metric-large_navigation_ms tool-playwright"><span class="cell-tool" aria-hidden="true"><span>Play<wbr>wright</span><span class="engine">Chrome</span></span><span class="number">40.4</span><span class="range"><span>[27.6–</span><wbr><span>57.6]</span></span></td><td role="cell" headers="metric-large_navigation_ms tool-puppeteer"><span class="cell-tool" aria-hidden="true"><span>Puppe<wbr>teer</span><span class="engine">Chrome</span></span><span class="number">39.0</span><span class="range"><span>[35.0–</span><wbr><span>44.4]</span></span></td><td role="cell" headers="metric-large_navigation_ms tool-agent-browser"><span class="cell-tool" aria-hidden="true"><span>agent-browser</span><span class="engine">Chrome</span></span><span class="number">82.0</span><span class="range"><span>[74.7–</span><wbr><span>99.9]</span></span></td><td role="cell" headers="metric-large_navigation_ms tool-stagehand"><span class="cell-tool" aria-hidden="true"><span>Stage<wbr>hand</span><span class="engine">Chrome</span></span><span class="number">80.3</span><span class="range"><span>[55.4–</span><wbr><span>91.5]</span></span></td><td role="cell" headers="metric-large_navigation_ms tool-browse"><span class="cell-tool" aria-hidden="true"><span>browse.<wbr>sh</span><span class="engine">Chrome</span></span><span class="number">492.1</span><span class="range"><span>[468.7–</span><wbr><span>528.3]</span></span></td><td role="cell" headers="metric-large_navigation_ms tool-playwright-mcp"><span class="cell-tool" aria-hidden="true"><span>Play<wbr>wright MCP</span><span class="engine">Chrome</span></span><span class="number">737.2</span><span class="range"><span>[723.5–</span><wbr><span>754.2]</span></span></td><td role="cell" headers="metric-large_navigation_ms tool-cypress"><span class="cell-tool" aria-hidden="true"><span>Cypress</span><span class="engine">Chrome runner</span></span><span class="number">91.8</span><span class="range"><span>[72.2–</span><wbr><span>126.9]</span></span></td><td role="cell" headers="metric-large_navigation_ms tool-uivision"><span class="cell-tool" aria-hidden="true"><span>Ui.Vision MCP</span><span class="engine">Extension</span></span><span class="number">810.0</span><span class="range"><span>[788.8–</span><wbr><span>853.6]</span></span></td><td role="cell" headers="metric-large_navigation_ms tool-rustwright"><span class="cell-tool" aria-hidden="true"><span>Rust<wbr>wright</span><span class="engine">Chrome</span></span><span class="number">62.1</span><span class="range"><span>[58.2–</span><wbr><span>76.2]</span></span></td><td role="cell" headers="metric-large_navigation_ms tool-rustwright-mcp"><span class="cell-tool" aria-hidden="true"><span>Rust<wbr>wright MCP</span><span class="engine">Chrome</span></span><span class="number">99.1</span><span class="range"><span>[88.1–</span><wbr><span>133.4]</span></span></td><td role="cell" headers="metric-large_navigation_ms tool-biloba"><span class="cell-tool" aria-hidden="true"><span>Biloba</span><span class="engine">Chrome</span></span><span class="number">61.7</span><span class="range"><span>[57.5–</span><wbr><span>94.6]</span></span></td></tr>
+<tr role="row"><th scope="row" role="rowheader" id="metric-image_navigation_ms" title="Image-page navigation (ms)" aria-label="Image-page navigation (ms)">Image page<span class="metric-unit">ms</span></th><td role="cell" headers="metric-image_navigation_ms tool-bruster"><span class="cell-tool" aria-hidden="true"><span>Bruster</span><span class="engine">WebKitGTK</span></span><span class="number">116.4</span><span class="range"><span>[112.4–</span><wbr><span>125.9]</span></span></td><td role="cell" headers="metric-image_navigation_ms tool-playwright-shell"><span class="cell-tool" aria-hidden="true"><span>Play<wbr>wright</span><span class="engine">Shell</span></span><span class="number">118.7</span><span class="range"><span>[117.4–</span><wbr><span>133.2]</span></span></td><td role="cell" headers="metric-image_navigation_ms tool-playwright"><span class="cell-tool" aria-hidden="true"><span>Play<wbr>wright</span><span class="engine">Chrome</span></span><span class="number">123.2</span><span class="range"><span>[120.4–</span><wbr><span>140.3]</span></span></td><td role="cell" headers="metric-image_navigation_ms tool-puppeteer"><span class="cell-tool" aria-hidden="true"><span>Puppe<wbr>teer</span><span class="engine">Chrome</span></span><span class="number">125.9</span><span class="range"><span>[122.3–</span><wbr><span>132.3]</span></span></td><td role="cell" headers="metric-image_navigation_ms tool-agent-browser"><span class="cell-tool" aria-hidden="true"><span>agent-browser</span><span class="engine">Chrome</span></span><span class="number">130.1</span><span class="range"><span>[126.0–</span><wbr><span>138.0]</span></span></td><td role="cell" headers="metric-image_navigation_ms tool-stagehand"><span class="cell-tool" aria-hidden="true"><span>Stage<wbr>hand</span><span class="engine">Chrome</span></span><span class="number">141.9</span><span class="range"><span>[135.1–</span><wbr><span>188.2]</span></span></td><td role="cell" headers="metric-image_navigation_ms tool-browse"><span class="cell-tool" aria-hidden="true"><span>browse.<wbr>sh</span><span class="engine">Chrome</span></span><span class="number">557.4</span><span class="range"><span>[536.6–</span><wbr><span>590.7]</span></span></td><td role="cell" headers="metric-image_navigation_ms tool-playwright-mcp"><span class="cell-tool" aria-hidden="true"><span>Play<wbr>wright MCP</span><span class="engine">Chrome</span></span><span class="number">654.6</span><span class="range"><span>[652.8–</span><wbr><span>674.6]</span></span></td><td role="cell" headers="metric-image_navigation_ms tool-cypress"><span class="cell-tool" aria-hidden="true"><span>Cypress</span><span class="engine">Chrome runner</span></span><span class="number">193.4</span><span class="range"><span>[182.9–</span><wbr><span>220.3]</span></span></td><td role="cell" headers="metric-image_navigation_ms tool-uivision"><span class="cell-tool" aria-hidden="true"><span>Ui.Vision MCP</span><span class="engine">Extension</span></span><span class="number">811.7</span><span class="range"><span>[799.5–</span><wbr><span>954.2]</span></span></td><td role="cell" headers="metric-image_navigation_ms tool-rustwright"><span class="cell-tool" aria-hidden="true"><span>Rust<wbr>wright</span><span class="engine">Chrome</span></span><span class="number">128.0</span><span class="range"><span>[124.2–</span><wbr><span>142.5]</span></span></td><td role="cell" headers="metric-image_navigation_ms tool-rustwright-mcp"><span class="cell-tool" aria-hidden="true"><span>Rust<wbr>wright MCP</span><span class="engine">Chrome</span></span><span class="number">131.3</span><span class="range"><span>[128.6–</span><wbr><span>137.0]</span></span></td><td role="cell" headers="metric-image_navigation_ms tool-biloba"><span class="cell-tool" aria-hidden="true"><span>Biloba</span><span class="engine">Chrome</span></span><span class="number">126.8</span><span class="range"><span>[124.6–</span><wbr><span>136.1]</span></span></td></tr>
+</tbody>
+<tbody role="rowgroup"><tr class="group-row" role="row"><th scope="rowgroup" role="rowheader" colspan="14">Extraction and screenshots</th></tr>
+<tr role="row"><th scope="row" role="rowheader" id="metric-tiny_extract_ms" title="Tiny DOM extraction (ms)" aria-label="Tiny DOM extraction (ms)">Tiny DOM<span class="metric-unit">ms</span></th><td role="cell" headers="metric-tiny_extract_ms tool-bruster"><span class="cell-tool" aria-hidden="true"><span>Bruster</span><span class="engine">WebKitGTK</span></span><span class="number">5.8</span><span class="range"><span>[1.0–</span><wbr><span>7.4]</span></span></td><td role="cell" headers="metric-tiny_extract_ms tool-playwright-shell"><span class="cell-tool" aria-hidden="true"><span>Play<wbr>wright</span><span class="engine">Shell</span></span><span class="number">3.4</span><span class="range"><span>[2.3–</span><wbr><span>7.9]</span></span></td><td role="cell" headers="metric-tiny_extract_ms tool-playwright"><span class="cell-tool" aria-hidden="true"><span>Play<wbr>wright</span><span class="engine">Chrome</span></span><span class="number">7.8</span><span class="range"><span>[3.1–</span><wbr><span>18.2]</span></span></td><td role="cell" headers="metric-tiny_extract_ms tool-puppeteer"><span class="cell-tool" aria-hidden="true"><span>Puppe<wbr>teer</span><span class="engine">Chrome</span></span><span class="number">6.3</span><span class="range"><span>[1.4–</span><wbr><span>11.9]</span></span></td><td role="cell" headers="metric-tiny_extract_ms tool-agent-browser"><span class="cell-tool" aria-hidden="true"><span>agent-browser</span><span class="engine">Chrome</span></span><span class="number">4.5</span><span class="range"><span>[3.5–</span><wbr><span>10.3]</span></span></td><td role="cell" headers="metric-tiny_extract_ms tool-stagehand"><span class="cell-tool" aria-hidden="true"><span>Stage<wbr>hand</span><span class="engine">Chrome</span></span><span class="number">4.1</span><span class="range"><span>[3.4–</span><wbr><span>9.4]</span></span></td><td role="cell" headers="metric-tiny_extract_ms tool-browse"><span class="cell-tool" aria-hidden="true"><span>browse.<wbr>sh</span><span class="engine">Chrome</span></span><span class="number">419.5</span><span class="range"><span>[390.3–</span><wbr><span>447.9]</span></span></td><td role="cell" headers="metric-tiny_extract_ms tool-playwright-mcp"><span class="cell-tool" aria-hidden="true"><span>Play<wbr>wright MCP</span><span class="engine">Chrome</span></span><span class="number">506.4</span><span class="range"><span>[505.7–</span><wbr><span>517.0]</span></span></td><td role="cell" headers="metric-tiny_extract_ms tool-cypress"><span class="cell-tool" aria-hidden="true"><span>Cypress</span><span class="engine">Chrome runner</span></span><span class="number">31.8</span><span class="range"><span>[27.5–</span><wbr><span>45.7]</span></span></td><td role="cell" headers="metric-tiny_extract_ms tool-uivision"><span class="cell-tool" aria-hidden="true"><span>Ui.Vision MCP</span><span class="engine">Extension</span></span><span class="number">106.3</span><span class="range"><span>[96.2–</span><wbr><span>172.7]</span></span></td><td role="cell" headers="metric-tiny_extract_ms tool-rustwright"><span class="cell-tool" aria-hidden="true"><span>Rust<wbr>wright</span><span class="engine">Chrome</span></span><span class="number">1.4</span><span class="range"><span>[1.1–</span><wbr><span>9.7]</span></span></td><td role="cell" headers="metric-tiny_extract_ms tool-rustwright-mcp"><span class="cell-tool" aria-hidden="true"><span>Rust<wbr>wright MCP</span><span class="engine">Chrome</span></span><span class="number">3.5</span><span class="range"><span>[3.1–</span><wbr><span>9.3]</span></span></td><td role="cell" headers="metric-tiny_extract_ms tool-biloba"><span class="cell-tool" aria-hidden="true"><span>Biloba</span><span class="engine">Chrome</span></span><span class="number">1.8</span><span class="range"><span>[1.1–</span><wbr><span>6.9]</span></span></td></tr>
+<tr role="row"><th scope="row" role="rowheader" id="metric-large_extract_ms" title="Large DOM extraction, object return (ms)" aria-label="Large DOM extraction, object return (ms)">Large DOM · object<span class="metric-unit">ms</span></th><td role="cell" headers="metric-large_extract_ms tool-bruster"><span class="cell-tool" aria-hidden="true"><span>Bruster</span><span class="engine">WebKitGTK</span></span><span class="number">12.7</span><span class="range"><span>[5.3–</span><wbr><span>22.5]</span></span></td><td role="cell" headers="metric-large_extract_ms tool-playwright-shell"><span class="cell-tool" aria-hidden="true"><span>Play<wbr>wright</span><span class="engine">Shell</span></span><span class="number">102.4</span><span class="range"><span>[74.1–</span><wbr><span>149.0]</span></span></td><td role="cell" headers="metric-large_extract_ms tool-playwright"><span class="cell-tool" aria-hidden="true"><span>Play<wbr>wright</span><span class="engine">Chrome</span></span><span class="number">106.1</span><span class="range"><span>[77.8–</span><wbr><span>150.7]</span></span></td><td role="cell" headers="metric-large_extract_ms tool-puppeteer"><span class="cell-tool" aria-hidden="true"><span>Puppe<wbr>teer</span><span class="engine">Chrome</span></span><span class="number">29.0</span><span class="range"><span>[16.6–</span><wbr><span>52.4]</span></span></td><td role="cell" headers="metric-large_extract_ms tool-agent-browser"><span class="cell-tool" aria-hidden="true"><span>agent-browser</span><span class="engine">Chrome</span></span><span class="number">30.7</span><span class="range"><span>[25.1–</span><wbr><span>42.5]</span></span></td><td role="cell" headers="metric-large_extract_ms tool-stagehand"><span class="cell-tool" aria-hidden="true"><span>Stage<wbr>hand</span><span class="engine">Chrome</span></span><span class="number">48.5</span><span class="range"><span>[44.2–</span><wbr><span>105.9]</span></span></td><td role="cell" headers="metric-large_extract_ms tool-browse"><span class="cell-tool" aria-hidden="true"><span>browse.<wbr>sh</span><span class="engine">Chrome</span></span><span class="number">462.7</span><span class="range"><span>[443.7–</span><wbr><span>503.2]</span></span></td><td role="cell" headers="metric-large_extract_ms tool-playwright-mcp"><span class="cell-tool" aria-hidden="true"><span>Play<wbr>wright MCP</span><span class="engine">Chrome</span></span><span class="number">597.0</span><span class="range"><span>[588.7–</span><wbr><span>664.6]</span></span></td><td role="cell" headers="metric-large_extract_ms tool-cypress"><span class="cell-tool" aria-hidden="true"><span>Cypress</span><span class="engine">Chrome runner</span></span><span class="number">57.3</span><span class="range"><span>[49.3–</span><wbr><span>102.2]</span></span></td><td role="cell" headers="metric-large_extract_ms tool-uivision"><span class="cell-tool" aria-hidden="true"><span>Ui.Vision MCP</span><span class="engine">Extension</span></span><span class="number">1,310.2</span><span class="range"><span>[1,206.2–</span><wbr><span>1,417.3]</span></span></td><td role="cell" headers="metric-large_extract_ms tool-rustwright"><span class="cell-tool" aria-hidden="true"><span>Rust<wbr>wright</span><span class="engine">Chrome</span></span><span class="number">36.4</span><span class="range"><span>[31.8–</span><wbr><span>48.1]</span></span></td><td role="cell" headers="metric-large_extract_ms tool-rustwright-mcp"><span class="cell-tool" aria-hidden="true"><span>Rust<wbr>wright MCP</span><span class="engine">Chrome</span></span><span class="number">66.3</span><span class="range"><span>[57.9–</span><wbr><span>85.8]</span></span></td><td role="cell" headers="metric-large_extract_ms tool-biloba"><span class="cell-tool" aria-hidden="true"><span>Biloba</span><span class="engine">Chrome</span></span><span class="number">25.1</span><span class="range"><span>[22.9–</span><wbr><span>32.5]</span></span></td></tr>
+<tr role="row"><th scope="row" role="rowheader" id="metric-large_extract_json_ms" title="Large DOM extraction, JSON-string return (ms)" aria-label="Large DOM extraction, JSON-string return (ms)">Large DOM · JSON<span class="metric-unit">ms</span></th><td role="cell" headers="metric-large_extract_json_ms tool-bruster"><span class="cell-tool" aria-hidden="true"><span>Bruster</span><span class="engine">WebKitGTK</span></span><span class="number">13.3</span><span class="range"><span>[5.7–</span><wbr><span>29.9]</span></span></td><td role="cell" headers="metric-large_extract_json_ms tool-playwright-shell"><span class="cell-tool" aria-hidden="true"><span>Play<wbr>wright</span><span class="engine">Shell</span></span><span class="number">26.4</span><span class="range"><span>[8.2–</span><wbr><span>35.7]</span></span></td><td role="cell" headers="metric-large_extract_json_ms tool-playwright"><span class="cell-tool" aria-hidden="true"><span>Play<wbr>wright</span><span class="engine">Chrome</span></span><span class="number">21.6</span><span class="range"><span>[8.1–</span><wbr><span>38.2]</span></span></td><td role="cell" headers="metric-large_extract_json_ms tool-puppeteer"><span class="cell-tool" aria-hidden="true"><span>Puppe<wbr>teer</span><span class="engine">Chrome</span></span><span class="number">19.1</span><span class="range"><span>[8.5–</span><wbr><span>44.4]</span></span></td><td role="cell" headers="metric-large_extract_json_ms tool-agent-browser"><span class="cell-tool" aria-hidden="true"><span>agent-browser</span><span class="engine">Chrome</span></span><span class="number">12.6</span><span class="range"><span>[11.4–</span><wbr><span>23.6]</span></span></td><td role="cell" headers="metric-large_extract_json_ms tool-stagehand"><span class="cell-tool" aria-hidden="true"><span>Stage<wbr>hand</span><span class="engine">Chrome</span></span><span class="number">19.4</span><span class="range"><span>[17.7–</span><wbr><span>44.7]</span></span></td><td role="cell" headers="metric-large_extract_json_ms tool-browse"><span class="cell-tool" aria-hidden="true"><span>browse.<wbr>sh</span><span class="engine">Chrome</span></span><span class="number">433.3</span><span class="range"><span>[422.3–</span><wbr><span>450.7]</span></span></td><td role="cell" headers="metric-large_extract_json_ms tool-playwright-mcp"><span class="cell-tool" aria-hidden="true"><span>Play<wbr>wright MCP</span><span class="engine">Chrome</span></span><span class="number">518.7</span><span class="range"><span>[516.7–</span><wbr><span>531.8]</span></span></td><td role="cell" headers="metric-large_extract_json_ms tool-cypress"><span class="cell-tool" aria-hidden="true"><span>Cypress</span><span class="engine">Chrome runner</span></span><span class="number">47.6</span><span class="range"><span>[43.3–</span><wbr><span>100.2]</span></span></td><td role="cell" headers="metric-large_extract_json_ms tool-uivision"><span class="cell-tool" aria-hidden="true"><span>Ui.Vision MCP</span><span class="engine">Extension</span></span><span class="number">1,696.1</span><span class="range"><span>[1,557.2–</span><wbr><span>1,785.8]</span></span></td><td role="cell" headers="metric-large_extract_json_ms tool-rustwright"><span class="cell-tool" aria-hidden="true"><span>Rust<wbr>wright</span><span class="engine">Chrome</span></span><span class="number">9.8</span><span class="range"><span>[9.0–</span><wbr><span>13.1]</span></span></td><td role="cell" headers="metric-large_extract_json_ms tool-rustwright-mcp"><span class="cell-tool" aria-hidden="true"><span>Rust<wbr>wright MCP</span><span class="engine">Chrome</span></span><span class="number">32.1</span><span class="range"><span>[29.4–</span><wbr><span>48.5]</span></span></td><td role="cell" headers="metric-large_extract_json_ms tool-biloba"><span class="cell-tool" aria-hidden="true"><span>Biloba</span><span class="engine">Chrome</span></span><span class="number">13.6</span><span class="range"><span>[12.1–</span><wbr><span>17.7]</span></span></td></tr>
+<tr role="row"><th scope="row" role="rowheader" id="metric-screenshot_ms" title="PNG screenshot (ms)" aria-label="PNG screenshot (ms)">PNG screenshot<span class="metric-unit">ms</span></th><td role="cell" headers="metric-screenshot_ms tool-bruster"><span class="cell-tool" aria-hidden="true"><span>Bruster</span><span class="engine">WebKitGTK</span></span><span class="number">40.4</span><span class="range"><span>[39.8–</span><wbr><span>44.7]</span></span></td><td role="cell" headers="metric-screenshot_ms tool-playwright-shell"><span class="cell-tool" aria-hidden="true"><span>Play<wbr>wright</span><span class="engine">Shell</span></span><span class="number">47.2</span><span class="range"><span>[41.4–</span><wbr><span>56.0]</span></span></td><td role="cell" headers="metric-screenshot_ms tool-playwright"><span class="cell-tool" aria-hidden="true"><span>Play<wbr>wright</span><span class="engine">Chrome</span></span><span class="number">51.8</span><span class="range"><span>[40.5–</span><wbr><span>68.1]</span></span></td><td role="cell" headers="metric-screenshot_ms tool-puppeteer"><span class="cell-tool" aria-hidden="true"><span>Puppe<wbr>teer</span><span class="engine">Chrome</span></span><span class="number">75.7</span><span class="range"><span>[56.2–</span><wbr><span>93.9]</span></span></td><td role="cell" headers="metric-screenshot_ms tool-agent-browser"><span class="cell-tool" aria-hidden="true"><span>agent-browser</span><span class="engine">Chrome</span></span><span class="number">81.7</span><span class="range"><span>[69.5–</span><wbr><span>100.2]</span></span></td><td role="cell" headers="metric-screenshot_ms tool-stagehand"><span class="cell-tool" aria-hidden="true"><span>Stage<wbr>hand</span><span class="engine">Chrome</span></span><span class="number">93.9</span><span class="range"><span>[75.6–</span><wbr><span>123.7]</span></span></td><td role="cell" headers="metric-screenshot_ms tool-browse"><span class="cell-tool" aria-hidden="true"><span>browse.<wbr>sh</span><span class="engine">Chrome</span></span><span class="number">505.8</span><span class="range"><span>[492.4–</span><wbr><span>537.1]</span></span></td><td role="cell" headers="metric-screenshot_ms tool-playwright-mcp"><span class="cell-tool" aria-hidden="true"><span>Play<wbr>wright MCP</span><span class="engine">Chrome</span></span><span class="number">41.6</span><span class="range"><span>[36.6–</span><wbr><span>52.7]</span></span></td><td role="cell" headers="metric-screenshot_ms tool-cypress"><span class="cell-tool" aria-hidden="true"><span>Cypress</span><span class="engine">Chrome runner</span></span><span class="number">349.7</span><span class="range"><span>[320.9–</span><wbr><span>402.8]</span></span></td><td role="cell" headers="metric-screenshot_ms tool-uivision"><span class="cell-tool" aria-hidden="true"><span>Ui.Vision MCP</span><span class="engine">Extension</span></span><span class="number">1,403.7</span><span class="range"><span>[1,319.5–</span><wbr><span>1,444.2]</span></span></td><td role="cell" headers="metric-screenshot_ms tool-rustwright"><span class="cell-tool" aria-hidden="true"><span>Rust<wbr>wright</span><span class="engine">Chrome</span></span><span class="number">39.1</span><span class="range"><span>[20.7–</span><wbr><span>49.1]</span></span></td><td role="cell" headers="metric-screenshot_ms tool-rustwright-mcp"><span class="cell-tool" aria-hidden="true"><span>Rust<wbr>wright MCP</span><span class="engine">Chrome</span></span><span class="number">36.0</span><span class="range"><span>[22.9–</span><wbr><span>47.9]</span></span></td><td role="cell" headers="metric-screenshot_ms tool-biloba"><span class="cell-tool" aria-hidden="true"><span>Biloba</span><span class="engine">Chrome</span></span><span class="number">81.6</span><span class="range"><span>[64.3–</span><wbr><span>89.6]</span></span></td></tr>
+</tbody>
+<tbody role="rowgroup"><tr class="group-row" role="row"><th scope="rowgroup" role="rowheader" colspan="14">Memory and runtime footprint</th></tr>
+<tr role="row"><th scope="row" role="rowheader" id="metric-total_pss_mib" title="Idle total PSS, including display (MiB)" aria-label="Idle total PSS, including display (MiB)">Idle PSS + display<span class="metric-unit">MiB</span></th><td role="cell" headers="metric-total_pss_mib tool-bruster"><span class="cell-tool" aria-hidden="true"><span>Bruster</span><span class="engine">WebKitGTK</span></span><span class="number">220.1</span><span class="range"><span>[218.4–</span><wbr><span>224.6]</span></span></td><td role="cell" headers="metric-total_pss_mib tool-playwright-shell"><span class="cell-tool" aria-hidden="true"><span>Play<wbr>wright</span><span class="engine">Shell</span></span><span class="number">324.7</span><span class="range"><span>[323.6–</span><wbr><span>326.1]</span></span></td><td role="cell" headers="metric-total_pss_mib tool-playwright"><span class="cell-tool" aria-hidden="true"><span>Play<wbr>wright</span><span class="engine">Chrome</span></span><span class="number">507.6</span><span class="range"><span>[506.0–</span><wbr><span>508.9]</span></span></td><td role="cell" headers="metric-total_pss_mib tool-puppeteer"><span class="cell-tool" aria-hidden="true"><span>Puppe<wbr>teer</span><span class="engine">Chrome</span></span><span class="number">419.5</span><span class="range"><span>[417.4–</span><wbr><span>421.0]</span></span></td><td role="cell" headers="metric-total_pss_mib tool-agent-browser"><span class="cell-tool" aria-hidden="true"><span>agent-browser</span><span class="engine">Chrome</span></span><span class="number">519.0</span><span class="range"><span>[516.3–</span><wbr><span>527.1]</span></span></td><td role="cell" headers="metric-total_pss_mib tool-stagehand"><span class="cell-tool" aria-hidden="true"><span>Stage<wbr>hand</span><span class="engine">Chrome</span></span><span class="number">568.6</span><span class="range"><span>[564.6–</span><wbr><span>570.7]</span></span></td><td role="cell" headers="metric-total_pss_mib tool-browse"><span class="cell-tool" aria-hidden="true"><span>browse.<wbr>sh</span><span class="engine">Chrome</span></span><span class="number">697.6</span><span class="range"><span>[691.5–</span><wbr><span>701.0]</span></span></td><td role="cell" headers="metric-total_pss_mib tool-playwright-mcp"><span class="cell-tool" aria-hidden="true"><span>Play<wbr>wright MCP</span><span class="engine">Chrome</span></span><span class="number">562.7</span><span class="range"><span>[560.0–</span><wbr><span>568.5]</span></span></td><td role="cell" headers="metric-total_pss_mib tool-cypress"><span class="cell-tool" aria-hidden="true"><span>Cypress</span><span class="engine">Chrome runner</span></span><span class="number">1,320.8</span><span class="range"><span>[1,307.3–</span><wbr><span>1,332.7]</span></span></td><td role="cell" headers="metric-total_pss_mib tool-uivision"><span class="cell-tool" aria-hidden="true"><span>Ui.Vision MCP</span><span class="engine">Extension</span></span><span class="number">832.6</span><span class="range"><span>[803.5–</span><wbr><span>840.4]</span></span></td><td role="cell" headers="metric-total_pss_mib tool-rustwright"><span class="cell-tool" aria-hidden="true"><span>Rust<wbr>wright</span><span class="engine">Chrome</span></span><span class="number">525.6</span><span class="range"><span>[523.8–</span><wbr><span>527.5]</span></span></td><td role="cell" headers="metric-total_pss_mib tool-rustwright-mcp"><span class="cell-tool" aria-hidden="true"><span>Rust<wbr>wright MCP</span><span class="engine">Chrome</span></span><span class="number">522.2</span><span class="range"><span>[520.5–</span><wbr><span>528.6]</span></span></td><td role="cell" headers="metric-total_pss_mib tool-biloba"><span class="cell-tool" aria-hidden="true"><span>Biloba</span><span class="engine">Chrome</span></span><span class="number">592.3</span><span class="range"><span>[590.9–</span><wbr><span>595.2]</span></span></td></tr>
+<tr role="row"><th scope="row" role="rowheader" id="metric-rss_mib" title="Idle process RSS, excluding display (MiB)" aria-label="Idle process RSS, excluding display (MiB)">Idle RSS − display<span class="metric-unit">MiB</span></th><td role="cell" headers="metric-rss_mib tool-bruster"><span class="cell-tool" aria-hidden="true"><span>Bruster</span><span class="engine">WebKitGTK</span></span><span class="number">345.3</span><span class="range"><span>[341.5–</span><wbr><span>348.3]</span></span></td><td role="cell" headers="metric-rss_mib tool-playwright-shell"><span class="cell-tool" aria-hidden="true"><span>Play<wbr>wright</span><span class="engine">Shell</span></span><span class="number">595.2</span><span class="range"><span>[593.1–</span><wbr><span>599.8]</span></span></td><td role="cell" headers="metric-rss_mib tool-playwright"><span class="cell-tool" aria-hidden="true"><span>Play<wbr>wright</span><span class="engine">Chrome</span></span><span class="number">1,169.4</span><span class="range"><span>[1,154.1–</span><wbr><span>1,175.9]</span></span></td><td role="cell" headers="metric-rss_mib tool-puppeteer"><span class="cell-tool" aria-hidden="true"><span>Puppe<wbr>teer</span><span class="engine">Chrome</span></span><span class="number">1,064.8</span><span class="range"><span>[1,049.3–</span><wbr><span>1,068.1]</span></span></td><td role="cell" headers="metric-rss_mib tool-agent-browser"><span class="cell-tool" aria-hidden="true"><span>agent-browser</span><span class="engine">Chrome</span></span><span class="number">1,592.8</span><span class="range"><span>[1,579.5–</span><wbr><span>1,691.5]</span></span></td><td role="cell" headers="metric-rss_mib tool-stagehand"><span class="cell-tool" aria-hidden="true"><span>Stage<wbr>hand</span><span class="engine">Chrome</span></span><span class="number">1,450.9</span><span class="range"><span>[1,439.6–</span><wbr><span>1,455.7]</span></span></td><td role="cell" headers="metric-rss_mib tool-browse"><span class="cell-tool" aria-hidden="true"><span>browse.<wbr>sh</span><span class="engine">Chrome</span></span><span class="number">1,578.4</span><span class="range"><span>[1,556.5–</span><wbr><span>1,588.0]</span></span></td><td role="cell" headers="metric-rss_mib tool-playwright-mcp"><span class="cell-tool" aria-hidden="true"><span>Play<wbr>wright MCP</span><span class="engine">Chrome</span></span><span class="number">1,271.8</span><span class="range"><span>[1,255.5–</span><wbr><span>1,283.0]</span></span></td><td role="cell" headers="metric-rss_mib tool-cypress"><span class="cell-tool" aria-hidden="true"><span>Cypress</span><span class="engine">Chrome runner</span></span><span class="number">2,347.2</span><span class="range"><span>[2,326.4–</span><wbr><span>2,363.8]</span></span></td><td role="cell" headers="metric-rss_mib tool-uivision"><span class="cell-tool" aria-hidden="true"><span>Ui.Vision MCP</span><span class="engine">Extension</span></span><span class="number">1,919.0</span><span class="range"><span>[1,770.6–</span><wbr><span>1,938.4]</span></span></td><td role="cell" headers="metric-rss_mib tool-rustwright"><span class="cell-tool" aria-hidden="true"><span>Rust<wbr>wright</span><span class="engine">Chrome</span></span><span class="number">1,563.0</span><span class="range"><span>[1,547.8–</span><wbr><span>1,566.8]</span></span></td><td role="cell" headers="metric-rss_mib tool-rustwright-mcp"><span class="cell-tool" aria-hidden="true"><span>Rust<wbr>wright MCP</span><span class="engine">Chrome</span></span><span class="number">1,384.2</span><span class="range"><span>[1,367.9–</span><wbr><span>1,477.0]</span></span></td><td role="cell" headers="metric-rss_mib tool-biloba"><span class="cell-tool" aria-hidden="true"><span>Biloba</span><span class="engine">Chrome</span></span><span class="number">1,738.1</span><span class="range"><span>[1,723.6–</span><wbr><span>1,753.5]</span></span></td></tr>
+<tr role="row"><th scope="row" role="rowheader" id="metric-footprint" title="Installed runtime files, lower bound (MB)" aria-label="Installed runtime files, lower bound (MB)">Runtime · lower bound<span class="metric-unit">MB</span></th><td role="cell" headers="metric-footprint tool-bruster"><span class="cell-tool" aria-hidden="true"><span>Bruster</span><span class="engine">WebKitGTK</span></span><span class="number">428.3</span></td><td role="cell" headers="metric-footprint tool-playwright-shell"><span class="cell-tool" aria-hidden="true"><span>Play<wbr>wright</span><span class="engine">Shell</span></span><span class="number">475.5</span></td><td role="cell" headers="metric-footprint tool-playwright"><span class="cell-tool" aria-hidden="true"><span>Play<wbr>wright</span><span class="engine">Chrome</span></span><span class="number">630.8</span></td><td role="cell" headers="metric-footprint tool-puppeteer"><span class="cell-tool" aria-hidden="true"><span>Puppe<wbr>teer</span><span class="engine">Chrome</span></span><span class="number">644.7</span></td><td role="cell" headers="metric-footprint tool-agent-browser"><span class="cell-tool" aria-hidden="true"><span>agent-browser</span><span class="engine">Chrome</span></span><span class="number">483.4</span></td><td role="cell" headers="metric-footprint tool-stagehand"><span class="cell-tool" aria-hidden="true"><span>Stage<wbr>hand</span><span class="engine">Chrome</span></span><span class="number">643.9</span></td><td role="cell" headers="metric-footprint tool-browse"><span class="cell-tool" aria-hidden="true"><span>browse.<wbr>sh</span><span class="engine">Chrome</span></span><span class="number">673.4</span></td><td role="cell" headers="metric-footprint tool-playwright-mcp"><span class="cell-tool" aria-hidden="true"><span>Play<wbr>wright MCP</span><span class="engine">Chrome</span></span><span class="number">667.8</span></td><td role="cell" headers="metric-footprint tool-cypress"><span class="cell-tool" aria-hidden="true"><span>Cypress</span><span class="engine">Chrome runner</span></span><span class="number">1,660.4</span></td><td role="cell" headers="metric-footprint tool-uivision"><span class="cell-tool" aria-hidden="true"><span>Ui.Vision MCP</span><span class="engine">Extension</span></span><span class="number">677.1</span></td><td role="cell" headers="metric-footprint tool-rustwright"><span class="cell-tool" aria-hidden="true"><span>Rust<wbr>wright</span><span class="engine">Chrome</span></span><span class="number">644.8</span></td><td role="cell" headers="metric-footprint tool-rustwright-mcp"><span class="cell-tool" aria-hidden="true"><span>Rust<wbr>wright MCP</span><span class="engine">Chrome</span></span><span class="number">645.9</span></td><td role="cell" headers="metric-footprint tool-biloba"><span class="cell-tool" aria-hidden="true"><span>Biloba</span><span class="engine">Chrome</span></span><span class="number">628.7</span></td></tr>
+</tbody>
+<tbody role="rowgroup"><tr class="group-row" role="row"><th scope="rowgroup" role="rowheader" colspan="14">Reliability</th></tr>
+<tr role="row"><th scope="row" role="rowheader" id="metric-failures" title="Sessions with failures (including cleanup)" aria-label="Sessions with failures (including cleanup)">Sessions with failures<span class="metric-unit">incl. cleanup</span></th><td role="cell" headers="metric-failures tool-bruster"><span class="cell-tool" aria-hidden="true"><span>Bruster</span><span class="engine">WebKitGTK</span></span><span class="badge badge-neutral">0/10</span></td><td role="cell" headers="metric-failures tool-playwright-shell"><span class="cell-tool" aria-hidden="true"><span>Play<wbr>wright</span><span class="engine">Shell</span></span><span class="badge badge-warn">10/10</span></td><td role="cell" headers="metric-failures tool-playwright"><span class="cell-tool" aria-hidden="true"><span>Play<wbr>wright</span><span class="engine">Chrome</span></span><span class="badge badge-warn">10/10</span></td><td role="cell" headers="metric-failures tool-puppeteer"><span class="cell-tool" aria-hidden="true"><span>Puppe<wbr>teer</span><span class="engine">Chrome</span></span><span class="badge badge-neutral">0/10</span></td><td role="cell" headers="metric-failures tool-agent-browser"><span class="cell-tool" aria-hidden="true"><span>agent-browser</span><span class="engine">Chrome</span></span><span class="badge badge-neutral">0/10</span></td><td role="cell" headers="metric-failures tool-stagehand"><span class="cell-tool" aria-hidden="true"><span>Stage<wbr>hand</span><span class="engine">Chrome</span></span><span class="badge badge-neutral">0/10</span></td><td role="cell" headers="metric-failures tool-browse"><span class="cell-tool" aria-hidden="true"><span>browse.<wbr>sh</span><span class="engine">Chrome</span></span><span class="badge badge-warn">10/10</span></td><td role="cell" headers="metric-failures tool-playwright-mcp"><span class="cell-tool" aria-hidden="true"><span>Play<wbr>wright MCP</span><span class="engine">Chrome</span></span><span class="badge badge-warn">10/10</span></td><td role="cell" headers="metric-failures tool-cypress"><span class="cell-tool" aria-hidden="true"><span>Cypress</span><span class="engine">Chrome runner</span></span><span class="badge badge-neutral">0/10</span></td><td role="cell" headers="metric-failures tool-uivision"><span class="cell-tool" aria-hidden="true"><span>Ui.Vision MCP</span><span class="engine">Extension</span></span><span class="badge badge-neutral">0/10</span></td><td role="cell" headers="metric-failures tool-rustwright"><span class="cell-tool" aria-hidden="true"><span>Rust<wbr>wright</span><span class="engine">Chrome</span></span><span class="badge badge-neutral">0/10</span></td><td role="cell" headers="metric-failures tool-rustwright-mcp"><span class="cell-tool" aria-hidden="true"><span>Rust<wbr>wright MCP</span><span class="engine">Chrome</span></span><span class="badge badge-neutral">0/10</span></td><td role="cell" headers="metric-failures tool-biloba"><span class="cell-tool" aria-hidden="true"><span>Biloba</span><span class="engine">Chrome</span></span><span class="badge badge-neutral">0/10</span></td></tr>
+</tbody>
+</table><p class="table-note">Ranges show observed variation, not confidence intervals. Memory is idle usage; installed runtime sizes are lower bounds. <a href="#method">Read the measurement method</a>.</p></div></section>
+<section class="section" id="environment" aria-labelledby="environment-title">
+<div class="section-head"><div><h2 id="environment-title">Environment &amp; versions</h2>
+<p>The machine and exact runtime versions behind this measurement.</p></div></div>
+<div class="environment-grid"><div class="panel environment-card"><h3>Runner</h3>
+<dl class="detail-list"><div><dt>Operating system</dt><dd>Ubuntu 24.04.5 LTS</dd></div><div><dt>Processor</dt><dd>AMD EPYC 7763 64-Core Processor</dd></div><div><dt>Visible CPUs</dt><dd>4</dd></div><div><dt>System memory</dt><dd>15.6 GiB</dd></div><div><dt>Runner image</dt><dd>20261101.360.1</dd></div></dl>
+</div><div class="panel environment-card"><h3>Browser runtimes &amp; tools</h3>
+<dl class="detail-list"><div><dt>WebKitGTK</dt><dd>2.52.6</dd></div><div><dt>@browserbasehq/stagehand</dt><dd>4.4.0</dd></div><div><dt>@modelcontextprotocol/sdk</dt><dd>1.32.2</dd></div><div><dt>@playwright/mcp</dt><dd>0.0.84</dd></div><div><dt>agent-browser</dt><dd>0.41.2</dd></div><div><dt>biloba</dt><dd>0.22.0</dd></div><div><dt>browse</dt><dd>0.11.3</dd></div><div><dt>cypress</dt><dd>16.2.1</dd></div><div><dt>playwright-core</dt><dd>1.64.1</dd></div><div><dt>puppeteer-core</dt><dd>25.16.0</dd></div><div><dt>rustwright</dt><dd>0.3.0</dd></div><div><dt>rustwright-mcp</dt><dd>0.1.0</dd></div><div><dt>uivision-mcp-bridge</dt><dd>1.7.20</dd></div><div><dt>Chrome</dt><dd>Google Chrome for Testing 156.0.8078.4</dd></div><div><dt>Headless Shell</dt><dd>Google Chrome for Testing 156.0.8078.4</dd></div><div><dt>Node.js</dt><dd>v26.13.0</dd></div></dl>
+</div></div></section>
+<section class="section" id="method" aria-labelledby="method-title">
+<div class="section-head"><div><h2 id="method-title">How to read these results</h2>
+<p>Measurement conditions, accounting boundaries, and comparison guidance.</p></div></div><div class="method-grid">
+<article class="panel method-card"><h3>Sampling</h3><p>Ten sessions per configuration by default, with rotating order and fresh browser profiles. Values are medians [observed minimum–maximum], not confidence intervals. Startup and first navigation have one sample per session; repeated-operation timings pool all iterations; memory uses the median of three idle readings per session.</p></article>
+<article class="panel method-card"><h3>Startup and workloads</h3><p>Startup includes adapter/daemon/server initialization and blank-page/viewport setup. The combined launch-to-first-page measurement includes both setup and the first navigation. Xvfb is already running: its startup time is excluded, but its memory is included. 1280×800 viewport; localhost fixtures; no-store HTTP responses; navigation waits for load. OS filesystem caches are not flushed. Identical extraction JavaScript and cross-tool result hashes. Timings include controller round trips and per-command CLI launches. These deterministic workloads do not measure LLM inference or token efficiency.</p></article>
+<article class="panel method-card"><h3>Memory and scope</h3><p>Memory covers the complete owned process forest (including detached daemons and helpers), plus Xvfb for Bruster. PSS apportions shared pages; summed RSS double-counts them. Memory is small-page idle usage, not peak usage. Native snapshots have different semantics and are retained in the raw artifacts rather than ranked as equal work. MB = 1,000,000 bytes; MiB = 1,048,576 bytes.</p></article>
+<article class="panel method-card"><h3>Footprint and comparability</h3><p>Installed-file inventories are lower bounds including browser/engine, linked libraries, observed mapped files and Node where required; unobserved OS resources may add more. GitHub-hosted runner hardware and OS packages can change: compare the configurations within a run and inspect provenance before interpreting trends.</p></article>
+</div></section><section class="section" id="reliability" aria-labelledby="reliability-title">
+<div class="section-head"><div><h2 id="reliability-title">Fault probes &amp; cleanup</h2>
+<p>These probes run after the timed workloads. Failed attempts remain counted even when a later retry succeeds.</p></div></div>
+<p class="scroll-hint">Scroll horizontally for fault, cleanup, and recovery details.</p>
+<div class="panel table-scroll" role="region" aria-labelledby="reliability-title" tabindex="0">
+<table class="reliability-table"><caption class="sr-only">Post-workload fault probes and cleanup outcomes for each configuration.</caption>
+<thead><tr><th scope="col">Configuration</th><th scope="col">Sessions with failures</th>
+<th scope="col">Fault-probe failures</th><th scope="col">Shutdown / cleanup failures</th><th scope="col">Successful 100 ms retries</th></tr></thead><tbody>
+<tr><th scope="row">Bruster<span class="engine">WebKitGTK</span></th><td><span class="badge badge-neutral">0/10</span></td><td><span class="badge badge-neutral">None</span></td><td><span class="badge badge-neutral">None</span></td><td>0</td></tr>
+<tr><th scope="row">Playwright<span class="engine">Headless Shell</span></th><td><span class="badge badge-warn">10/10</span></td><td><ul class="probe-list"><li>recovery after navigation error: <strong>10</strong></li></ul></td><td><span class="badge badge-neutral">None</span></td><td>10</td></tr>
+<tr><th scope="row">Playwright<span class="engine">full Chrome</span></th><td><span class="badge badge-warn">10/10</span></td><td><ul class="probe-list"><li>recovery after navigation error: <strong>10</strong></li></ul></td><td><span class="badge badge-neutral">None</span></td><td>10</td></tr>
+<tr><th scope="row">Puppeteer<span class="engine">full Chrome</span></th><td><span class="badge badge-neutral">0/10</span></td><td><span class="badge badge-neutral">None</span></td><td><span class="badge badge-neutral">None</span></td><td>0</td></tr>
+<tr><th scope="row">agent-browser<span class="engine">full Chrome</span></th><td><span class="badge badge-neutral">0/10</span></td><td><span class="badge badge-neutral">None</span></td><td><span class="badge badge-neutral">None</span></td><td>0</td></tr>
+<tr><th scope="row">Stagehand<span class="engine">full Chrome</span></th><td><span class="badge badge-neutral">0/10</span></td><td><span class="badge badge-neutral">None</span></td><td><span class="badge badge-neutral">None</span></td><td>0</td></tr>
+<tr><th scope="row">browse.sh<span class="engine">full Chrome</span></th><td><span class="badge badge-warn">10/10</span></td><td><ul class="probe-list"><li>connection refused: <strong>10</strong></li></ul></td><td><span class="badge badge-neutral">None</span></td><td>0</td></tr>
+<tr><th scope="row">Playwright MCP<span class="engine">full Chrome</span></th><td><span class="badge badge-warn">10/10</span></td><td><ul class="probe-list"><li>recovery after navigation error: <strong>10</strong></li></ul></td><td><span class="badge badge-neutral">None</span></td><td>10</td></tr>
+<tr><th scope="row">Cypress<span class="engine">Chrome test runner</span></th><td><span class="badge badge-neutral">0/10</span></td><td><span class="badge badge-neutral">None</span></td><td><span class="badge badge-neutral">None</span></td><td>0</td></tr>
+<tr><th scope="row">Ui.Vision MCP<span class="engine">browser extension</span></th><td><span class="badge badge-neutral">0/10</span></td><td><span class="badge badge-neutral">None</span></td><td><span class="badge badge-neutral">None</span></td><td>0</td></tr>
+<tr><th scope="row">Rustwright<span class="engine">full Chrome</span></th><td><span class="badge badge-neutral">0/10</span></td><td><span class="badge badge-neutral">None</span></td><td><span class="badge badge-neutral">None</span></td><td>0</td></tr>
+<tr><th scope="row">Rustwright MCP<span class="engine">full Chrome</span></th><td><span class="badge badge-neutral">0/10</span></td><td><span class="badge badge-neutral">None</span></td><td><span class="badge badge-neutral">None</span></td><td>0</td></tr>
+<tr><th scope="row">Biloba<span class="engine">full Chrome</span></th><td><span class="badge badge-neutral">0/10</span></td><td><span class="badge badge-neutral">None</span></td><td><span class="badge badge-neutral">None</span></td><td>0</td></tr>
+</tbody></table></div></section>
+<section class="section" id="downloads" aria-labelledby="downloads-title"><div class="section-head"><div>
+<h2 id="downloads-title">Raw data &amp; reproducibility</h2>
+<p>Download the measurements, runtime inventory, and resolved dependency files for this run.</p></div>
+<a href="https://github.com/aliilyas/bruster/actions/runs/41995962393">Workflow and raw artifacts ↗</a></div><ul class="files">
+<li><a href="measurement.json"><code>measurement.json</code><span>JSON ↓</span></a></li>
+<li><a href="summary.json"><code>summary.json</code><span>JSON ↓</span></a></li>
+<li><a href="samples.json"><code>samples.json</code><span>JSON ↓</span></a></li>
+<li><a href="footprint.json"><code>footprint.json</code><span>JSON ↓</span></a></li>
+<li><a href="report.md"><code>report.md</code><span>Markdown ↓</span></a></li>
+<li><a href="package.json"><code>package.json</code><span>JSON ↓</span></a></li>
+<li><a href="package-lock.json"><code>package-lock.json</code><span>JSON ↓</span></a></li>
+</ul><details class="panel provenance"><summary>Full environment, versions and hashes</summary>
+<pre tabindex="0" aria-label="Measurement provenance">{
+  &quot;started_utc&quot;: &quot;2026-11-05T08:39:50.280282+00:00&quot;,
+  &quot;platform&quot;: &quot;Linux-7.0.0-1017-azure-x86_64-with-glibc2.39&quot;,
+  &quot;os&quot;: {
+    &quot;NAME&quot;: &quot;Ubuntu&quot;,
+    &quot;ID&quot;: &quot;ubuntu&quot;,
+    &quot;PRETTY_NAME&quot;: &quot;Ubuntu 24.04.5 LTS&quot;,
+    &quot;VERSION_ID&quot;: &quot;24.04&quot;,
+    &quot;VERSION&quot;: &quot;24.04.5 LTS (Noble Numbat)&quot;,
+    &quot;VERSION_CODENAME&quot;: &quot;noble&quot;,
+    &quot;ID_LIKE&quot;: &quot;debian&quot;,
+    &quot;HOME_URL&quot;: &quot;https://www.ubuntu.com/&quot;,
+    &quot;SUPPORT_URL&quot;: &quot;https://help.ubuntu.com/&quot;,
+    &quot;BUG_REPORT_URL&quot;: &quot;https://bugs.launchpad.net/ubuntu/&quot;,
+    &quot;PRIVACY_POLICY_URL&quot;: &quot;https://www.ubuntu.com/legal/terms-and-policies/privacy-policy&quot;,
+    &quot;UBUNTU_CODENAME&quot;: &quot;noble&quot;,
+    &quot;LOGO&quot;: &quot;ubuntu-logo&quot;
+  },
+  &quot;node&quot;: &quot;v26.13.0&quot;,
+  &quot;chrome&quot;: &quot;Google Chrome for Testing 156.0.8078.4&quot;,
+  &quot;headless_shell&quot;: &quot;Google Chrome for Testing 156.0.8078.4&quot;,
+  &quot;cpu_count&quot;: 4,
+  &quot;cpu_model&quot;: &quot;AMD EPYC 7763 64-Core Processor&quot;,
+  &quot;mem_total_kib&quot;: 16371756,
+  &quot;runner_image&quot;: {
+    &quot;ImageOS&quot;: &quot;ubuntu24&quot;,
+    &quot;ImageVersion&quot;: &quot;20261101.360.1&quot;,
+    &quot;RUNNER_ARCH&quot;: &quot;X64&quot;
+  },
+  &quot;session_environment&quot;: {
+    &quot;display_set&quot;: true,
+    &quot;session_bus_address_set&quot;: false,
+    &quot;XDG_CURRENT_DESKTOP&quot;: null,
+    &quot;GTK_USE_PORTAL&quot;: null,
+    &quot;GTK_MODULES&quot;: null,
+    &quot;NO_AT_BRIDGE&quot;: null,
+    &quot;BRUSTER_USE_SESSION_BUS&quot;: null
+  },
+  &quot;rustc&quot;: &quot;rustc 1.99.1 (58cf8f9c3 2026-10-13)&quot;,
+  &quot;gtk&quot;: &quot;3.24.41&quot;,
+  &quot;webkitgtk&quot;: &quot;2.52.6&quot;,
+  &quot;tools&quot;: [
+    &quot;bruster&quot;,
+    &quot;playwright-shell&quot;,
+    &quot;playwright&quot;,
+    &quot;puppeteer&quot;,
+    &quot;agent-browser&quot;,
+    &quot;stagehand&quot;,
+    &quot;browse&quot;,
+    &quot;playwright-mcp&quot;,
+    &quot;cypress&quot;,
+    &quot;uivision&quot;,
+    &quot;rustwright&quot;,
+    &quot;rustwright-mcp&quot;,
+    &quot;biloba&quot;
+  ],
+  &quot;competitors&quot;: {
+    &quot;source&quot;: &quot;https://news.ycombinator.com/item?id=49756671&quot;,
+    &quot;reviewed&quot;: &quot;2026-11-01&quot;,
+    &quot;scope&quot;: &quot;The linked story and its complete public comment tree, including replies, plus user-requested Rustwright, Rustwright MCP and Biloba. Additional stories are recorded separately from comments on the original thread. This is not a search of every Hacker News submission.&quot;,
+    &quot;tools&quot;: [
+      {
+        &quot;id&quot;: &quot;bruster&quot;,
+        &quot;label&quot;: &quot;Bruster / WebKitGTK&quot;,
+        &quot;github&quot;: &quot;https://github.com/aliilyas/bruster&quot;,
+        &quot;status&quot;: &quot;linux&quot;,
+        &quot;notes&quot;: &quot;Native JSONL; system WebKitGTK and Xvfb. Reference implementation.&quot;
+      },
+      {
+        &quot;id&quot;: &quot;playwright-shell&quot;,
+        &quot;label&quot;: &quot;Playwright / Headless Shell&quot;,
+        &quot;github&quot;: &quot;https://github.com/microsoft/playwright&quot;,
+        &quot;comments&quot;: [
+          49756672,
+          49767485
+        ],
+        &quot;package&quot;: &quot;playwright-core&quot;,
+        &quot;status&quot;: &quot;linux&quot;,
+        &quot;notes&quot;: &quot;Public Playwright API; separate Headless Shell configuration.&quot;
+      },
+      {
+        &quot;id&quot;: &quot;playwright&quot;,
+        &quot;label&quot;: &quot;Playwright / full Chrome&quot;,
+        &quot;github&quot;: &quot;https://github.com/microsoft/playwright&quot;,
+        &quot;comments&quot;: [
+          49756672,
+          49767485
+        ],
+        &quot;package&quot;: &quot;playwright-core&quot;,
+        &quot;status&quot;: &quot;linux&quot;,
+        &quot;notes&quot;: &quot;Public Playwright API.&quot;
+      },
+      {
+        &quot;id&quot;: &quot;puppeteer&quot;,
+        &quot;label&quot;: &quot;Puppeteer / full Chrome&quot;,
+        &quot;github&quot;: &quot;https://github.com/puppeteer/puppeteer&quot;,
+        &quot;package&quot;: &quot;puppeteer-core&quot;,
+        &quot;status&quot;: &quot;linux&quot;,
+        &quot;notes&quot;: &quot;Existing baseline; not named in the linked HN thread.&quot;
+      },
+      {
+        &quot;id&quot;: &quot;agent-browser&quot;,
+        &quot;label&quot;: &quot;agent-browser / full Chrome&quot;,
+        &quot;github&quot;: &quot;https://github.com/vercel-labs/agent-browser&quot;,
+        &quot;comments&quot;: [
+          49763636,
+          49784241
+        ],
+        &quot;package&quot;: &quot;agent-browser&quot;,
+        &quot;status&quot;: &quot;linux&quot;,
+        &quot;notes&quot;: &quot;Native CLI and persistent daemon; per-command CLI overhead included.&quot;
+      },
+      {
+        &quot;id&quot;: &quot;stagehand&quot;,
+        &quot;label&quot;: &quot;Stagehand / full Chrome&quot;,
+        &quot;github&quot;: &quot;https://github.com/browserbase/stagehand&quot;,
+        &quot;comments&quot;: [
+          49756672
+        ],
+        &quot;package&quot;: &quot;@browserbasehq/stagehand&quot;,
+        &quot;status&quot;: &quot;linux&quot;,
+        &quot;notes&quot;: &quot;Local v4 SDK and bundled extension; deterministic Page APIs. No LLM calls, act/extract inference, cloud caching, or token-efficiency claims.&quot;
+      },
+      {
+        &quot;id&quot;: &quot;browse&quot;,
+        &quot;label&quot;: &quot;browse.sh / full Chrome&quot;,
+        &quot;github&quot;: &quot;https://github.com/browserbase/stagehand/tree/main/packages/cli&quot;,
+        &quot;comments&quot;: [
+          49784241
+        ],
+        &quot;package&quot;: &quot;browse&quot;,
+        &quot;status&quot;: &quot;linux&quot;,
+        &quot;notes&quot;: &quot;Local browse CLI, Stagehand extension and persistent daemon; per-command Node CLI overhead included. Same monorepo as Stagehand.&quot;
+      },
+      {
+        &quot;id&quot;: &quot;playwright-mcp&quot;,
+        &quot;label&quot;: &quot;Playwright MCP / full Chrome&quot;,
+        &quot;github&quot;: &quot;https://github.com/microsoft/playwright-mcp&quot;,
+        &quot;comments&quot;: [
+          49756672
+        ],
+        &quot;package&quot;: &quot;@playwright/mcp&quot;,
+        &quot;adapter_packages&quot;: [
+          &quot;@modelcontextprotocol/sdk&quot;
+        ],
+        &quot;status&quot;: &quot;linux&quot;,
+        &quot;notes&quot;: &quot;Actual stdio MCP server and tool calls, including default response snapshots and client/server overhead; navigation explicitly waits for load.&quot;
+      },
+      {
+        &quot;id&quot;: &quot;sleepyhollow&quot;,
+        &quot;label&quot;: &quot;SleepyHollow / Apple WebKit&quot;,
+        &quot;github&quot;: &quot;https://github.com/bensyverson/sleepyhollow&quot;,
+        &quot;comments&quot;: [
+          49762455,
+          49767052
+        ],
+        &quot;status&quot;: &quot;macos-timing&quot;,
+        &quot;notes&quot;: &quot;Separate same-Mac Bruster/SleepyHollow timing job and artifact. Requires macOS 12+ and WebKit.framework. No Linux/PSS or runtime-footprint estimates; native validation requires the macOS workflow.&quot;
+      },
+      {
+        &quot;id&quot;: &quot;cypress&quot;,
+        &quot;label&quot;: &quot;Cypress / Chrome test runner&quot;,
+        &quot;github&quot;: &quot;https://github.com/cypress-io/cypress&quot;,
+        &quot;comments&quot;: [
+          49766482,
+          49773778
+        ],
+        &quot;package&quot;: &quot;cypress&quot;,
+        &quot;status&quot;: &quot;linux&quot;,
+        &quot;notes&quot;: &quot;Real Cypress CLI/spec runner, application iframe, proxy and task IPC; one command per test with test isolation and retries disabled. Runner, bundled Electron runtime and owned Xvfb are counted. Native snapshot is unavailable; shared DOM extraction is measured.&quot;
+      },
+      {
+        &quot;id&quot;: &quot;uivision&quot;,
+        &quot;label&quot;: &quot;Ui.Vision MCP / browser extension&quot;,
+        &quot;github&quot;: &quot;https://github.com/A9T9/RPA&quot;,
+        &quot;implementation&quot;: &quot;https://github.com/A9T9/RPA/tree/master/mcp&quot;,
+        &quot;comments&quot;: [
+          49765724
+        ],
+        &quot;package&quot;: &quot;uivision-mcp-bridge&quot;,
+        &quot;adapter_packages&quot;: [
+          &quot;playwright-core&quot;,
+          &quot;@modelcontextprotocol/sdk&quot;
+        ],
+        &quot;status&quot;: &quot;linux&quot;,
+        &quot;notes&quot;: &quot;Official browser extension and real MCP bridge in an isolated headless Chrome profile with an open panel. Playwright provisions/closes the browser; measured operations use MCP. Macro-log extraction is chunked to respect transport limits; all calls and default response snapshots are counted. Native snapshots can truncate at 60,000 characters; shared extraction is complete.&quot;
+      },
+      {
+        &quot;id&quot;: &quot;rustwright&quot;,
+        &quot;label&quot;: &quot;Rustwright / full Chrome&quot;,
+        &quot;github&quot;: &quot;https://github.com/Skyvern-AI/rustwright&quot;,
+        &quot;stories&quot;: [
+          48923788,
+          48932230,
+          49319583
+        ],
+        &quot;package&quot;: &quot;rustwright&quot;,
+        &quot;status&quot;: &quot;linux&quot;,
+        &quot;notes&quot;: &quot;User-requested addition, verified against separate HN stories identifying Skyvern-AI/rustwright. Public Node SDK over its in-process Rust CDP engine. The experimental Node API lacks a viewport setter: a CDP connection provisions the viewport at startup and remains idle in memory scope. All workload operations use the SDK. Native snapshot is unavailable in the Node SDK.&quot;
+      },
+      {
+        &quot;id&quot;: &quot;rustwright-mcp&quot;,
+        &quot;label&quot;: &quot;Rustwright MCP / full Chrome&quot;,
+        &quot;github&quot;: &quot;https://github.com/Skyvern-AI/rustwright&quot;,
+        &quot;implementation&quot;: &quot;https://github.com/Skyvern-AI/rustwright/tree/main/mcp&quot;,
+        &quot;stories&quot;: [
+          48923788,
+          48932230,
+          49319583
+        ],
+        &quot;package&quot;: &quot;rustwright-mcp&quot;,
+        &quot;adapter_packages&quot;: [
+          &quot;@modelcontextprotocol/sdk&quot;
+        ],
+        &quot;status&quot;: &quot;linux&quot;,
+        &quot;notes&quot;: &quot;User confirmed that &#x27;Rust MCP&#x27; means Rustwright MCP. Canonical native Rust stdio MCP server, launched directly from its official npm binary package. MCP client/server and automatic snapshots are counted; navigation explicitly waits for load. Native snapshots can truncate; shared extraction is complete. Distinct from the deprecated Python server and luka-loehr/browser-rs.&quot;
+      },
+      {
+        &quot;id&quot;: &quot;biloba&quot;,
+        &quot;label&quot;: &quot;Biloba / full Chrome&quot;,
+        &quot;github&quot;: &quot;https://github.com/onsi/biloba&quot;,
+        &quot;stories&quot;: [
+          49699819
+        ],
+        &quot;package&quot;: &quot;biloba&quot;,
+        &quot;status&quot;: &quot;linux&quot;,
+        &quot;notes&quot;: &quot;User-requested addition, verified against its separate Show HN story. Public TypeScript SDK and real bilobad Go daemon over chromedp; a fresh local browser and session per round. Measures serial browser operations, including daemon transport; no Vitest/Ginkgo scheduling or parallel-suite claims. Native accessibility outlines can truncate; shared extraction is complete.&quot;
+      }
+    ],
+    &quot;related_mentions&quot;: [
+      {
+        &quot;name&quot;: &quot;Jev / TypeSafe&quot;,
+        &quot;comments&quot;: [
+          49768496
+        ],
+        &quot;github&quot;: &quot;https://github.com/browserbase/stagehand/pull/2952&quot;,
+        &quot;notes&quot;: &quot;Typed decision model integrated with Stagehand, not a browser runtime. The verified GitHub link is the integration PR; no standalone Jev browser repository was identified. Requires a model-driven accuracy/cost evaluation.&quot;
+      },
+      {
+        &quot;name&quot;: &quot;Browserbase&quot;,
+        &quot;comments&quot;: [
+          49763632,
+          49757218
+        ],
+        &quot;github&quot;: &quot;https://github.com/browserbase/sdk-node&quot;,
+        &quot;notes&quot;: &quot;Hosted browser service; this is its client SDK, not the hosted browser source. Cloud/network latency needs a separate comparison.&quot;
+      },
+      {
+        &quot;name&quot;: &quot;Codex&quot;,
+        &quot;comments&quot;: [
+          49756672,
+          49757944
+        ],
+        &quot;github&quot;: &quot;https://github.com/openai/codex&quot;,
+        &quot;notes&quot;: &quot;Coding-agent harness using browser tools, not a browser backend.&quot;
+      },
+      {
+        &quot;name&quot;: &quot;Claude Code&quot;,
+        &quot;comments&quot;: [
+          49756672,
+          49757944
+        ],
+        &quot;github&quot;: &quot;https://github.com/anthropics/claude-code&quot;,
+        &quot;notes&quot;: &quot;Coding-agent product repository, not an open-source browser backend.&quot;
+      },
+      {
+        &quot;name&quot;: &quot;Deep Agents&quot;,
+        &quot;comments&quot;: [
+          49757944,
+          49757129
+        ],
+        &quot;github&quot;: &quot;https://github.com/langchain-ai/deepagents&quot;,
+        &quot;notes&quot;: &quot;Agent harness; browser tools and model must be specified for an end-to-end task evaluation.&quot;
+      },
+      {
+        &quot;name&quot;: &quot;Mastra&quot;,
+        &quot;comments&quot;: [
+          49757944
+        ],
+        &quot;github&quot;: &quot;https://github.com/mastra-ai/mastra&quot;,
+        &quot;notes&quot;: &quot;Agent framework, not a browser runtime.&quot;
+      },
+      {
+        &quot;name&quot;: &quot;Eve&quot;,
+        &quot;comments&quot;: [
+          49757944,
+          49757129
+        ],
+        &quot;github&quot;: &quot;https://github.com/vercel/eve&quot;,
+        &quot;notes&quot;: &quot;Vercel agent framework, identified through Stagehand&#x27;s Eve integration and the eve npm package repository. Uses a browser integration rather than implementing a browser.&quot;
+      },
+      {
+        &quot;name&quot;: &quot;Fx&quot;,
+        &quot;comments&quot;: [
+          49757129
+        ],
+        &quot;github&quot;: &quot;https://github.com/vercel-labs/fx&quot;,
+        &quot;notes&quot;: &quot;Coding agent, identified through Stagehand&#x27;s fx integration and fx.sh&#x27;s repository link. Uses the Stagehand MCP integration for browser tasks.&quot;
+      },
+      {
+        &quot;name&quot;: &quot;Astra computer use&quot;,
+        &quot;comments&quot;: [
+          49756970,
+          49757217
+        ],
+        &quot;github&quot;: null,
+        &quot;notes&quot;: &quot;Computer-use/model alternative, with no repository linked in the thread. No authoritative standalone browser repository identified; unrelated projects with the same name are not substituted. Requires a specified model and computer-use environment.&quot;
+      }
+    ]
+  },
+  &quot;competitors_sha256&quot;: &quot;a7ea594c9373720b11a51e597df3e96755af781d64be84256edbe9aa1eca91cc&quot;,
+  &quot;packages&quot;: {
+    &quot;@browserbasehq/stagehand&quot;: &quot;4.4.0&quot;,
+    &quot;@modelcontextprotocol/sdk&quot;: &quot;1.32.2&quot;,
+    &quot;@playwright/mcp&quot;: &quot;0.0.84&quot;,
+    &quot;agent-browser&quot;: &quot;0.41.2&quot;,
+    &quot;biloba&quot;: &quot;0.22.0&quot;,
+    &quot;browse&quot;: &quot;0.11.3&quot;,
+    &quot;cypress&quot;: &quot;16.2.1&quot;,
+    &quot;playwright-core&quot;: &quot;1.64.1&quot;,
+    &quot;puppeteer-core&quot;: &quot;25.16.0&quot;,
+    &quot;rustwright&quot;: &quot;0.3.0&quot;,
+    &quot;rustwright-mcp&quot;: &quot;0.1.0&quot;,
+    &quot;uivision-mcp-bridge&quot;: &quot;1.7.20&quot;
+  },
+  &quot;bruster_bytes&quot;: 1918824,
+  &quot;bruster_sha256&quot;: &quot;7987c2ebd0a367c2ec6f5f17b1b7f8a2245afb8027902010f9f75bd1dca24dce&quot;,
+  &quot;chrome_sha256&quot;: &quot;377a9fc07b495c3b8d0ab8ec1fdfd153641759f9756fea34d8dfce4de82f5025&quot;,
+  &quot;headless_shell_sha256&quot;: &quot;4fa61f0ba0b4f89b7bec242c32ca16d3bccf69dbfef0651924a9ba8fede5f9d6&quot;,
+  &quot;rounds&quot;: 10,
+  &quot;iterations&quot;: 10,
+  &quot;common_extraction_js&quot;: &quot;(() =&gt; ({\n  title: document.title,\n  elements: Array.from(document.querySelectorAll(&#x27;h1,h2,h3,p,li,a,input,button,select,textarea&#x27;))\n    .filter(e =&gt; { const r = e.getBoundingClientRect(); return r.width &gt; 0 &amp;&amp; r.height &gt; 0; })\n    .map(e =&gt; ({tag: e.tagName.toLowerCase(),\n      name: (e.getAttribute(&#x27;aria-label&#x27;) || e.getAttribute(&#x27;placeholder&#x27;) || e.textContent || &#x27;&#x27;).trim(),\n      href: e.getAttribute(&#x27;href&#x27;), value: &#x27;value&#x27; in e ? e.value : null}))\n}))()&quot;,
+  &quot;harness_sha256&quot;: {
+    &quot;bench_compare.py&quot;: &quot;d4da9e833d91d6ca515ae22a0f85fad8a60fc26d3d99391910b61d2c389cddd0&quot;,
+    &quot;bench_competitor_driver.mjs&quot;: &quot;091a04fe34ced734f2ba96c013ef2a373b668fe83e2a8e410496dcdcc062d9ca&quot;,
+    &quot;bench_mcp_driver.mjs&quot;: &quot;d970d5f6d40e9055c36c7cbdd8572e17992f9bd245a3ec89d5c57de417f68f48&quot;,
+    &quot;bench_cypress_driver.mjs&quot;: &quot;c7a795bf4149a7275f13ea7cce10e37439ccc7c6ca7b97480b2e631321498c22&quot;,
+    &quot;bench_cypress.config.cjs&quot;: &quot;a0442f2fa87bd3f83ea2ef975e0bb6529edda9c735f8a45c25dfbd3473896c25&quot;,
+    &quot;bench_cypress.cy.js&quot;: &quot;833b3469ecab1bbd443a81c4902899abd0ab1fb8ab58df055d992e1420169bd8&quot;,
+    &quot;bench_uivision_driver.mjs&quot;: &quot;4a83601cbaf55df9b0b6d3725a2b351f81f04d6392acc90486216b8b2b07c0f1&quot;,
+    &quot;bench_install_uivision.py&quot;: &quot;b44f264df9b9ad32e19276105d6d50533cc2943bb235bdb820ee03db30e10741&quot;,
+    &quot;bench_rustwright_mcp_driver.mjs&quot;: &quot;f78b48216164af7ddca8bad23a0588ad7cecf3a255113add843f425c93451d99&quot;,
+    &quot;bench_footprint.py&quot;: &quot;f6a70626b3cc160bd115e9a22d5677a990cfb45e48f32918259cd591b3b32ac4&quot;,
+    &quot;bench_tools.py&quot;: &quot;4dfe872c7dc61eac092c1a7a402c322a0f4e3a3fc9404faff48658a3fea7ac91&quot;,
+    &quot;bench_audit.py&quot;: &quot;df91d7a203077227c82fc6730033498ea20badaf519c6dd8f6bf10b1c6ae006c&quot;
+  },
+  &quot;package_lock_sha256&quot;: &quot;cf197ea51d53877738f76871d6342d83b48de9937fff27ebfa67e47bfddb976e&quot;,
+  &quot;args&quot;: {
+    &quot;bruster&quot;: &quot;/home/runner/work/bruster/bruster/target/release/bruster&quot;,
+    &quot;node&quot;: &quot;/opt/hostedtoolcache/node/26.13.0/x64/bin/node&quot;,
+    &quot;chrome&quot;: &quot;/home/runner/work/_temp/benchmark-browsers/chromium-1248/chrome-linux64/chrome&quot;,
+    &quot;shell&quot;: &quot;/home/runner/work/_temp/benchmark-browsers/chromium_headless_shell-1248/chrome-headless-shell-linux64/chrome-headless-shell&quot;,
+    &quot;deps&quot;: &quot;/home/runner/work/_temp/benchmark-deps&quot;,
+    &quot;output&quot;: &quot;/home/runner/work/_temp/benchmark-results&quot;,
+    &quot;rounds&quot;: 10,
+    &quot;iterations&quot;: 10,
+    &quot;tools&quot;: [
+      &quot;bruster&quot;,
+      &quot;playwright-shell&quot;,
+      &quot;playwright&quot;,
+      &quot;puppeteer&quot;,
+      &quot;agent-browser&quot;,
+      &quot;stagehand&quot;,
+      &quot;browse&quot;,
+      &quot;playwright-mcp&quot;,
+      &quot;cypress&quot;,
+      &quot;uivision&quot;,
+      &quot;rustwright&quot;,
+      &quot;rustwright-mcp&quot;,
+      &quot;biloba&quot;
+    ]
+  },
+  &quot;uivision_extension&quot;: {
+    &quot;extension_id&quot;: &quot;gcbalfbdmfieckjlnblleoemohcganoc&quot;,
+    &quot;version&quot;: &quot;10.0.303&quot;,
+    &quot;source&quot;: &quot;https://clients2.google.com/service/update2/crx?response=redirect&amp;prodversion=156.0.8078.4&amp;acceptformat=crx3&amp;x=id%3Dgcbalfbdmfieckjlnblleoemohcganoc%26uc&quot;,
+    &quot;resolved_url&quot;: &quot;https://clients2.googleusercontent.com/crx/blobs/ARGaeZLbm26tOXxwaO7G9nHFStm9MCxhn2FdYuO1H9c5BC5zaaCuLFzYiiPbzChvifYhssoWnxLzKpBKUmWpZw4ITUki7EKrdnZXKf0OKVsU-UHxojdC1dXXYpAJq5VVVz_IAMZSmuWgdOGcctPNE4bJ8DmNkgqogycQ8g/GCBALFBDMFIECKJLNBLLEOEMOHCGANOC_10_0_303_0.crx&quot;,
+    &quot;crx_sha256&quot;: &quot;cabd81754af33b574d44a4908e061c67fd04e6ab6509fcc51af95b273fb76f9d&quot;,
+    &quot;setup_change&quot;: &quot;Public CRX key added to manifest to retain the official ID when unpacked&quot;,
+    &quot;manifest_sha256&quot;: &quot;af925e1f2298e07b96e9783d76540fafcfdd0738fbdf2f7cc1055075e48d4c6e&quot;
+  },
+  &quot;native_artifacts&quot;: {
+    &quot;rustwright&quot;: {
+      &quot;path&quot;: &quot;node_modules/rustwright/rustwright.linux-x64-gnu.node&quot;,
+      &quot;bytes&quot;: 5585072,
+      &quot;sha256&quot;: &quot;26ea8439f6f168fa7e1a68eee970705e1583eda9debf011b8f58bc1c16538131&quot;
+    },
+    &quot;rustwright-mcp&quot;: {
+      &quot;path&quot;: &quot;node_modules/@skyvernai/rustwright-mcp-linux-x64-gnu/bin/rustwright-mcp&quot;,
+      &quot;bytes&quot;: 10090120,
+      &quot;sha256&quot;: &quot;552f458fe2655807c624f560df6c9643c02a61dda21c00e179c44581af31676d&quot;
+    },
+    &quot;biloba&quot;: {
+      &quot;path&quot;: &quot;node_modules/biloba-linux-x64/bin/bilobad&quot;,
+      &quot;bytes&quot;: 10453154,
+      &quot;sha256&quot;: &quot;a2926a4535a1a7dd63148ddc8322d556e126afd3b2d7e1cc4899bead2d754428&quot;
+    }
+  },
+  &quot;finished_utc&quot;: &quot;2026-11-05T09:07:30.044154+00:00&quot;
+}</pre></details></section>
+<p class="back-link"><a href="../../">← All measurements</a></p>
+<p class="benchmark-source"><a href="https://github.com/aliilyas/bruster/blob/64a520214052e58cb26e652c01bc97c76e06bf6f/benchmarks/README.md">Benchmark source &amp; methodology ↗</a></p>
+</main>
+  <footer class="site-footer">
+    <div class="container footer-grid">
+      <div><a class="brand" href="/bruster/"><img src="/bruster/assets/wordmark.svg" alt="bruster" width="128" height="32"></a><p>Small controller. Real browser. Your workflow.</p></div>
+      <nav aria-label="Resources"><span class="footer-label">Build with bruster</span><a href="/bruster/docs/">Documentation</a><a href="/bruster/testing/">UI testing DSL</a><a href="/bruster/mcp/">MCP setup</a><a href="/bruster/docs/#api">API reference</a><a href="/bruster/llms.txt">AI documentation (llms.txt)</a></nav>
+      <nav aria-label="Project"><span class="footer-label">Explore the project</span><a href="/bruster/benchmarks/">Benchmarks</a><a href="/bruster/compare/">Compare tools</a><a href="https://github.com/aliilyas/bruster/releases">Releases <span aria-hidden="true">↗</span></a><a href="https://hub.docker.com/r/ilyastmn/bruster">Docker Hub <span aria-hidden="true">↗</span></a></nav>
+    </div>
+    <div class="container footer-bottom"><span>Open source. MIT licensed. Built in Rust.</span><a href="https://github.com/aliilyas/bruster">Made in the open <span aria-hidden="true">↗</span></a></div>
+  </footer>
+  <p id="copy-status" class="sr-only" role="status"></p>
+</body>
+</html>
