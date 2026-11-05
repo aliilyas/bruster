@@ -35,6 +35,7 @@ run() {
 
 run build cargo build --release --locked --tests
 run unit cargo test --release --locked --bin bruster
+run testing cargo test --release --locked --test testing
 i=1
 while [ "$i" -le "$ROUNDS" ]; do
   run "smoke-$i" cargo test --release --locked --test smoke

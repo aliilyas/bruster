@@ -12,9 +12,10 @@
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 
-use serde_json::{json, Value};
+use serde::{Deserialize, Serialize};
+use serde_json::{json, value::RawValue, Value};
 
 use crate::Request;
 
@@ -70,25 +71,32 @@ fn rpc_error(id: Value, code: i64, msg: impl ToString) {
 }
 
 /// Parses one stdin line. `Ok(None)` means it was consumed here.
-pub fn incoming(line: &str) -> Result<Option<Request>, String> {
+pub fn incoming(line: &str, mut cancel: impl FnMut(u64)) -> Result<Option<Request>, String> {
     if !enabled() {
         return serde_json::from_str(line)
             .map(Some)
             .map_err(|e| e.to_string());
     }
 
-    let msg: Value = match serde_json::from_str(line) {
+    let mut msg: Value = match serde_json::from_str(line) {
         Ok(v) => v,
         Err(e) => {
             rpc_error(Value::Null, PARSE_ERROR, e);
             return Ok(None);
         }
     };
-    let id = msg.get("id").cloned().unwrap_or(Value::Null);
-    let method = msg.get("method").and_then(Value::as_str).unwrap_or("");
-    let params = msg.get("params").cloned().unwrap_or(Value::Null);
+    let id = msg.get_mut("id").map(Value::take).unwrap_or(Value::Null);
+    let method = msg
+        .get("method")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_owned();
+    let mut params = msg
+        .get_mut("params")
+        .map(Value::take)
+        .unwrap_or(Value::Null);
 
-    match method {
+    match method.as_str() {
         "initialize" => {
             let wanted = params.get("protocolVersion").and_then(Value::as_str);
             let version = wanted
@@ -106,7 +114,11 @@ pub fn incoming(line: &str) -> Result<Option<Request>, String> {
         "ping" => rpc_result(id, json!({})),
         "tools/list" => rpc_result(id, json!({ "tools": tools() })),
         "tools/call" => {
-            let Some(name) = params.get("name").and_then(Value::as_str) else {
+            let Some(name) = params
+                .get("name")
+                .and_then(Value::as_str)
+                .map(str::to_owned)
+            else {
                 rpc_error(id, INVALID_PARAMS, "tools/call: missing name");
                 return Ok(None);
             };
@@ -114,14 +126,17 @@ pub fn incoming(line: &str) -> Result<Option<Request>, String> {
                 rpc_error(id, INVALID_PARAMS, format!("unknown tool '{name}'"));
                 return Ok(None);
             }
-            let mut args = params.get("arguments").cloned().unwrap_or(json!({}));
+            let mut args = params
+                .get_mut("arguments")
+                .map(Value::take)
+                .unwrap_or(json!({}));
             let tab = args
                 .as_object_mut()
                 .and_then(|o| o.remove("tab"))
                 .and_then(|t| t.as_u64())
                 .map(|t| t as u32);
             // The model reads the result as text anyway; the line format is ~40% smaller than JSON.
-            if matches!(name, "snapshot" | "find") && args.get("format").is_none() {
+            if matches!(name.as_str(), "snapshot" | "find") && args.get("format").is_none() {
                 args["format"] = json!("text");
             }
 
@@ -134,9 +149,10 @@ pub fn incoming(line: &str) -> Result<Option<Request>, String> {
                 .insert(internal, id);
             return Ok(Some(Request {
                 id: internal,
-                method: name.to_owned(),
+                method: name,
                 params: args,
                 tab,
+                permit: None,
             }));
         }
         "logging/setLevel" => {
@@ -150,13 +166,19 @@ pub fn incoming(line: &str) -> Result<Option<Request>, String> {
             }
         }
         "notifications/initialized" => INITIALIZED.store(true, Ordering::Relaxed),
-        // The browser still finishes the work; its answer is dropped in outgoing().
         "notifications/cancelled" => {
             let Some(rpc_id) = params.get("requestId") else {
                 return Ok(None);
             };
             if let Some(map) = IN_FLIGHT.lock().unwrap().as_mut() {
-                map.retain(|_, v| *v != *rpc_id);
+                map.retain(|id, v| {
+                    if *v == *rpc_id {
+                        cancel(*id);
+                        false
+                    } else {
+                        true
+                    }
+                });
             }
         }
         m if m.starts_with("notifications/") => {}
@@ -182,6 +204,157 @@ pub fn outgoing(v: Value) -> Option<Value> {
         None => json!({ "content": [content(&v["result"])] }),
     };
     Some(json!({ "jsonrpc": JSONRPC, "id": rpc_id, "result": result }))
+}
+
+#[derive(Serialize)]
+#[serde(untagged)]
+enum BorrowedText<'a> {
+    // Page strings are already JSON-escaped. Objects/scalars become JSON text
+    // inside the MCP string, without building and serializing a Value tree.
+    String(&'a RawValue),
+    Json(&'a str),
+}
+
+#[derive(Serialize)]
+#[serde(tag = "type", rename_all = "lowercase")]
+enum BorrowedContent<'a> {
+    Text {
+        text: BorrowedText<'a>,
+    },
+    Image {
+        data: &'a RawValue,
+        #[serde(rename = "mimeType")]
+        mime_type: &'static str,
+    },
+}
+
+fn borrowed_content(result: &RawValue) -> BorrowedContent<'_> {
+    let raw = result.get();
+    if raw.starts_with('{') {
+        #[derive(Deserialize)]
+        struct Image<'a> {
+            #[serde(borrow)]
+            png_base64: Option<&'a RawValue>,
+        }
+        // eval can return an image too. Skip other fields without allocating
+        // them, and keep the same image detection as the normal result path.
+        if let Ok(Image {
+            png_base64: Some(data),
+        }) = serde_json::from_str(raw)
+        {
+            if data.get().starts_with('"') {
+                return BorrowedContent::Image {
+                    data,
+                    mime_type: "image/png",
+                };
+            }
+        }
+    }
+    BorrowedContent::Text {
+        text: if raw.starts_with('"') {
+            BorrowedText::String(result)
+        } else {
+            BorrowedText::Json(raw)
+        },
+    }
+}
+
+/// The page envelope has already passed document/attempt validation. Consume
+/// the ID under the stdout lock, as outgoing() does, including cancellations.
+pub fn raw_reply(internal: u64, result: &RawValue) {
+    #[derive(Serialize)]
+    struct Content<'a> {
+        content: [BorrowedContent<'a>; 1],
+    }
+    #[derive(Serialize)]
+    struct Reply<'a> {
+        jsonrpc: &'static str,
+        id: Value,
+        result: Content<'a>,
+    }
+    let out = std::io::stdout().lock();
+    crate::limits::complete(internal);
+    let Some(id) = IN_FLIGHT
+        .lock()
+        .unwrap()
+        .as_mut()
+        .and_then(|m| m.remove(&internal))
+    else {
+        return;
+    };
+    crate::write_json_to(
+        out,
+        &Reply {
+            jsonrpc: JSONRPC,
+            id,
+            result: Content {
+                content: [borrowed_content(result)],
+            },
+        },
+    );
+}
+
+pub fn image_reply(internal: u64, data: &str) {
+    #[derive(Serialize)]
+    struct Image<'a> {
+        r#type: &'static str,
+        data: &'a str,
+        #[serde(rename = "mimeType")]
+        mime_type: &'static str,
+    }
+    #[derive(Serialize)]
+    struct Content<'a> {
+        content: [Image<'a>; 1],
+    }
+    #[derive(Serialize)]
+    struct Reply<'a> {
+        jsonrpc: &'static str,
+        id: Value,
+        result: Content<'a>,
+    }
+    let out = std::io::stdout().lock();
+    crate::limits::complete(internal);
+    let Some(id) = IN_FLIGHT
+        .lock()
+        .unwrap()
+        .as_mut()
+        .and_then(|m| m.remove(&internal))
+    else {
+        return;
+    };
+    crate::write_json_to(
+        out,
+        &Reply {
+            jsonrpc: JSONRPC,
+            id,
+            result: Content {
+                content: [Image {
+                    r#type: "image",
+                    data,
+                    mime_type: "image/png",
+                }],
+            },
+        },
+    );
+}
+
+pub fn input_error(message: &str) {
+    if enabled() {
+        rpc_error(Value::Null, PARSE_ERROR, message);
+    } else {
+        write(json!({ "error": message }));
+    }
+}
+
+pub fn rejected(id: u64, message: &str) {
+    // A duplicate native ID must not retire the original request's permit.
+    if enabled() {
+        if let Some(value) = outgoing(json!({ "id": id, "error": message })) {
+            write(value);
+        }
+    } else {
+        write(json!({ "id": id, "error": message }));
+    }
 }
 
 /// Browser events become log notifications. Nothing goes out before the
@@ -217,13 +390,18 @@ fn content(result: &Value) -> Value {
 }
 
 /// Tool definitions. Target tools accept `selector` or `ref` (from snapshot).
-fn tools() -> Vec<Value> {
+fn tools() -> &'static [Value] {
+    static TOOLS: OnceLock<Vec<Value>> = OnceLock::new();
+    TOOLS.get_or_init(build_tools)
+}
+
+fn build_tools() -> Vec<Value> {
     const TARGET: &str = "target";
     let specs: &[(&str, &str, &str, &[&str])] = &[
         ("navigate", "Open a URL and wait for it. until: load (default), dom (DOMContentLoaded, fastest, fine for server-rendered pages) or idle (load plus a quiet network).", "url,until,timeout", &["url"]),
         ("snapshot", "List visible elements and text with refs usable in other tools, one per line: ref role \"name\" href=... selector scopes to a subtree, max caps the list, boxes adds rects, format=json for objects.", "selector,max,boxes,format", &[]),
         ("find", "Snapshot narrowed to elements whose name, text, value or href contains text or matches regex.", "text,regex,selector,max,boxes,format", &[]),
-        ("screenshot", "PNG of the viewport. full=true for the whole page, or clip={x,y,width,height}. path writes the file instead of returning it.", "full,clip,path", &[]),
+        ("screenshot", "PNG of the viewport. full=true for the whole page, or clip={x,y,width,height}. path writes the file instead of returning it. Captures are queued per tab within a physical pixel budget.", "full,clip,path,request_timeout", &[]),
         ("click", "Click an element, or a viewport point with x,y. Waits until it is visible, enabled and not covered; force skips that.", "target,x,y,force,timeout", &[]),
         ("hover", "Hover an element.", "target,force,timeout", &[]),
         ("fill", "Set an input's value (fires input/change).", "target,value,force,timeout", &["value"]),
@@ -248,7 +426,7 @@ fn tools() -> Vec<Value> {
         ("count", "Number of elements matching a selector.", "selector", &["selector"]),
         ("eval", "Evaluate a JavaScript expression in the page.", "expression", &["expression"]),
         ("wait_for", "Wait for selector state (visible/attached/hidden), text present or gone, url substring, network idle, or time ms.", "target,state,text,textGone,url,idle,time,timeout", &[]),
-        ("network", "Requests made by the page: fetch, xhr and resources. index feeds network_request.", "clear", &[]),
+        ("network", "Requests made by the page: fetch, xhr and resources. index feeds network_request. bodies=false selects metadata-only capture until navigation or re-enabled.", "clear,bodies", &[]),
         ("network_request", "Headers and body prefix of one fetch/xhr entry from network.", "index", &["index"]),
         ("console", "Console messages and page errors since the last navigation.", "clear", &[]),
         ("dialog", "Set how alert/confirm/prompt are answered from now on, and list dialogs seen so far.", "accept,text,clear", &[]),
@@ -305,7 +483,11 @@ fn tools() -> Vec<Value> {
 
 fn prop_schema(name: &str) -> Value {
     match name {
-        "full" | "clear" | "checked" | "force" | "boxes" | "submit" | "idle" | "accept" => {
+        "request_timeout" => {
+            json!({ "type": "integer", "minimum": 0, "description": "Outer deadline including time queued, in milliseconds; default 30000" })
+        }
+        "full" | "clear" | "bodies" | "checked" | "force" | "boxes" | "submit" | "idle"
+        | "accept" => {
             json!({ "type": "boolean" })
         }
         "timeout" | "delay" | "x" | "y" | "tab" | "max" | "width" | "height" | "time" | "index" => {
@@ -335,6 +517,36 @@ fn prop_schema(name: &str) -> Value {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn borrowed_results_preserve_mcp_content() {
+        use serde_json::{json, value::RawValue, Value};
+        for source in [
+            r#""quote\"\\\r\n雪""#,
+            r#""\uD83D\uDE00""#,
+            "null",
+            "true",
+            "42",
+            "-1.25",
+            r#"{"z":[1,null,false],"a":"line\nend"}"#,
+            r#"{"png_base64":"YWJj","other":[1,2]}"#,
+            r#"{"png_base64":false}"#,
+        ] {
+            let raw: &RawValue = serde_json::from_str(source).unwrap();
+            let value: Value = serde_json::from_str(source).unwrap();
+            let actual = serde_json::to_value(super::borrowed_content(raw)).unwrap();
+            let expected = super::content(&value);
+            if value.is_string() || actual["type"] == "image" {
+                assert_eq!(actual, expected);
+            } else {
+                assert_eq!(actual["type"], json!("text"));
+                assert_eq!(
+                    serde_json::from_str::<Value>(actual["text"].as_str().unwrap()).unwrap(),
+                    value
+                );
+            }
+        }
+    }
+
     #[test]
     fn window_controls_are_exposed() {
         let tools = super::tools();

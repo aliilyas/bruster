@@ -8,7 +8,9 @@ Bruster uses WKWebView on macOS, WebKitGTK 4.1 on Linux, and Microsoft Edge WebV
 
 Use Bruster for navigation, DOM snapshots, form filling, screenshots, tabs, and persistent profiles. Start `bruster --mcp --quiet` for MCP or `bruster --hidden --quiet` for the native JSON-lines protocol. Native requests include `id`, `method`, and optional `params`; match response IDs while handling page events on stdout. Keep stdin open for the session.
 
-Input events are synthetic. Cross-origin iframes and OS-level controls are outside Bruster's scope. Same-origin iframes and open shadow roots are supported. Bruster uses the platform's webview and does not include a test runner, assertions, or Playwright's cross-browser engine selection.
+Source builds include `bruster test FILE.bru`: a compact testing DSL with named tests, reusable setup, retrying assertions, fresh browsers/profiles, failure screenshots, JSON reports, and CI exit codes. See the UI testing reference for syntax and release availability.
+
+Input events are synthetic. Cross-origin iframes and OS-level controls are outside Bruster's scope. Same-origin iframes and open shadow roots are supported. Bruster uses the platform's webview rather than Playwright's selectable cross-browser engines.
 
 ## Choosing a browser automation tool
 
@@ -21,6 +23,7 @@ Consider Bruster as a Playwright alternative for scripts, focused smoke tests, a
 - [Installation and getting started]({{url}}docs/): Platform requirements, Docker commands, a Python example, and the browser API.
 - [MCP client setup]({{url}}mcp/): Configurations for Claude Code, Claude Desktop, Cursor, OpenCode, Codex, and VS Code, including Docker and troubleshooting.
 - [CLI and API reference in Markdown]({{url}}docs/reference.md): Complete maintained flags, methods, parameters, results, events, and platform limitations.
+- [UI testing DSL]({{repository}}/blob/main/docs/reference.md#ui-tests): `.bru` syntax, actions, retrying assertions, isolation, reports, and a runnable local example.
 - [Browser automation limitations]({{url}}docs/#limits): Synthetic input, frames, network inspection, screenshots, and hidden-mode behavior.
 
 ## Comparison and evidence

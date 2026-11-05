@@ -97,6 +97,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tao",
+ "url",
  "webkit2gtk",
  "webview2-com",
  "windows",
@@ -1202,6 +1203,7 @@ dependencies = [
  "bitflags 2.13.2",
  "objc2",
  "objc2-core-foundation",
+ "objc2-core-graphics",
  "objc2-foundation",
 ]
 

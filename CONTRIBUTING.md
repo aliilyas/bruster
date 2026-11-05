@@ -22,6 +22,18 @@ Run `target/release/bruster` after building. See the
 
 ## Tests
 
+The user-facing `.bru` runner is covered by parser unit tests and real-browser
+CLI tests. Run its focused checks with:
+
+```sh
+cargo test --release --locked --bin bruster testing::
+cargo test --release --locked --test testing -- --test-threads=1
+```
+
+On headless Linux, prefix the second command with `xvfb-run -a`. See the
+[DSL reference](docs/reference.md#ui-tests) and
+[local example](examples/testing/greeting.bru) to author application tests.
+
 The full test cycle needs Python 3.10+ and network access for end-to-end tests:
 
 ```sh

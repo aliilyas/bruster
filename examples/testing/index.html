@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Greeting demo</title>
+<h1>Greeting demo</h1>
+<form id="greeting">
+  <label>Your name <input id="name" required></label>
+  <button>Greet</button>
+</form>
+<p id="result" role="status"></p>
+<script>
+  document.querySelector('#greeting').addEventListener('submit', event => {
+    event.preventDefault();
+    document.querySelector('#result').textContent = `Hello, ${document.querySelector('#name').value}!`;
+  });
+</script>
+</html>

@@ -5,54 +5,140 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Bruster browser lab</title>
   <style>
-    :root { color-scheme: dark; }
+    :root {
+      color-scheme: dark;
+      --bg: #1b1c19;
+      --panel: #22231f;
+      --text: #e5e3d6;
+      --muted: #aaa99b;
+      --line: #45463d;
+      --accent: #dfb775;
+      --success: #b0c58d;
+      font: 14px/1.6 ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    }
     * { box-sizing: border-box; }
-    body { margin: 0; background: #0d1422; color: #edf4ff; font: 17px system-ui, sans-serif; }
-    main { max-width: 720px; margin: 32px auto; padding: 0 28px; }
-    header { display: flex; justify-content: space-between; align-items: center; color: #77e7da; font-weight: 700; }
-    header span { color: #97aac7; font-size: 13px; font-weight: 400; }
-    h1 { margin: 30px 0 8px; font-size: 34px; letter-spacing: -1px; }
-    p { color: #aebed5; margin: 0 0 24px; }
-    form { background: #182338; border: 1px solid #2c3b55; border-radius: 16px; padding: 24px; }
-    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
-    label { display: block; font-size: 14px; color: #c6d5e9; }
-    input[type=text], select { width: 100%; margin: 8px 0 18px; padding: 12px; border-radius: 8px; border: 1px solid #47566e; background: #101a2a; color: white; font: inherit; }
-    select { appearance: none; -webkit-appearance: none; }
-    .check { display: flex; gap: 9px; align-items: center; margin: 0 0 20px; }
-    button { width: 100%; background: #77e7da; color: #0d1422; font: 700 17px system-ui; border: 0; border-radius: 8px; padding: 14px; cursor: pointer; }
-    #result { border: 1px solid #77e7da; background: #14312e; padding: 20px; border-radius: 12px; margin-top: 18px; }
-    #result h2 { margin: 0 0 9px; font-size: 22px; }
-    #result p { margin: 0; color: #c7eee7; font-size: 15px; }
-    footer { margin-top: 20px; color: #8a9ab4; font-size: 13px; }
+    body { margin: 0; background: var(--bg); color: var(--text); }
+    main { max-width: 1024px; margin: 24px auto; padding: 0 28px; }
+    header { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+    .brand { font-weight: 700; }
+    .brand b { color: var(--accent); margin-right: 8px; }
+    .path, .fixture-id { color: var(--muted); font-size: 12px; }
+    .path { font-weight: 400; }
+    .intro { margin: 24px 0 22px; }
+    h1 { margin: 0 0 6px; font-size: clamp(24px, 4vw, 32px); line-height: 1.25; font-weight: 600; letter-spacing: -1.2px; }
+    .intro p { margin: 0; color: var(--muted); font-size: 13px; }
+    .workbench { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); border: 1px solid var(--line); background: var(--panel); }
+    .panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 16px; border-bottom: 1px solid var(--line); }
+    .panel-heading h2 { margin: 0; font-size: 12px; font-weight: 400; }
+    .panel-heading h2 span { color: var(--accent); margin-right: 8px; }
+    .panel-heading code { font-size: 11px; color: var(--muted); }
+    .fields { padding: 16px; }
+    .row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+    label { display: block; font-size: 12px; }
+    .field-label { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+    .field-label code { color: var(--muted); font-size: 10px; }
+    input[type=text], select { width: 100%; min-width: 0; margin: 6px 0 14px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 0; background: var(--bg); color: var(--text); font: inherit; font-size: 13px; }
+    input::placeholder { color: #8f9084; opacity: 1; }
+    input, select { accent-color: var(--accent); }
+    input:hover, select:hover { border-color: var(--muted); }
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+    .check { display: flex; gap: 9px; align-items: center; width: fit-content; min-height: 30px; margin-bottom: 12px; cursor: pointer; }
+    .check input { width: 15px; height: 15px; margin: 0; }
+    button { display: inline-flex; align-items: center; gap: 24px; padding: 9px 12px; border: 1px solid var(--accent); border-radius: 0; background: var(--accent); color: var(--bg); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+    button:hover { background: #edc78b; border-color: #edc78b; }
+    button:active { background: #cba266; }
+    button span { font-weight: 400; }
+    .inspector { min-width: 0; border-left: 1px solid var(--line); background: var(--bg); }
+    pre, code { font-family: inherit; }
+    pre { margin: 0; padding: 18px 16px; color: var(--accent); font-size: 12px; line-height: 1.9; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .inspector-note { margin: 0 16px 16px; padding-top: 12px; border-top: 1px dashed var(--line); color: var(--muted); font-size: 11px; }
+    .inspector-note p { margin: 0 0 4px; }
+    .inspector-note code { color: var(--text); }
+    #result { border: 1px solid var(--line); border-left: 3px solid var(--success); padding: 12px 16px; margin-top: 14px; overflow-wrap: anywhere; }
+    .result-label { color: var(--success); font-size: 10px; }
+    #result h2 { margin: 3px 0; font-size: 16px; line-height: 1.5; font-weight: 500; }
+    #result p { margin: 0; color: var(--muted); font-size: 12px; }
+    footer { display: flex; justify-content: space-between; gap: 12px; margin-top: 16px; color: var(--muted); font-size: 10px; }
+    footer p { margin: 0; }
+    footer code { white-space: nowrap; }
+    @media (max-width: 640px) {
+      main { margin: 16px auto; padding: 0 16px; }
+      .fixture-id { display: none; }
+      .workbench { grid-template-columns: minmax(0, 1fr); }
+      .inspector { border-left: 0; border-top: 1px solid var(--line); }
+      footer { flex-direction: column; gap: 4px; }
+    }
+    @media (max-width: 360px) {
+      .row { grid-template-columns: minmax(0, 1fr); gap: 0; }
+    }
   </style>
 </head>
 <body>
   <main>
-    <header>bruster / browser lab <span>LOCAL DEMO · NO ACCOUNT</span></header>
-    <h1>Create a browser smoke test</h1>
-    <p>A small form for trying navigation, snapshots, inputs, and screenshots.</p>
-    <form id="test-form">
-      <div class="row">
-        <label>Your name<input id="name" name="name" type="text" placeholder="Name" required></label>
-        <label>Project<input id="project" name="project" type="text" placeholder="Project name" required></label>
-      </div>
-      <label>Workflow
-        <select id="workflow" name="workflow">
-          <option value="navigation">Navigation check</option>
-          <option value="forms">Form submission</option>
-          <option value="screenshots">Screenshot review</option>
-        </select>
-      </label>
-      <label class="check"><input id="screenshots" name="screenshots" type="checkbox"> Include screenshots</label>
-      <button type="submit">Create smoke test</button>
-    </form>
-    <section id="result" role="status" hidden><h2></h2><p></p></section>
-    <footer>This fixture runs entirely in your browser. Nothing is sent to a service.</footer>
+    <header>
+      <div class="brand"><b aria-hidden="true">[b]</b>bruster <span class="path">/ browser lab</span></div>
+      <span class="fixture-id">fixture: forms</span>
+    </header>
+    <div class="intro">
+      <h1>Browser smoke test</h1>
+      <p>A local fixture for inputs, DOM snapshots, and screenshots.</p>
+    </div>
+    <div class="workbench">
+      <form id="test-form">
+        <div class="panel-heading"><h2><span>01</span>Input</h2><code>#test-form</code></div>
+        <div class="fields">
+          <div class="row">
+            <label><span class="field-label">Your name <code aria-hidden="true">#name</code></span><input id="name" name="name" type="text" placeholder="Ada Lovelace" required></label>
+            <label><span class="field-label">Project <code aria-hidden="true">#project</code></span><input id="project" name="project" type="text" placeholder="Bruster" required></label>
+          </div>
+          <label><span class="field-label">Workflow <code aria-hidden="true">#workflow</code></span>
+            <select id="workflow" name="workflow">
+              <option value="navigation">Navigation check</option>
+              <option value="forms">Form submission</option>
+              <option value="screenshots">Screenshot review</option>
+            </select>
+          </label>
+          <label class="check"><input id="screenshots" name="screenshots" type="checkbox"> Include screenshots</label>
+          <button type="submit">Create smoke test <span aria-hidden="true">↵</span></button>
+        </div>
+      </form>
+      <aside class="inspector" aria-labelledby="payload-title">
+        <div class="panel-heading"><h2 id="payload-title"><span>02</span>Form state</h2><code>live / json</code></div>
+        <pre><code id="payload">{
+  "name": "",
+  "project": "",
+  "workflow": "navigation",
+  "screenshots": false
+}</code></pre>
+        <div class="inspector-note">
+          <p>// Current values. Updated on input.</p>
+          <p>Submit writes a receipt to <code>#result</code>.</p>
+        </div>
+      </aside>
+    </div>
+    <section id="result" role="status" hidden><span class="result-label">03 / LAST SUBMISSION</span><h2></h2><p></p></section>
+    <footer><p>Local fixture. Nothing is sent to a service.</p><code>navigate → snapshot → fill_form → click</code></footer>
   </main>
   <script>
-    document.querySelector('#test-form').addEventListener('submit', event => {
+    const form = document.querySelector('#test-form');
+    const payload = document.querySelector('#payload');
+
+    function updatePayload() {
+      payload.textContent = JSON.stringify({
+        name: form.elements.name.value,
+        project: form.elements.project.value,
+        workflow: form.elements.workflow.value,
+        screenshots: form.elements.screenshots.checked,
+      }, null, 2);
+    }
+
+    form.addEventListener('input', updatePayload);
+    form.addEventListener('change', updatePayload);
+    updatePayload();
+
+    form.addEventListener('submit', event => {
       event.preventDefault();
-      const form = event.currentTarget;
+      updatePayload();
       const result = document.querySelector('#result');
       result.querySelector('h2').textContent = `Smoke test created for ${form.elements.project.value}`;
       result.querySelector('p').textContent = `${form.elements.name.value} · ${form.elements.workflow.selectedOptions[0].textContent} · Screenshots: ${form.elements.screenshots.checked ? 'on' : 'off'}`;

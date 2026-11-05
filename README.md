@@ -27,7 +27,7 @@ or your own test runner through MCP or a JSON-lines API. No Node.js required.
 Navigate pages, inspect the DOM, fill forms, take screenshots, and manage tabs
 and persistent sessions on macOS (WKWebView), Linux (WebKitGTK), and Windows
 (WebView2). Bruster fits native-webview scripts, focused smoke tests, and
-agent-driven workflows; bring your own assertions and test runner.
+agent-driven workflows. Run `.bru` tests with the built-in runner or use your own.
 
 For AI tools: [documentation index](https://aliilyas.github.io/bruster/llms.txt) ·
 [full CLI and API reference](https://aliilyas.github.io/bruster/llms-full.txt).
@@ -103,6 +103,31 @@ Run `bruster`, then send requests on stdin, waiting for each response before the
 
 Responses carry the matching `id`; page events also arrive on stdout.
 [Protocol and API reference](docs/reference.md#protocol).
+
+## UI tests
+
+Write a `login.bru` file:
+
+```text
+base_url "http://localhost:3000"
+
+test "opens the dashboard"
+  navigate "/login"
+  fill "#email" "tester@example.com"
+  fill "#password" "test-password"
+  click "button[type=submit]"
+  expect url "/dashboard"
+  expect text "h1" "Dashboard"
+end
+```
+
+Run `bruster test login.bru`. Assertions retry until their deadline; each test
+gets a fresh browser and profile. Failures include source lines, screenshots,
+and page diagnostics. The runner writes a JSON report and returns a nonzero exit
+code on failure. No Node.js or Python is needed to run tests.
+
+[DSL reference](docs/reference.md#ui-tests) ·
+[Runnable local example](examples/testing/greeting.bru)
 
 ## Limitations
 

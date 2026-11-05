@@ -1,6 +1,6 @@
 # Promotion status
 
-Last updated: 2026-10-28.
+Last updated: 2026-11-03.
 
 | Channel | Status | Link / next step |
 |---|---|---|
@@ -8,6 +8,7 @@ Last updated: 2026-10-28.
 | Official MCP Registry | Published as `io.github.aliilyas/bruster`, v0.3.2 | [Registry API](https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.aliilyas%2Fbruster) |
 | Native MCP bundle | Published; manifest validated and Linux launcher exercised in CI | [v0.3.2 assets](https://github.com/aliilyas/bruster/releases/tag/v0.3.2) |
 | Launch kit / README | Available in this repository | [Launch kit](README.md), [PR #12](https://github.com/aliilyas/bruster/pull/12) |
+| DevHunt | Published free listing; launch queued for 2031-10-28 | [Listing](https://devhunt.org/tool/bruster); earlier launch weeks cost $49 (no purchase made) |
 | r/mcp | Prepared; this environment received Reddit's network-security block | [Post](posts/mcp.md); submit from an accessible browser |
 | Claude Code community | Prepared; Reddit posting blocked here | [Workflow post](posts/claude-code.md) |
 | Cursor community | Prepared; authenticated browser session needed | [Post](posts/cursor.md); Built for Cursor category |
