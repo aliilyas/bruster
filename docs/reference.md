@@ -308,8 +308,10 @@ MCP represents null results as the text `null`.
   metadata-only logging; `bodies:true` restores capture for future responses.
   `body_skipped`, `body_truncated` and `truncated` flag incomplete diagnostics.
 - Console history is capped at **500 × 1000 code units**, with bounded-depth/item
-  formatting that avoids getters and `toJSON`. Dialog history is capped at
-  **100 entries / 128 KiB**; messages are limited to 1000 code units. Once full,
+  formatting that avoids application getters and `toJSON`. V8's built-in stack
+  accessor is used only with plain error fields and no custom stack formatter.
+  Dialog history is capped at **100 entries / 128 KiB**; messages are limited to
+  1000 code units. Once full,
   the last dialog records `dropped` and additional dialog events are suppressed.
   Clearing history restores admission. Browser-native console retention is
   separate from these instrumentation budgets.

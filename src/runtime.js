@@ -69,6 +69,8 @@
 
   // Pages can replace JSON.stringify after injection; IPC must still work.
   const stringify = JSON.stringify.bind(JSON);
+  const NativeError = Error;
+  const nativeStackGetter = Object.getOwnPropertyDescriptor(new NativeError(), 'stack')?.get;
   // Do not retain an engine substring's potentially much larger backing string.
   // Call only on already-bounded diagnostic text, preserving UTF-16 code units.
   const compact = s => s.split('').join('');
@@ -118,7 +120,7 @@
     });
   }
   // Format before serialization, with a shared output/item/depth budget. Avoid
-  // getters and toJSON: logging must not traverse an application's entire graph.
+  // application getters and toJSON: logging must not traverse the entire graph.
   function formatLog(args) {
     let out = '', items = 40;
     const seen = new WeakSet();
@@ -127,17 +129,33 @@
       if (out.length >= LOG_MAX || --items < 0) return add('…');
       if (typeof v === 'string') return add(quoted ? stringify(v.slice(0, LOG_MAX - out.length)) : v);
       if (v === null || typeof v !== 'object') return add(typeof v === 'function' ? '[Function]' : String(v));
-      if (v instanceof Error) {
+      if (v instanceof NativeError) {
         const field = key => {
           let obj = v;
           for (let i = 0; obj && i < 4; i++, obj = Object.getPrototypeOf(obj)) {
             const d = Object.getOwnPropertyDescriptor(obj, key);
-            if (d) return 'value' in d ? (typeof d.value === 'string' ? d.value : '') : '[Getter]';
+            if (d) return d;
           }
-          return '';
         };
-        add(field('name')); add(': '); add(field('message'));
-        const stack = field('stack');
+        const text = d => !d ? '' : 'value' in d ? (typeof d.value === 'string' ? d.value : '') : '[Getter]';
+        const name = field('name'), message = field('message'), descriptor = field('stack');
+        add(text(name)); add(': '); add(text(message));
+        let stack = text(descriptor);
+        // V8 keeps even an assigned stack string behind its native accessor.
+        // Admit only that captured getter, with plain bounded error fields and
+        // no prepareStackTrace hook that could run application code lazily.
+        if (nativeStackGetter && descriptor?.get === nativeStackGetter
+            && [name, message].every(d => d && 'value' in d && typeof d.value === 'string' && d.value.length <= LOG_MAX)) {
+          let ctor = NativeError, safe = false;
+          for (let i = 0; ctor && i < 4; i++, ctor = Object.getPrototypeOf(ctor)) {
+            const hook = Object.getOwnPropertyDescriptor(ctor, 'prepareStackTrace');
+            if (hook) { safe = 'value' in hook && hook.value === undefined; break; }
+          }
+          if (safe || !ctor) {
+            const value = nativeStackGetter.call(v);
+            stack = typeof value === 'string' ? value : '';
+          }
+        }
         if (stack) { add('\n'); add(stack); }
         return;
       }

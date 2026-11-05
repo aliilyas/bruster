@@ -15,7 +15,7 @@ are historical analyses of the named commits, not descriptions of current code.
 | DNS prefetch | Routes through `App` and the originating tab's native `WebContext`; no global default context is created for prefetch. |
 | DOM/XHR retention | Snapshot refs use weak references, with a token/DOM-walker fallback on engines without `WeakRef`. One observer per XHR tracks reuse, including opens that never send. Clearing diagnostics drops pending fetch/XHR entry references. |
 | Network diagnostics | 500 entries / 2 MiB accounted text and metadata; four cloned readers with five-second deadlines; 4096-code-unit URL/header bounds. Clearing logs and page teardown cancel readers. Binary fetch responses are skipped; `network({bodies:false})` enables metadata-only capture. The page's original request is preserved. |
-| Console/dialog diagnostics | Console formatting is admitted before bounded item/depth/text traversal; it avoids getters and `toJSON`. Dialogs have count, byte and message limits, with a dropped-record counter. Bounded diagnostic substrings are copied to avoid retaining oversized backing strings. |
+| Console/dialog diagnostics | Console formatting is admitted before bounded item/depth/text traversal; it avoids application getters and `toJSON`. V8's built-in stack accessor is allowed with plain bounded error fields and no custom stack formatter. Dialogs have count, byte and message limits, with a dropped-record counter. Bounded diagnostic substrings are copied to avoid retaining oversized backing strings. |
 | Screenshot peaks | One capture per tab / two globally; 24 × 1024² physical-pixel preflight budget, including scale and full-document width. The 16000-CSS-pixel full-height cap applies before choosing the capture path. Large Linux captures avoid the full RGB intermediate; Linux file output streams PNG directly to disk. |
 | Screenshot lifecycle | Outer deadlines include the screenshot queue. Cancellation restores resized viewports; native callbacks retain their concurrency reservation through timeout/tab close. Unique capture tokens reject late geometry callbacks after public request IDs are reused. Inline replies borrow the base64 string instead of cloning it into a second JSON/MCP tree. |
 | Uploads | At most 32 regular files / 16 MiB total; blockwise file reading, base64 encoding and page decoding, with file-growth checks. Large strings/arrays move into their final containers, and retry parameters share an immutable `Rc<Value>`. Unix FIFO inputs fail without blocking the UI. |
@@ -114,6 +114,38 @@ SHA-256 identifiers:
 - Candidate binary: `a0dcf3c8162dc9d731105ee7568ed10dcc46b0060d2a989dabbb23bb271a5245`.
 - Shared `Cargo.lock`: `5b75bda0b91878a502491f77bb966fcda27aaeaeb2233f8ce9ab82617a695c62`.
 - Final `samples.json`: `a125d78d3e2729f0c192fe206295593fe62836e4c83355184aa23ac71c6b2f76`.
+
+### Paired CI comparison — 2026-11-05
+
+[Run 41996757193](https://github.com/aliilyas/bruster/actions/runs/41996757193)
+completed native correctness checks and **20 alternating pairs per transport**
+on Linux x86_64 and macOS arm64. Baseline was the preceding main commit
+`4c6324c5ca6bd7af59debdaa27ec6b42b3a92693`; candidate was
+`64a520214052e58cb26e652c01bc97c76e06bf6f`. All decoded results and opaque screenshot
+RGB hashes matched. The run retains full reports and samples in its two
+`paired-performance-*` artifacts.
+
+This suite measures viewport captures and settled memory, rather than the large
+capture peaks above. It exposes these fixture-specific tradeoffs (positive
+changes mean slower):
+
+- Linux file screenshots: native **26.04 → 32.28 ms**, paired **+24.06%**
+  (95% interval +23.02% to +25.14%); MCP **26.16 → 32.23 ms**, **+23.31%**
+  (+22.09% to +24.58%). Streaming Cairo output trades small-capture encoding
+  latency for lower transient allocation.
+- Linux native inline screenshots: **+1.66%** (+0.49% to +2.71%); MCP inline
+  captures were statistically unresolved. Tiny JSON snapshots increased about
+  **6–7%**, and selector lookup about **5–9%**, depending on transport.
+- Linux settled PSS was about **257 MiB**; both transports' paired intervals
+  included zero. This run does not establish lower idle RAM.
+- macOS native fetch-with-capture latency increased **9.03%** (+1.59% to +17.16%).
+  The other macOS latency intervals included zero.
+
+The first main CI run also exposed two Windows-specific failures: V8's native
+stack accessor was mistaken for an application getter, and a late favicon timing
+violated a test's empty-network assertion. The follow-up preserves native stack
+text while rejecting application accessors/custom stack formatters, and checks
+that the cleared held fetch is absent independently of browser resource timings.
 
 ### Remaining research
 

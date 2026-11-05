@@ -942,6 +942,25 @@ fn diagnostics_bound_formatting_and_dialog_history() {
         // retained record must describe the accessor without calling it.
         Object.defineProperty(error, 'message', {get() { return 'native-message'; }});
         console.log(error);
+        const stackError = new TypeError('fixture failure');
+        stackError.stack = 'fixture@source.js:1:2';
+        console.error(stackError);
+        // Synthetic rejection events exercise just our formatter: the native
+        // console may inspect Error accessors independently when called above.
+        const reject = reason => {
+            const event = new Event('unhandledrejection');
+            Object.defineProperty(event, 'reason', {value:reason});
+            dispatchEvent(event);
+        };
+        for (const key of ['name', 'message', 'stack']) {
+            const error = new Error('custom getter');
+            Object.defineProperty(error, key, {get() { formatted++; return 'bad'; }});
+            reject(error);
+        }
+        const lazyError = new Error('custom stack formatter');
+        Error.prepareStackTrace = () => { formatted++; return 'bad'; };
+        reject(lazyError);
+        delete Error.prepareStackTrace;
         const huge = 'x'.repeat(1024*1024);
         for(let i=0;i<600;i++) console.log(huge, value);
         for(let i=0;i<250;i++) alert(huge);
@@ -950,7 +969,17 @@ fn diagnostics_bound_formatting_and_dialog_history() {
     assert_eq!(b.ok("eval", json!({ "expression": "formatted" })), 0);
     let console = b.ok("console", json!({ "clear": true }));
     assert_eq!(console.as_array().unwrap().len(), 500);
-    assert!(console[1]["text"].as_str().unwrap().contains("[Getter]"));
+    let messages: Vec<_> = console
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|entry| entry["text"].as_str().unwrap())
+        .collect();
+    assert!(messages.iter().any(|text| text.contains("Error: [Getter]")));
+    assert!(messages
+        .iter()
+        .any(|text| text.contains("TypeError: fixture failure")
+            && text.contains("fixture@source.js:1:2")));
     assert!(console.as_array().unwrap().iter().all(|e| e["text"]
         .as_str()
         .unwrap()
@@ -1139,7 +1168,17 @@ fn request_capacity_recovers_after_inflight_work_finishes() {
         assert_eq!(b.recv(id).unwrap(), 42);
     }
     assert_eq!(b.ok("eval", json!({ "expression": "6*7" })), 42);
-    assert_eq!(b.ok("network", json!({})), json!([]));
+    // WebView2 may fetch a favicon after clear. Only the held fetch's metadata
+    // belongs to this regression; resource timings have independent lifetimes.
+    let network = b.ok("network", json!({}));
+    assert!(
+        network
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|entry| entry["url"] != url),
+        "cleared fetch was retained: {network}"
+    );
     server.join().unwrap();
 }
 
