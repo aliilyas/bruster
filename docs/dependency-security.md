@@ -13,10 +13,11 @@ check.
 | [Trivy](../.github/workflows/trivy.yml) | Repository dependency vulnerabilities, including supported development dependencies | 06:38 |
 
 Findings retain the scanner's nonzero exit status. No vulnerability IDs are
-suppressed. cargo-audit reports informational advisories as warnings, while
-cargo-deny can fail on unmaintained dependencies. Inspect the linked logs as well
-as the badge. A passing check describes the scanner's coverage and policy at that
-run, rather than certifying code safety.
+suppressed. cargo-audit reports
+informational advisories as warnings, while cargo-deny can fail on unmaintained
+dependencies. Inspect the linked logs as well as the badge. A passing check
+describes the scanner's coverage and policy at that run, rather than certifying
+code safety.
 
 ## Run locally
 
@@ -38,6 +39,9 @@ and Trivy. Benchmark tooling currently has floating `latest` dependencies and
 no committed lockfile, so its resolved dependency versions depend on installation
 time.
 
+Trivy also scans gitignored files. Use a clean checkout when reproducing CI;
+local benchmark archives can contain historical lockfiles that CI never sees.
+
 ## GTK advisory remediation
 
 The Linux dependency graph uses GTK 0.19 / GLib 0.22, removing GLib 0.18 and
@@ -45,6 +49,11 @@ The Linux dependency graph uses GTK 0.19 / GLib 0.22, removing GLib 0.18 and
 and the WebKit bindings are pinned to an upstream migration commit. See
 [`vendor/README.md`](../vendor/README.md) for provenance, verification, and the
 removal plan. No advisory suppressions are needed.
+
+The previous GTK3 exceptions in cargo-deny, OSV, and Trivy were removed with
+this migration: `RUSTSEC-2024-0429` / `GHSA-wrw7-89jp-8q8g` is fixed by the GLib
+upgrade, and the packages affected by `RUSTSEC-2024-0370` are absent from the
+lockfile. The release-mode iterator regression exercises the fixed GLib API.
 
 ## Dependabot
 

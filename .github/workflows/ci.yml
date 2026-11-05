@@ -11,6 +11,10 @@ on:
   pull_request:
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   CARGO_TERM_COLOR: always
 
@@ -125,7 +129,7 @@ jobs:
           if [ "$RUNNER_OS" = Linux ]; then set -- xvfb-run -a "$BIN"; else set -- "$BIN"; fi
           sh tests/mcp_launch.sh "$@" --hidden --mcp --quiet
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         if: ${{ !cancelled() && steps.bruster_build.outcome == 'success' }}
         with:
           python-version: '3.12'
@@ -144,10 +148,13 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: website-tests-${{ matrix.target }}
-          path: ${{ runner.temp }}/bruster-website-results/
+          # WebView2 can still remove profile lockfiles after browser shutdown.
+          path: |
+            ${{ runner.temp }}/bruster-website-results/
+            !${{ runner.temp }}/bruster-website-results/**/profile/**
           if-no-files-found: warn
           retention-days: 14
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         if: ${{ !cancelled() && steps.bruster_build.outcome == 'success' }}
         with:
           node-version: '24'
@@ -232,7 +239,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - name: Linux deps
@@ -275,9 +282,9 @@ jobs:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with: { node-version: 22 }
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with: { python-version: '3.12' }
       - run: |
           sudo apt-get update -qq
@@ -292,7 +299,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: bruster-*
           path: dist

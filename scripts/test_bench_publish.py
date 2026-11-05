@@ -1,4 +1,4 @@
-"""Publication contracts: reject misleading data and preserve every merge result."""
+"""Publication contracts: reject misleading data and preserve published results."""
 import copy
 import hashlib
 import json

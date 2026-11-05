@@ -47,6 +47,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -57,7 +61,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - name: Check site and publication contracts
@@ -77,15 +81,12 @@ jobs:
       contents: read
       pages: write
       id-token: write
-    # Fetch both branches after taking the deployment lock. An older workflow
-    # completion must not put stale source or measurements back on the live site.
-    concurrency:
-      group: github-pages
-      cancel-in-progress: false
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      # Always read the latest branches. An older benchmark completion must not
+      # put stale source or measurements back on the live site.
       - uses: actions/checkout@v7
         with:
           ref: main
@@ -95,10 +96,10 @@ jobs:
           ref: gh-pages
           path: _measurements
           persist-credentials: false
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
@@ -112,7 +113,7 @@ jobs:
           python3 -m unittest discover -s scripts -p 'test_site_*.py'
           python3 -m unittest discover -s scripts -p 'test_bench_publish.py'
           python3 -m unittest discover -s scripts -p 'test_test_lab.py'
-      - uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@v6
         id: pages
       - name: Build website with published measurements
         env:

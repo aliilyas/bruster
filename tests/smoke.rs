@@ -779,7 +779,17 @@ fn network_readers_release_slots_on_clear_and_deadline() {
     assert_eq!(b.ok("eval", json!({ "expression": "clonedReaders" })), 4);
     b.ok("network", json!({ "clear": true }));
     b.wait_js("cancelledReaders", json!(4));
-    assert_eq!(b.ok("network", json!({})), json!([]));
+    // Native resource timings (such as WebView2's favicon request) have
+    // independent lifetimes. The cleared fetch readers must stay cleared.
+    let network = b.ok("network", json!({}));
+    assert!(
+        network
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|entry| entry["type"] != "fetch"),
+        "cleared fetch was retained: {network}"
+    );
     assert_eq!(
         b.ok(
             "eval",
@@ -788,7 +798,14 @@ fn network_readers_release_slots_on_clear_and_deadline() {
         "still-original"
     );
     b.wait_js("cancelledReaders", json!(5));
-    let entry = b.ok("network_request", json!({ "index": 0 }));
+    let network = b.ok("network", json!({}));
+    let fetch = network
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|entry| entry["url"] == "data:text/plain,still-original")
+        .expect("new fetch must be captured after clear");
+    let entry = b.ok("network_request", json!({ "index": fetch["index"] }));
     assert_eq!(entry["body"], "partial");
     assert_eq!(entry["body_truncated"], true);
     b.ok(
