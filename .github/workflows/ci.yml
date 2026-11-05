@@ -122,6 +122,24 @@ jobs:
         if: ${{ !cancelled() && steps.bruster_build.outcome == 'success' }}
         with:
           python-version: '3.12'
+      - name: Website and demo DSL tests
+        if: ${{ !cancelled() && steps.bruster_build.outcome == 'success' }}
+        shell: bash
+        env:
+          PYTHONUTF8: '1'
+        run: |
+          BIN=target/${{ matrix.target }}/release/bruster
+          if [ "$RUNNER_OS" = Windows ]; then BIN="$BIN.exe"; fi
+          if [ "$RUNNER_OS" = Linux ]; then set -- xvfb-run -a; else set --; fi
+          "$@" python scripts/site_test.py --binary "$BIN" --output "$RUNNER_TEMP/bruster-website-results"
+      - name: Retain website and demo evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: website-tests-${{ matrix.target }}
+          path: ${{ runner.temp }}/bruster-website-results/
+          if-no-files-found: warn
+          retention-days: 14
       - uses: actions/setup-node@v4
         if: ${{ !cancelled() && steps.bruster_build.outcome == 'success' }}
         with:

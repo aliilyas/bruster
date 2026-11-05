@@ -1,0 +1,45 @@
+# Run with --viewport 375x640; see example-tests/README.md.
+base_url "http://127.0.0.1:8000/"
+timeout 5000
+
+before_each
+  navigate "."
+  expect js "innerWidth === 375"
+end
+
+test "mobile menu opens and Escape closes it with focus restored"
+  expect visible ".nav-toggle"
+  expect hidden "#site-nav"
+  expect attr ".nav-toggle" "aria-expanded" "false"
+  click ".nav-toggle"
+  expect visible "#site-nav"
+  expect attr ".nav-toggle" "aria-expanded" "true"
+  press "Escape"
+  expect hidden "#site-nav"
+  expect attr ".nav-toggle" "aria-expanded" "false"
+  expect js "document.activeElement === document.querySelector('.nav-toggle')"
+  expect js "document.documentElement.scrollWidth <= innerWidth"
+  screenshot "mobile-home.png"
+end
+
+test "mobile navigation follows links and starts closed on the new page"
+  click ".nav-toggle"
+  click "#site-nav a[href$='docs/']"
+  expect url "docs/"
+  expect hidden "#site-nav"
+  expect attr ".nav-toggle" "aria-expanded" "false"
+  expect contains "h1" "Bruster documentation."
+  expect js "document.documentElement.scrollWidth <= innerWidth"
+end
+
+test "the tutorial and its code blocks fit a mobile viewport"
+  navigate "guides/web-automation-testing/"
+  expect visible "h1"
+  expect js "document.documentElement.scrollWidth <= innerWidth"
+  click ".toc-inline a[href='#first-test']"
+  expect url "guides/web-automation-testing/#first-test"
+  expect visible "#recording-example"
+  eval "document.querySelector('#recording-example').scrollIntoView({block: 'start', behavior: 'instant'})"
+  expect js "document.querySelector('#recording-example').getBoundingClientRect().top >= document.querySelector('.site-header').getBoundingClientRect().bottom && document.querySelector('#recording-example').getBoundingClientRect().top < innerHeight"
+  screenshot "mobile-guide.png"
+end

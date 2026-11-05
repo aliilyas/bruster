@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - 'tests/site/**'
+      - 'example-tests/**'
+      - 'examples/launch-demo/**'
       - 'scripts/lab/**'
       - 'scripts/test_lab.py'
       - 'scripts/test_lab_check.mjs'
@@ -22,6 +24,8 @@ on:
   pull_request:
     paths:
       - 'tests/site/**'
+      - 'example-tests/**'
+      - 'examples/launch-demo/**'
       - 'scripts/lab/**'
       - 'scripts/test_lab.py'
       - 'scripts/test_lab_check.mjs'

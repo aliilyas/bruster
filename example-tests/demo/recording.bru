@@ -1,0 +1,24 @@
+# The form workflow from scripts/launch_media.py, expressed as an executable test.
+# Serve the fixture: python3 -m http.server 8765 --bind 127.0.0.1 --directory examples/launch-demo
+base_url "http://127.0.0.1:8765/"
+timeout 5000
+
+test "creates the smoke test from the demo recording"
+  navigate "."
+  expect title "Bruster browser lab"
+  expect hidden "#result"
+  screenshot "01-empty-form.png"
+  fill "#name" "Ada Lovelace"
+  fill "#project" "Bruster"
+  select "#workflow" "forms"
+  check "#screenshots"
+  expect js "JSON.parse(document.querySelector('#payload').textContent).screenshots === true"
+  screenshot "02-filled-form.png"
+  click "button[type=submit]"
+  expect visible "#result"
+  expect text "#result h2" "Smoke test created for Bruster"
+  expect text "#result p" "Ada Lovelace · Form submission · Screenshots: on"
+  eval "document.querySelector('#result').scrollIntoView({block: 'center', behavior: 'instant'})"
+  expect js "document.querySelector('#result').getBoundingClientRect().top >= 0 && document.querySelector('#result').getBoundingClientRect().bottom <= innerHeight"
+  screenshot "03-receipt.png"
+end

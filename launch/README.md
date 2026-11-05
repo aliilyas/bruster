@@ -101,6 +101,22 @@ tests the selected checkout before performing the same capture. Select
 `source: release` and a published `version` to exercise the packaged MCP launcher
 instead.
 
+### Test the recording workflow with the DSL
+
+From a source checkout containing `bruster test`, keep the fixture server above
+running and execute:
+
+```sh
+target/release/bruster test example-tests/demo/recording.bru example-tests/demo/components.bru
+```
+
+The recording test checks the same Ada Lovelace / Bruster submission and saves
+three screenshots. Component tests cover input state, dropdowns, checkboxes,
+required-field validation, and repeat submissions. See the
+[website and demo suite](../example-tests/README.md) for an automatic local server
+and mobile checks, or follow the
+[web automation testing tutorial](https://aliilyas.github.io/bruster/guides/web-automation-testing/).
+
 ## Benchmark chart
 
 ![Browser benchmark comparison](assets/benchmark.png)

@@ -34,6 +34,16 @@ On headless Linux, prefix the second command with `xvfb-run -a`. See the
 [DSL reference](docs/reference.md#ui-tests) and
 [local example](examples/testing/greeting.bru) to author application tests.
 
+Test the product website and demo-recording form with the DSL itself:
+
+```sh
+python3 scripts/site_test.py --binary target/release/bruster
+```
+
+The helper builds and serves a temporary site, then runs desktop and mobile
+checks. It requires Python 3.11+. See the [example tests](example-tests/README.md)
+for coverage, standalone commands, and failure artifacts.
+
 The full test cycle needs Python 3.10+ and network access for end-to-end tests:
 
 ```sh

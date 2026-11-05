@@ -24,6 +24,9 @@ Consider Bruster as a Playwright alternative for scripts, focused smoke tests, a
 - [MCP client setup]({{url}}mcp/): Configurations for Claude Code, Claude Desktop, Cursor, OpenCode, Codex, and VS Code, including Docker and troubleshooting.
 - [CLI and API reference in Markdown]({{url}}docs/reference.md): Complete maintained flags, methods, parameters, results, events, and platform limitations.
 - [UI testing DSL]({{url}}testing/): What `.bru` tests do, when they save time, quickstart, reusable setup, retrying assertions, isolation, and CI reports.
+- [Web automation testing tutorial]({{url}}guides/web-automation-testing/): Beginner guide built from executable `.bru` tests: recorded form workflow, component validation, website navigation, mobile menus, failure artifacts, and CI.
+- [Interactive browser automation demo]({{url}}demo/): The demo-recording form with text inputs, a select, a checkbox, a live JSON preview, and a submission receipt. Download its tests from the tutorial.
+- [Runnable example tests]({{repository}}/tree/main/example-tests): The tutorial's `.bru` files for demo components, website navigation, and desktop/mobile checks, with local and published-site commands.
 - [Browser automation limitations]({{url}}docs/#limits): Synthetic input, frames, network inspection, screenshots, and hidden-mode behavior.
 
 ## Comparison and evidence

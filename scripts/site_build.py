@@ -10,7 +10,11 @@ from urllib.parse import urljoin, urlsplit
 from xml.etree import ElementTree as ET
 
 from bench_report import render_reports
-from site_layout import REPOSITORY, ROOT, SITE, SITE_URL, project_version, render_page, site_url, substitute
+from site_layout import REPOSITORY, ROOT, SITE, SITE_URL, project_version, render_metadata, render_page, site_url, substitute
+
+
+GUIDE_PATH = 'guides/web-automation-testing/'
+GUIDE_HEADLINE = 'Web automation testing: a practical guide with Bruster'
 
 
 PAGES = (
@@ -29,6 +33,9 @@ PAGES = (
     ('compare/', 'Bruster vs Playwright & Puppeteer — Browser Automation',
      'Compare Bruster, Playwright, and Puppeteer for browser automation and testing: '
      'engines, APIs, runtime requirements, limitations, and reproducible benchmarks.', 'Compare'),
+    (GUIDE_PATH, 'Web Automation Testing: A Practical Bruster DSL Guide',
+     'Learn web automation testing with runnable Bruster DSL examples. Test forms, UI components, '
+     'navigation, and mobile layouts, then debug failures and run in CI.', 'Web automation testing'),
 )
 
 
@@ -84,6 +91,33 @@ def write_page(output, path, content):
     target.write_text(content, encoding='utf-8')
 
 
+def dsl_example(path, test=None):
+    """Embed the executable source, optionally keeping setup and one named test."""
+    source = (ROOT / path).read_text(encoding='utf-8')
+    if test is not None:
+        match = re.search(r'^test "' + re.escape(test) + r'"\n.*?^end$', source, re.M | re.S)
+        if match is None:
+            raise ValueError(f'Missing tutorial test {test!r} in {path}')
+        source = source.split('\ntest ', 1)[0] + '\n\n' + match[0] + '\n'
+    return html.escape(source.rstrip())
+
+
+def write_demo(output, base_url):
+    # Publish the recording fixture itself so the guide and tests exercise one implementation.
+    source = (ROOT / 'examples/launch-demo/index.html').read_text(encoding='utf-8')
+    metadata = render_metadata(
+        'Bruster browser lab', 'Practice browser automation on a local form with live state and a submission receipt.',
+        'demo/', base_url=base_url, noindex=True)
+    source, count = re.subn(r'<title>.*?</title>', lambda match: metadata, source, count=1, flags=re.S)
+    if count != 1:
+        raise ValueError('The recording fixture must contain a title')
+    write_page(output, 'demo/index.html', source)
+    for path in sorted((ROOT / 'example-tests').rglob('*.bru')):
+        target = output / path.relative_to(ROOT)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(path, target)
+
+
 def write_ai_docs(output, base_url, version):
     """Publish an AI-readable index and the maintained reference with portable links."""
     index = substitute((SITE / 'llms.txt').read_text(), {
@@ -132,16 +166,22 @@ def build(output, measurements=None, base_url=SITE_URL):
     base = html.escape(urlsplit(base_url).path, quote=True)
     version = project_version()
     write_ai_docs(output, base_url, version)
+    write_demo(output, base_url)
     values = {
         'base': base, 'version': 'v' + html.escape(version),
         'api_table': reference_table('API', 'Browser methods, parameters, and results'),
         'flags_table': reference_table('Run', 'Command-line flags and their effects'),
         'benchmark_preview': benchmark_preview(history),
+        'demo_recording': dsl_example('example-tests/demo/recording.bru'),
+        'demo_checkbox': dsl_example('example-tests/demo/components.bru', 'checkbox state and preview stay in sync'),
+        'demo_validation': dsl_example('example-tests/demo/components.bru', 'a missing project blocks submission'),
+        'website_navigation': dsl_example('example-tests/website/pages.bru', 'main navigation and browser history reach the documentation'),
     }
     for path, title, description, section in PAGES:
         fragment = substitute((SITE / path / 'index.html').read_text(), values)
         write_page(output, path + 'index.html', render_page(
-            title, description, path, fragment, base_url=base_url, section=section, application=not path))
+            title, description, path, fragment, base_url=base_url, section=section, application=not path,
+            article=GUIDE_HEADLINE if path == GUIDE_PATH else ''))
     if not history:
         method = ('<main id="main" class="container article-layout prose"><header class="page-intro">'
                   '<p class="eyebrow">Evidence, included</p><h1>Browser benchmarks.</h1>'
@@ -173,7 +213,7 @@ def build(output, measurements=None, base_url=SITE_URL):
     if urlsplit(base_url).path == '/':
         write_page(output, 'robots.txt', f'User-agent: *\nAllow: /\nSitemap: {base_url}sitemap.xml\n')
     (output / '.nojekyll').touch()
-    print(f'Built {len(PAGES) + 2 + len(history)} HTML pages in {output}; {len(history)} benchmark runs.')
+    print(f'Built {len(PAGES) + 3 + len(history)} HTML pages in {output}; {len(history)} benchmark runs.')
     return history
 
 

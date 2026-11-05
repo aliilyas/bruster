@@ -1,0 +1,148 @@
+<main id="main" class="container article-layout prose">
+  <article>
+    <header class="page-intro">
+      <p class="breadcrumbs"><a href="{{base}}">bruster</a><span>/</span>Web automation testing</p>
+      <p class="eyebrow">A hands-on browser automation tutorial</p>
+      <h1>Web automation testing: a practical guide with Bruster</h1>
+      <p class="lead">Web automation testing uses software to open a browser, interact with a website, and check the result. In this guide, you will turn a recorded demo workflow into repeatable tests for forms, UI components, website navigation, and mobile layouts using Bruster’s <code>.bru</code> DSL.</p>
+      <p>By <a href="https://github.com/aliilyas/bruster">Bruster contributors</a> · Examples from the executable website and demo suites.</p>
+    </header>
+
+    <nav class="toc-inline" aria-label="On this page"><a href="#what-is-web-automation">The basics</a><a href="#setup">Setup</a><a href="#first-test">First test</a><a href="#components">Components</a><a href="#website">Website tests</a><a href="#debugging">Debugging</a><a href="#ci">CI</a><a href="#faq">FAQ</a></nav>
+
+    <section id="what-is-web-automation" aria-labelledby="basics-title">
+      <h2 id="basics-title">What is web automation testing?</h2>
+      <p><strong>Browser automation performs actions; a test also checks an expected outcome.</strong> A script that fills a form and clicks Submit automates a task. A test that then verifies the confirmation text can detect a broken submission. That final check is called an assertion.</p>
+      <p>A useful first test has three parts: establish a known starting page, perform a short user workflow, and assert its visible result. Start with important journeys such as signing in, searching, or submitting a form. Add smaller checks for individual controls when you need to identify which part broke.</p>
+      <ul>
+        <li><strong>Smoke tests</strong> check that a few important paths still work after a change.</li>
+        <li><strong>UI component checks</strong> exercise a field, checkbox, tab, or menu and observe its state. Here, those components run inside a real page.</li>
+        <li><strong>End-to-end tests</strong> exercise a complete journey. This demo’s journey ends at a browser-rendered receipt; it has no backend. A production checkout test would also need to verify the order was actually saved.</li>
+      </ul>
+      <p>Bruster is an open-source browser automation tool written in Rust. Its domain-specific language, or <strong>DSL</strong>, gives these common steps short commands such as <code>navigate</code>, <code>fill</code>, <code>click</code>, and <code>expect text</code>. You write them in a <code>.bru</code> file and run <code>bruster test</code>.</p>
+    </section>
+
+    <section id="setup" aria-labelledby="setup-title">
+      <h2 id="setup-title">1. Set up Bruster and the demo website</h2>
+      <p>We will reuse the form in <code>examples/launch-demo/index.html</code>, the fixture used by <a href="https://github.com/aliilyas/bruster/blob/main/scripts/launch_media.py">Bruster’s demo-recording script</a>. It contains name and project fields, a workflow dropdown, a screenshot checkbox, a live JSON preview, and a submission receipt.</p>
+      <p><a id="try-demo" href="{{base}}demo/">Open the interactive browser automation demo →</a> Try submitting an empty form, then enter a name and project. Watch the preview update as you change the controls.</p>
+      <p>Use a source build containing the test runner; older release binaries may not have <code>bruster test</code>. Install <a href="{{base}}docs/#install">Rust and your platform’s webview development dependencies</a>, then run:</p>
+      <div class="code-block"><div class="code-toolbar"><span>Terminal · source checkout</span><button type="button" class="copy-button" data-copy="guide-build" aria-label="Copy source build commands" hidden>Copy</button></div><pre tabindex="0"><code id="guide-build">git clone https://github.com/aliilyas/bruster.git
+cd bruster
+cargo build --release --locked
+target/release/bruster test --help</code></pre></div>
+      <p>The commands below run from the repository root. On Windows, use <code>target/release/bruster.exe</code>. Linux needs WebKitGTK 4.1 and a display; install <code>xvfb</code> and <code>xauth</code> on a headless machine. See <a href="{{base}}docs/#linux">Linux setup</a>.</p>
+      <p>Serve the fixture in a separate terminal:</p>
+      <div class="code-block"><div class="code-toolbar"><span>Terminal 1 · keep running</span><button type="button" class="copy-button" data-copy="guide-serve" aria-label="Copy demo server command" hidden>Copy</button></div><pre tabindex="0"><code id="guide-serve">python3 -m http.server 8765 --bind 127.0.0.1 --directory examples/launch-demo</code></pre></div>
+      <p>Open <code>http://127.0.0.1:8765/</code> to inspect it yourself. Python only serves this static page; Bruster executes the tests. The fixture needs no account, API key, or external service.</p>
+    </section>
+
+    <section id="first-test" aria-labelledby="first-test-title">
+      <h2 id="first-test-title">2. Turn the demo recording into an automated test</h2>
+      <p>The recording fills in Ada Lovelace and Bruster, chooses Form submission, enables screenshots, and submits. This is the actual <a href="{{base}}example-tests/demo/recording.bru" download>downloadable <code>recording.bru</code> test</a>; its contents are embedded from the file that the test suite runs. All five suites are in the repository’s <a href="https://github.com/aliilyas/bruster/tree/main/example-tests"><code>example-tests/</code> directory</a>.</p>
+      <div class="code-block"><div class="code-toolbar"><span>example-tests/demo/recording.bru</span><button type="button" class="copy-button" data-copy="recording-example" aria-label="Copy the recording workflow test" hidden>Copy</button></div><pre tabindex="0"><code id="recording-example">{{demo_recording}}</code></pre></div>
+      <p>Run it in another terminal:</p>
+      <div class="code-block"><div class="code-toolbar"><span>Terminal 2</span><button type="button" class="copy-button" data-copy="guide-run" aria-label="Copy demo test command" hidden>Copy</button></div><pre tabindex="0"><code id="guide-run">target/release/bruster test example-tests/demo/recording.bru --output target/demo-results</code></pre></div>
+      <p>Add <code>--visible</code> to watch the browser. A successful run reports one passed test and prints the report location. The three screenshots capture the empty form, filled form, and receipt.</p>
+      <h3>How to read the test</h3>
+      <ul>
+        <li><code>base_url</code> sets the website address. <code>navigate "."</code> opens that base directory.</li>
+        <li><code>fill "#name" "Ada Lovelace"</code> replaces the value of the element whose HTML ID is <code>name</code>. <code>#name</code> is a CSS selector.</li>
+        <li><code>select</code> chooses the dropdown’s option value. <code>check</code> sets a checkbox to checked.</li>
+        <li><code>expect hidden</code> verifies the initial receipt is hidden or absent. After submitting, <code>expect visible</code> and <code>expect text</code> verify the receipt and its contents.</li>
+        <li><code>screenshot</code> saves the current viewport for inspection. The final <code>eval</code> step scrolls the receipt into view, and the following assertion checks its position before capturing it. The text assertions decide whether the receipt is correct; capturing an image alone does not compare it with a visual baseline.</li>
+      </ul>
+      <p>Each command is on its own line. Quote selectors and values with double quotes, and close every <code>test</code> block with <code>end</code>. Use <code>#</code> for comments outside quoted strings.</p>
+    </section>
+
+    <section id="components" aria-labelledby="components-title">
+      <h2 id="components-title">3. Test form components and validation</h2>
+      <p>A happy-path test tells you the workflow works. Smaller component checks make failures easier to locate. The <a href="{{base}}example-tests/demo/components.bru" download>component suite</a> tests empty defaults, text editing, all three dropdown options, checkbox transitions, both required fields, repeat submissions, and rendering user input as text.</p>
+      <h3>Check the checkbox and its observable effect</h3>
+      <p>This test uses <code>before_each</code> to open the demo before each case. Checking twice should leave the checkbox checked; unchecking twice should leave it unchecked. Both the control and its live preview must agree.</p>
+      <div class="code-block"><div class="code-toolbar"><span>Runnable excerpt · components.bru</span><button type="button" class="copy-button" data-copy="checkbox-example" aria-label="Copy the checkbox component test" hidden>Copy</button></div><pre tabindex="0"><code id="checkbox-example">{{demo_checkbox}}</code></pre></div>
+      <p><code>expect js</code> is useful for values that are not plain text. It must return the boolean <code>true</code>. Read the checkbox’s <code>checked</code> property: the HTML <code>checked</code> attribute describes its default, and may not reflect its current state.</p>
+      <h3>Verify an invalid form cannot produce a receipt</h3>
+      <p>Leave the project empty, attempt submission, and check both native validity and the missing receipt. Then fill the required field and verify that the user can recover:</p>
+      <div class="code-block"><div class="code-toolbar"><span>Runnable excerpt · components.bru</span><button type="button" class="copy-button" data-copy="validation-example" aria-label="Copy the required-field test" hidden>Copy</button></div><pre tabindex="0"><code id="validation-example">{{demo_validation}}</code></pre></div>
+      <p>Run both files against the local server:</p>
+      <div class="code-block"><pre tabindex="0"><code>target/release/bruster test example-tests/demo/recording.bru example-tests/demo/components.bru</code></pre></div>
+      <p>Each test gets a fresh browser process and profile. One test’s input or cookies cannot establish another test’s starting state. Keep related actions together when they are part of the same journey.</p>
+    </section>
+
+    <section id="website" aria-labelledby="website-title">
+      <h2 id="website-title">4. Automate website navigation and mobile UI checks</h2>
+      <p>The same approach works on the Bruster website. Its <a href="{{base}}example-tests/website/pages.bru" download>page tests</a> follow real navigation links, check documentation anchors and browser history, and reach the demo from this guide. Here is the navigation test, including its setup:</p>
+      <div class="code-block"><div class="code-toolbar"><span>Runnable excerpt · example-tests/website/pages.bru</span><button type="button" class="copy-button" data-copy="navigation-example" aria-label="Copy the website navigation test" hidden>Copy</button></div><pre tabindex="0"><code id="navigation-example">{{website_navigation}}</code></pre></div>
+      <p>The <a href="{{base}}example-tests/website/components.bru" download>website component tests</a> exercise FAQ disclosure, MCP tabs with mouse and keyboard actions, and copy-button feedback. Clipboard tests replace the OS clipboard API with a controlled success or rejection so both UI paths are reproducible; they do not verify a system clipboard integration.</p>
+      <p>The <a href="{{base}}example-tests/website/mobile.bru" download>mobile suite</a> opens the menu, closes it with Escape, checks focus, follows a link, and checks page width at a 375×640 viewport. Viewport checks exercise responsive layout; they do not emulate a phone’s browser or touch hardware.</p>
+      <h3>Run the complete website and demo suites</h3>
+      <p>With Python 3.11+ and your built executable, this command builds the site, starts a temporary localhost server, runs the desktop and mobile suites, and stops the server:</p>
+      <div class="code-block"><div class="code-toolbar"><span>Repository root</span><button type="button" class="copy-button" data-copy="website-run" aria-label="Copy the complete website test command" hidden>Copy</button></div><pre tabindex="0"><code id="website-run">python3 scripts/site_test.py --binary target/release/bruster --output target/website-results</code></pre></div>
+      <p>For an existing preview, build and serve it using the <a href="https://github.com/aliilyas/bruster/blob/main/site/README.md">website instructions</a>, then invoke Bruster directly:</p>
+      <div class="code-block"><pre tabindex="0"><code>target/release/bruster test example-tests/website/pages.bru example-tests/website/components.bru --base-url http://127.0.0.1:8000/ --viewport 960x640
+target/release/bruster test example-tests/website/mobile.bru --base-url http://127.0.0.1:8000/ --viewport 375x640</code></pre></div>
+      <p><code>--base-url</code> overrides the file’s address. Keep a trailing slash when using a deployment prefix: with <code>https://example.com/bruster/</code>, <code>navigate "docs/"</code> stays under <code>/bruster/</code>, while <code>navigate "/docs/"</code> goes to the domain root.</p>
+      <h3>Can browser tests check SEO metadata?</h3>
+      <p>Yes. The page suite checks titles, canonical URLs, indexing directives, and this article’s structured data. The build checks also verify the sitemap and internal links. These catch publishing regressions; search ranking, crawl coverage, and page performance require their own measurements.</p>
+    </section>
+
+    <section id="debugging" aria-labelledby="debugging-title">
+      <h2 id="debugging-title">5. Write reliable assertions and debug failures</h2>
+      <p><strong>Wait for the outcome you need.</strong> Bruster retries assertions until their per-step deadline, set here to 5,000 milliseconds. Use <code>expect text "#result h2" "Smoke test created for Bruster"</code> instead of guessing how long submission might take and adding a fixed sleep. Actions run once; whole tests are not automatically retried.</p>
+      <ul>
+        <li><strong>Use stable selectors.</strong> Prefer purposeful IDs or test attributes over styling classes and positional selectors such as <code>:nth-child(3)</code>.</li>
+        <li><strong>Assert the result, not just the click.</strong> Verify the new receipt, selected panel, URL, or saved record.</li>
+        <li><strong>Keep observations read-only.</strong> An <code>expect js</code> expression may run multiple times. Put intentional setup mutations in <code>eval</code>, which executes once.</li>
+        <li><strong>Choose the right text check.</strong> <code>expect text</code> uses exact, whitespace-normalized text. Use <code>expect contains</code> when a substring is the actual requirement.</li>
+        <li><strong>Control dependencies.</strong> The demo and preview run locally. For your own application, seed known test data and wait for the server to be ready before launching tests.</li>
+      </ul>
+      <p>Every run creates a unique folder under <code>--output</code>. Its <code>results.json</code> records test names, source lines, step durations, failures, and artifact paths. Each test has a <code>test-NNN/</code> directory. On failure, Bruster also attempts to save <code>failure.png</code>, <code>snapshot.json</code>, and <code>console.json</code>, alongside <code>stderr.log</code>.</p>
+      <p>Read the failing source line first, then inspect the screenshot and DOM snapshot to see what the page actually showed. For practice, save a copy of <code>recording.bru</code> and change the expected receipt to a different project name. Run that copy and follow the reported artifact path. Correct the assertion afterward.</p>
+      <p>Common causes are a server that is not running, a base URL missing its path prefix, a selector that matches the wrong element, or a test expecting a default HTML attribute instead of a live input property. Increase a timeout only when the application legitimately needs more time.</p>
+    </section>
+
+    <section id="ci" aria-labelledby="ci-title">
+      <h2 id="ci-title">6. Run browser automation tests in CI</h2>
+      <p>Continuous integration runs the same checks after a code change. Bruster exits with <strong>0</strong> when all tests pass, <strong>1</strong> for test or browser failures, and <strong>2</strong> for invalid CLI arguments, test files, or report setup/write errors. Keep failure artifacts even when the job fails.</p>
+      <p>This GitHub Actions example runs the suites in the Bruster repository on Ubuntu:</p>
+      <div class="code-block"><div class="code-toolbar"><span>.github/workflows/website-tests.yml</span><button type="button" class="copy-button" data-copy="ci-example" aria-label="Copy the CI example" hidden>Copy</button></div><pre tabindex="0"><code id="ci-example">name: website tests
+on: [push, pull_request]
+jobs:
+  website:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: sudo apt-get update
+      - run: sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev xvfb xauth
+      - run: cargo build --release --locked
+      - run: xvfb-run -a python3 scripts/site_test.py --binary target/release/bruster --output website-results
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: website-results
+          path: website-results/
+          retention-days: 14</code></pre></div>
+      <p>For your own website, replace the fixture build and server with your application’s setup and pass its address through <code>--base-url</code>. Bruster uses WKWebView on macOS, WebKitGTK on Linux, and WebView2 on Windows. Run on the platforms whose native-webview behavior you need to cover.</p>
+    </section>
+
+    <section id="faq" aria-labelledby="faq-title">
+      <h2 id="faq-title">Web automation testing FAQ</h2>
+      <h3 id="coding-required">Do I need JavaScript to write a browser test?</h3>
+      <p>Basic navigation, clicks, input, text checks, and screenshots use Bruster DSL commands. JavaScript is useful for application-specific observations, such as the live checkbox state or the JSON preview in this demo. The test runner itself does not require Node.js.</p>
+      <h3 id="recording-vs-testing">Is a demo recording already a test?</h3>
+      <p>A recording shows a workflow once. A repeatable test adds a known starting state and explicit assertions that can fail on later runs. Here, the recording’s form actions become <code>recording.bru</code>, while component checks cover invalid input and state changes that the short recording does not show.</p>
+      <h3 id="component-scope">Are these isolated component unit tests?</h3>
+      <p>These are browser-level checks of components on a complete page. They exercise real DOM events, validation, and rendering together. Unit tests for a framework component’s internal logic are a separate layer.</p>
+      <h3 id="choosing-a-tool">When should I choose Bruster or Playwright?</h3>
+      <p>Bruster fits focused smoke tests and native-webview automation with a small, line-oriented DSL. Its input events are synthetic, and cross-origin iframes and OS-level controls are outside its scope. Choose Playwright when you need selectable Chromium, Firefox, and WebKit engines, tracing, or its wider testing ecosystem. See the <a href="{{base}}compare/">browser automation comparison</a> and <a href="{{base}}docs/#limits">Bruster limitations</a>.</p>
+    </section>
+
+    <div class="link-cards"><a class="link-card" href="{{base}}demo/"><strong>Try the browser automation demo →</strong><span>Explore the same form used by the executable examples.</span></a><a class="link-card" href="{{base}}testing/"><strong>Continue with the DSL guide →</strong><span>Commands, options, isolation, and failure diagnostics.</span></a></div>
+  </article>
+</main>

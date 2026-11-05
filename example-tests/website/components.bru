@@ -1,0 +1,59 @@
+# Build and serve the product site first; see example-tests/README.md.
+base_url "http://127.0.0.1:8000/"
+timeout 5000
+
+test "FAQ answers expand and collapse"
+  navigate "."
+  expect hidden "#bruster-vs-playwright p"
+  click "#bruster-vs-playwright summary"
+  expect visible "#bruster-vs-playwright p"
+  expect contains "#bruster-vs-playwright p" "native webview"
+  click "#bruster-vs-playwright summary"
+  expect hidden "#bruster-vs-playwright p"
+end
+
+test "MCP tabs select one panel with click and keyboard controls"
+  navigate "mcp/"
+  expect attr "#tab-opencode" "aria-selected" "true"
+  expect visible "#panel-opencode"
+  expect hidden "#panel-claude"
+  expect count "[role=tabpanel]:not([hidden])" 1
+  click "#tab-claude"
+  expect attr "#tab-claude" "aria-selected" "true"
+  expect visible "#panel-claude"
+  expect hidden "#panel-opencode"
+  expect contains "#claude-cli" "claude mcp add"
+  press "#tab-claude" "ArrowRight"
+  expect attr "#tab-desktop" "aria-selected" "true"
+  expect visible "#panel-desktop"
+  expect js "document.activeElement.id === 'tab-desktop'"
+  press "#tab-desktop" "End"
+  expect visible "#panel-vscode"
+  press "#tab-vscode" "ArrowRight"
+  expect visible "#panel-opencode"
+  press "#tab-opencode" "ArrowLeft"
+  expect visible "#panel-vscode"
+  press "#tab-vscode" "Home"
+  expect attr "#tab-opencode" "tabindex" "0"
+  expect attr "#tab-vscode" "tabindex" "-1"
+  expect count "[role=tabpanel]:not([hidden])" 1
+end
+
+test "copy button sends the displayed command to the clipboard API"
+  navigate "."
+  expect visible "[data-copy=install-command]"
+  # Stub the OS clipboard boundary; observe the string passed by the real click handler.
+  eval "Object.defineProperty(navigator, 'clipboard', {configurable: true, value: {writeText: async text => { window.copiedText = text; }}})"
+  click "[data-copy=install-command]"
+  expect text "#copy-status" "Code copied to clipboard."
+  expect js "window.copiedText === document.querySelector('#install-command').textContent.trim()"
+end
+
+test "clipboard rejection selects the command for manual copying"
+  navigate "."
+  expect visible "[data-copy=install-command]"
+  eval "Object.defineProperty(navigator, 'clipboard', {configurable: true, value: {writeText: async () => { throw new Error('Clipboard denied for this test'); }}})"
+  click "[data-copy=install-command]"
+  expect text "#copy-status" "Clipboard unavailable. Code selected; use your keyboard to copy."
+  expect js "getSelection().toString() === document.querySelector('#install-command').textContent"
+end

@@ -137,7 +137,9 @@ not include `bruster test` yet.
 
 [UI testing guide](https://aliilyas.github.io/bruster/testing/) ·
 [DSL reference](docs/reference.md#ui-tests) ·
-[Runnable local example](examples/testing/greeting.bru)
+[Runnable local example](examples/testing/greeting.bru) ·
+[Website and demo example tests](example-tests/README.md) ·
+[Web automation testing tutorial](https://aliilyas.github.io/bruster/guides/web-automation-testing/)
 
 ## Limitations
 

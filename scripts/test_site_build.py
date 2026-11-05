@@ -171,10 +171,23 @@ class SiteBuild(unittest.TestCase):
                     self.assertEqual((output / name).read_bytes(), content, 'Published evidence was altered')
             sitemap = ET.parse(output / 'sitemap.xml')
             locations = [item.text for item in sitemap.findall('.//{*}loc')]
-            self.assertEqual(set(locations), {base_url + path for path in ('', 'docs/', 'testing/', 'mcp/', 'compare/', 'benchmarks/')})
+            self.assertEqual(set(locations), {base_url + path for path in (
+                '', 'docs/', 'testing/', 'mcp/', 'compare/', 'benchmarks/', 'guides/web-automation-testing/')})
             for name, document in documents.items():
-                archived = '/runs/' in name or name == '404.html'
-                self.assertEqual('noindex' in document.meta['robots'], archived)
+                noindex = '/runs/' in name or name in ('404.html', 'demo/index.html')
+                self.assertEqual('noindex' in document.meta['robots'], noindex)
+            guide = documents['guides/web-automation-testing/index.html']
+            self.assertEqual(guide.meta['og:type'], 'article')
+            article = next(node for node in guide.schemas[0]['@graph'] if node['@type'] == 'TechArticle')
+            self.assertEqual(article['headline'], 'Web automation testing: a practical guide with Bruster')
+            self.assertEqual(article['url'], guide.canonical[0])
+            self.assertEqual(article['mainEntityOfPage'], {'@id': guide.canonical[0] + '#webpage'})
+            self.assertIn(base_url + 'guides/web-automation-testing/', (output / 'llms.txt').read_text())
+            for source in (ROOT / 'example-tests').rglob('*.bru'):
+                self.assertEqual((output / source.relative_to(ROOT)).read_bytes(), source.read_bytes())
+            fixture = (ROOT / 'examples/launch-demo/index.html').read_text()
+            self.assertEqual((output / 'demo/index.html').read_text().split('<body>', 1)[1],
+                             fixture.split('<body>', 1)[1], 'Published demo changed the recording fixture')
             self.assertEqual((output / 'robots.txt').exists(), index == 1)
             if index == 1:
                 self.assertIn(base_url + 'sitemap.xml', (output / 'robots.txt').read_text())
@@ -203,6 +216,9 @@ class SiteBuild(unittest.TestCase):
                 self.assertIn('Browser automation.<br>', home)
                 self.assertEqual(Document(home).canonical, [base_url])
                 for name in ('docs/index.html', 'testing/index.html', 'benchmarks/latest.json', 'benchmarks/history.json',
+                             'guides/web-automation-testing/index.html', 'demo/index.html',
+                             'example-tests/demo/recording.bru', 'example-tests/demo/components.bru',
+                             'example-tests/website/mobile.bru',
                              'llms.txt', 'llms-full.txt', 'docs/reference.md',
                              *(path.name for path in SITE.glob('google*.html'))):
                     self.assertEqual((published / name).read_bytes(), (output / name).read_bytes())

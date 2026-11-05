@@ -35,7 +35,7 @@ def substitute(template, values):
 
 
 def render_metadata(title, description, path, *, base_url=SITE_URL, section='',
-                    noindex=False, application=False, page_type='WebPage'):
+                    noindex=False, application=False, page_type='WebPage', article=''):
     base_url = site_url(base_url)
     e = lambda value: html.escape(str(value), quote=True)
     canonical = base_url + path
@@ -50,6 +50,16 @@ def render_metadata(title, description, path, *, base_url=SITE_URL, section='',
         'alternateName': 'bruster', 'url': base_url, 'inLanguage': 'en',
         'about': {'@id': base_url + '#software'},
     }, webpage]
+    if article:
+        webpage['mainEntity'] = {'@id': canonical + '#article'}
+        graph.append({
+            '@type': 'TechArticle', '@id': canonical + '#article', 'url': canonical,
+            'headline': article, 'description': description, 'inLanguage': 'en',
+            'mainEntityOfPage': {'@id': canonical + '#webpage'},
+            'about': {'@id': base_url + '#software'},
+            'image': base_url + 'assets/social.png', 'proficiencyLevel': 'Beginner',
+            'author': {'@type': 'Organization', 'name': 'Bruster contributors', 'url': REPOSITORY},
+        })
     if application:
         webpage['mainEntity'] = {'@id': base_url + '#software'}
         graph.append({
@@ -88,12 +98,13 @@ def render_metadata(title, description, path, *, base_url=SITE_URL, section='',
     return substitute((SITE / '_metadata.html').read_text(), {
         'title': e(title), 'description': e(description), 'canonical': e(canonical),
         'image': e(base_url + 'assets/social.png'), 'structured': structured,
+        'og_type': 'article' if article else 'website',
         'robots': 'noindex, follow' if noindex else 'index, follow, max-image-preview:large',
     })
 
 
 def render_page(title, description, path, content, *, base_url=SITE_URL, section='',
-                body_class='', extra_head='', noindex=False, application=False):
+                body_class='', extra_head='', noindex=False, application=False, article=''):
     base_url = site_url(base_url)
     e = lambda value: html.escape(str(value), quote=True)
     base = urlsplit(base_url).path
@@ -104,7 +115,7 @@ def render_page(title, description, path, content, *, base_url=SITE_URL, section
         nav.append(f'<a href="{e(base + target)}"{current}>{name}</a>')
     values = {
         'metadata': render_metadata(title, description, path, base_url=base_url,
-                                    section=section, noindex=noindex, application=application),
+                                    section=section, noindex=noindex, application=application, article=article),
         'base': e(base),
         'body_class': e(body_class), 'extra_head': extra_head, 'content': content,
         'nav': '\n'.join(nav), 'repository': REPOSITORY,

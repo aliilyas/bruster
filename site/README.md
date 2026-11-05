@@ -35,6 +35,32 @@ python3 -m unittest discover -s scripts -p 'test_site_*.py'
 python3 -m unittest discover -s scripts -p 'test_bench_publish.py'
 ```
 
+Run the real-browser website and demo checks with a source-built Bruster:
+
+```sh
+python3 scripts/site_test.py --binary target/release/bruster
+```
+
+This builds and serves a temporary preview, then runs the `.bru` website and
+recording-demo suites at desktop and mobile widths. See
+[`example-tests/README.md`](../example-tests/README.md) for individual commands,
+coverage, and reports. CI retains the reports and screenshots on each platform.
+
+## Web automation testing guide
+
+[`guides/web-automation-testing/index.html`](guides/web-automation-testing/index.html)
+is the beginner tutorial. Its code samples are embedded from executable `.bru`
+files by `scripts/site_build.py`; update those source tests when changing a
+workflow. The builder publishes the existing `examples/launch-demo/index.html`
+at `demo/` with shared metadata, and copies downloadable tests from the repository's
+`example-tests/` tree to the same paths on Pages. The recording fixture's body and
+behavior are reused.
+
+The guide has a search title/description, canonical and social metadata,
+`TechArticle` structured data, a sitemap entry, and links from the homepage,
+documentation, footer, and `llms.txt`. The interactive demo uses `noindex, follow`
+and stays out of the sitemap, like the Test Lab's individual fixtures.
+
 The social preview is a checked-in 1200×630 PNG with its editable SVG source next
 to it. Regenerate it with librsvg (or another SVG renderer) when branding changes:
 

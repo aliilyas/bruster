@@ -1,0 +1,67 @@
+# Build and serve the product site first; see example-tests/README.md.
+# Relative paths preserve a deployment prefix such as /bruster/.
+base_url "http://127.0.0.1:8000/"
+timeout 5000
+
+before_each
+  navigate "."
+end
+
+test "homepage presents the product and installation instructions"
+  expect title "Bruster — AI Agent Browser Automation & MCP Server"
+  expect count "h1" 1
+  expect contains "h1" "Browser automation."
+  expect visible ".site-header .brand img"
+  expect js "document.querySelector('.site-header .brand img').naturalWidth > 0"
+  expect js "document.querySelector('link[rel=canonical]').href === location.href"
+  expect attr "meta[name=robots]" "content" "index, follow, max-image-preview:large"
+  click ".hero-actions a[href='#install']"
+  expect url "#install"
+  expect visible "#install"
+  expect contains "#install-command" "install.sh"
+end
+
+test "main navigation and browser history reach the documentation"
+  click "#site-nav a[href$='docs/']"
+  expect url "docs/"
+  expect contains "h1" "Bruster documentation."
+  expect attr "#site-nav a[href$='docs/']" "aria-current" "page"
+  click ".docs-sidebar a[href='#testing']"
+  expect url "docs/#testing"
+  expect visible "#testing"
+  expect contains "#testing" "bruster test"
+  back
+  expect url "docs/"
+  back
+  expect url "."
+  forward
+  expect url "docs/"
+end
+
+test "comparison and benchmark methodology are reachable"
+  click "#site-nav a[href$='compare/']"
+  expect url "compare/"
+  expect contains "h1" "Playwright"
+  click "#site-nav a[href$='benchmarks/']"
+  expect url "benchmarks/"
+  expect visible "h1"
+  expect attached "#method"
+end
+
+test "the testing guide leads to the working recording demo"
+  click "#learn-web-automation"
+  expect url "guides/web-automation-testing/"
+  expect title "Web Automation Testing: A Practical Bruster DSL Guide"
+  expect text "h1" "Web automation testing: a practical guide with Bruster"
+  expect js "document.querySelector('link[rel=canonical]').href === location.href"
+  expect attr "meta[property='og:type']" "content" "article"
+  expect js "JSON.parse(document.querySelector('script[type=\"application/ld+json\"]').textContent)['@graph'].some(node => node['@type'] === 'TechArticle' && node.headline === document.querySelector('h1').textContent)"
+  expect contains "#recording-example" "creates the smoke test from the demo recording"
+  click "#try-demo"
+  expect url "demo/"
+  expect title "Bruster browser lab"
+  fill "#name" "Website visitor"
+  fill "#project" "Documentation"
+  click "button[type=submit]"
+  expect text "#result h2" "Smoke test created for Documentation"
+end

@@ -1,0 +1,98 @@
+# Serve examples/launch-demo on port 8765; see example-tests/README.md.
+base_url "http://127.0.0.1:8765/"
+timeout 5000
+
+before_each
+  navigate "."
+end
+
+test "starts with empty inputs and the navigation workflow"
+  expect text "h1" "Browser smoke test"
+  expect visible "#name"
+  expect visible "#project"
+  expect visible "#workflow"
+  expect visible "#screenshots"
+  expect count "#workflow option" 3
+  expect hidden "#result"
+  expect js "document.querySelector('#name').value === '' && document.querySelector('#project').value === ''"
+  expect js "document.querySelector('#workflow').value === 'navigation' && document.querySelector('#screenshots').checked === false"
+  expect js "JSON.stringify(JSON.parse(document.querySelector('#payload').textContent)) === JSON.stringify({name: '', project: '', workflow: 'navigation', screenshots: false})"
+  expect js "['name', 'project', 'workflow', 'screenshots'].every(id => document.getElementById(id).labels.length > 0)"
+  expect js "document.documentElement.scrollWidth <= innerWidth"
+end
+
+test "text inputs update the preview when filled typed and cleared"
+  fill "#name" "Ada"
+  type "#name" " Lovelace"
+  fill "#project" "Café browser lab"
+  expect js "JSON.parse(document.querySelector('#payload').textContent).name === 'Ada Lovelace'"
+  expect js "JSON.parse(document.querySelector('#payload').textContent).project === 'Café browser lab'"
+  fill "#name" ""
+  expect js "document.querySelector('#name').value === '' && JSON.parse(document.querySelector('#payload').textContent).name === ''"
+  expect hidden "#result"
+end
+
+test "every workflow option updates the preview"
+  select "#workflow" "forms"
+  expect js "document.querySelector('#workflow').value === 'forms' && JSON.parse(document.querySelector('#payload').textContent).workflow === 'forms'"
+  select "#workflow" "screenshots"
+  expect js "document.querySelector('#workflow').value === 'screenshots' && JSON.parse(document.querySelector('#payload').textContent).workflow === 'screenshots'"
+  select "#workflow" "navigation"
+  expect js "document.querySelector('#workflow').value === 'navigation' && JSON.parse(document.querySelector('#payload').textContent).workflow === 'navigation'"
+end
+
+test "checkbox state and preview stay in sync"
+  check "#screenshots"
+  check "#screenshots"
+  expect js "document.querySelector('#screenshots').checked === true && JSON.parse(document.querySelector('#payload').textContent).screenshots === true"
+  uncheck "#screenshots"
+  uncheck "#screenshots"
+  expect js "document.querySelector('#screenshots').checked === false && JSON.parse(document.querySelector('#payload').textContent).screenshots === false"
+end
+
+test "a missing name blocks submission"
+  fill "#project" "Bruster"
+  click "button[type=submit]"
+  expect js "document.querySelector('#name').validity.valueMissing === true && document.querySelector('#test-form').matches(':invalid')"
+  expect hidden "#result"
+  fill "#name" "Ada Lovelace"
+  click "button[type=submit]"
+  expect visible "#result"
+  expect text "#result p" "Ada Lovelace · Navigation check · Screenshots: off"
+end
+
+test "a missing project blocks submission"
+  fill "#name" "Ada Lovelace"
+  click "button[type=submit]"
+  expect js "document.querySelector('#project').validity.valueMissing === true && document.querySelector('#test-form').matches(':invalid')"
+  expect hidden "#result"
+  fill "#project" "Bruster"
+  click "button[type=submit]"
+  expect text "#result h2" "Smoke test created for Bruster"
+end
+
+test "resubmitting replaces the receipt with the current form state"
+  fill "#name" "Ada Lovelace"
+  fill "#project" "First project"
+  click "button[type=submit]"
+  expect text "#result h2" "Smoke test created for First project"
+  expect text "#result p" "Ada Lovelace · Navigation check · Screenshots: off"
+  fill "#project" "Second project"
+  select "#workflow" "screenshots"
+  check "#screenshots"
+  expect text "#result h2" "Smoke test created for First project"
+  click "button[type=submit]"
+  expect count "#result" 1
+  expect text "#result h2" "Smoke test created for Second project"
+  expect text "#result p" "Ada Lovelace · Screenshot review · Screenshots: on"
+  expect attr "#result" "role" "status"
+end
+
+test "the receipt displays user input as text"
+  fill "#name" "Renée & Ada"
+  fill "#project" "<strong>Browser lab</strong>"
+  click "button[type=submit]"
+  expect text "#result h2" "Smoke test created for <strong>Browser lab</strong>"
+  expect text "#result p" "Renée & Ada · Navigation check · Screenshots: off"
+  expect count "#result strong" 0
+end
