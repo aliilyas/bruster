@@ -5,7 +5,7 @@ Include your OS, Bruster version, and a small reproduction for bugs.
 
 ## Build
 
-Install Rust and your platform's WebView development libraries. On Ubuntu/Debian:
+Install Rust 1.92 or newer and your platform's WebView development libraries. On Ubuntu/Debian:
 
 ```sh
 sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev xvfb xauth
@@ -19,6 +19,9 @@ cargo build --release --locked
 
 Run `target/release/bruster` after building. See the
 [installation guide](https://aliilyas.github.io/bruster/docs/#install) for other platforms.
+
+The temporary GTK dependency patches and their upstream provenance are documented
+in [`vendor/README.md`](vendor/README.md). Keep `vendor/` in source build contexts.
 
 ## Lint and format
 

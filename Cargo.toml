@@ -2,12 +2,12 @@
 name = "bruster"
 version = "0.3.6"
 edition = "2021"
-rust-version = "1.85"
+rust-version = "1.92"
 description = "Native webview browser driven by an agent over JSON lines on stdio"
 
 [dependencies]
-wry = "0.57"
-tao = "0.37"
+wry = "=0.57.1"
+tao = "=0.37.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["raw_value"] }
 url = "2"
@@ -18,7 +18,7 @@ libc = "0.2"
 # Screenshot FFI. These are already in wry's tree; we only add the
 # feature flags for the snapshot and PNG encode calls.
 [target.'cfg(target_os = "linux")'.dependencies]
-gtk = "0.18"
+gtk = "0.19"
 webkit2gtk = { version = "=2.0.2", features = ["v2_38"] }
 cairo-rs = { version = "0.22", features = ["png"] }
 
@@ -32,6 +32,13 @@ objc2 = "0.6"
 objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSData", "NSDictionary", "NSError", "NSString", "NSURL", "NSURLRequest"] }
 objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSImage", "NSImageRep", "NSBitmapImageRep", "NSGraphicsContext", "objc2-core-graphics"] }
 objc2-web-kit = { version = "0.3.2", default-features = false, features = ["std", "block2", "WKWebView", "WKSnapshotConfiguration", "WKNavigation", "WKNavigationDelegate"] }
+
+# Temporary GTK 0.19 migration; provenance and removal plan: vendor/README.md.
+[patch.crates-io]
+wry = { path = "vendor/wry" }
+tao = { path = "vendor/tao" }
+webkit2gtk = { git = "https://github.com/tauri-apps/webkit2gtk-rs.git", rev = "f5c3825c3f21c44ce346a5aa42e8c33a762f9f72" }
+webkit2gtk-sys = { git = "https://github.com/tauri-apps/webkit2gtk-rs.git", rev = "f5c3825c3f21c44ce346a5aa42e8c33a762f9f72" }
 
 [profile.release]
 opt-level = 3

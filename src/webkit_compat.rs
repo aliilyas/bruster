@@ -59,3 +59,32 @@ pub fn configure(settings: &Settings) {
         unref(features);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use gtk::glib::variant::ToVariant;
+
+    // RUSTSEC-2024-0429: run in release mode, where the old GLib out-pointer
+    // aliasing bug could turn these safe iterator calls into a segmentation fault.
+    #[test]
+    fn variant_string_iterator_handles_both_ends() {
+        let values = ["first", "λ", "", "last"];
+        let variant = values.to_variant();
+        let mut iter = variant.array_iter_str().unwrap();
+        assert_eq!(iter.len(), 4);
+        assert_eq!(iter.next(), Some("first"));
+        assert_eq!(iter.next_back(), Some("last"));
+        assert_eq!(iter.next(), Some("λ"));
+        assert_eq!(iter.next_back(), Some(""));
+        assert_eq!(iter.next(), None);
+        assert_eq!(iter.next_back(), None);
+
+        assert_eq!(variant.array_iter_str().unwrap().nth(1), Some("λ"));
+        assert_eq!(variant.array_iter_str().unwrap().nth_back(1), Some(""));
+        assert_eq!(variant.array_iter_str().unwrap().last(), Some("last"));
+        assert_eq!(
+            variant.array_iter_str().unwrap().collect::<Vec<_>>(),
+            values
+        );
+    }
+}

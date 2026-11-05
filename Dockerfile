@@ -9,6 +9,7 @@ RUN apt-get update \
 
 WORKDIR /build
 COPY Cargo.toml Cargo.lock ./
+COPY vendor/ ./vendor/
 COPY src/ ./src/
 
 ARG TARGETARCH

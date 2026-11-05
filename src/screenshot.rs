@@ -173,16 +173,18 @@ fn to_png(surface: &cairo::Surface) -> Result<Vec<u8>, String> {
                     };
                     let opaque = image.format() == cairo::Format::Rgb24
                         || rows().all(|row| {
-                            row.chunks_exact(4)
-                                .all(|p| u32::from_ne_bytes(p.try_into().unwrap()) >> 24 == 255)
+                            row.as_chunks::<4>()
+                                .0
+                                .iter()
+                                .all(|p| u32::from_ne_bytes(*p) >> 24 == 255)
                         });
                     if opaque {
                         let mut pixels = Vec::with_capacity(
                             image.width() as usize * image.height() as usize * 3,
                         );
                         for row in rows() {
-                            for p in row.chunks_exact(4) {
-                                let pixel = u32::from_ne_bytes(p.try_into().unwrap());
+                            for p in row.as_chunks::<4>().0 {
+                                let pixel = u32::from_ne_bytes(*p);
                                 pixels.extend_from_slice(&[
                                     (pixel >> 16) as u8,
                                     (pixel >> 8) as u8,

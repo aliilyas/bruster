@@ -38,6 +38,14 @@ and Trivy. Benchmark tooling currently has floating `latest` dependencies and
 no committed lockfile, so its resolved dependency versions depend on installation
 time.
 
+## GTK advisory remediation
+
+The Linux dependency graph uses GTK 0.19 / GLib 0.22, removing GLib 0.18 and
+`proc-macro-error`. Current Wry/Tao releases need temporary compatibility patches,
+and the WebKit bindings are pinned to an upstream migration commit. See
+[`vendor/README.md`](../vendor/README.md) for provenance, verification, and the
+removal plan. No advisory suppressions are needed.
+
 ## Dependabot
 
 [`dependabot.yml`](../.github/dependabot.yml) requests daily dependency updates
