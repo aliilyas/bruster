@@ -1,0 +1,42 @@
+<p class="lead">You have practiced the individual skills. Now use them together: plan, run, review, and explain a small test suite for the practice website.</p>
+<p>This final project has five checks. Try writing your own version first. A complete worked example is included below so you can compare approaches and continue even if you get stuck.</p>
+
+<h2>Your project brief</h2>
+<p>A colleague is about to change the practice form. They want a small set of checks that will help them notice if an important behavior breaks. Write a file named <code>final-project.bru</code> with these cases:</p>
+<ol><li><strong>The page opens cleanly.</strong> Check its title and confirm that no old receipt is shown.</li><li><strong>A valid project succeeds.</strong> Submit Ada Lovelace and My first test. Check both the project heading and the default detail line.</li><li><strong>A missing project is rejected.</strong> Provide a name, leave the project empty, submit, and check the invalid field and hidden receipt.</li><li><strong>Choices reach the receipt.</strong> Select Form submission, turn Include screenshots on, submit, and check the detail line.</li><li><strong>A new submission replaces the old receipt.</strong> Submit First project, change it to Updated project, submit again, and confirm there is one receipt with the updated heading.</li></ol>
+<p>Use shared navigation when it makes the file clearer. Give every case a descriptive name. Keep the two submissions in the last case inside the same test, because they are part of one journey.</p>
+
+<h2>Work in small passes</h2>
+<p>Write the page-opening case first and run it. Add the valid submission case next. Continue one case at a time. If a new change breaks the file, you will know which small addition to inspect.</p>
+<p>For each assertion, ask whether it really proves the result you care about. For example, a visible receipt alone would not prove that Updated project replaced First project.</p>
+<p>If your file is not ready yet, download the worked version into a different folder so you can compare it with your own without accidentally overwriting your work.</p>
+<p><a class="download-link" href="{{base}}example-tests/learn-testin/final-project.bru" download="final-project.bru">Download the worked final-project.bru ↓</a></p>
+<details><summary>Read the complete worked solution</summary>{{final_project}}</details>
+
+<h2>Run and review the project</h2>
+<div class="command"><span class="command-label">macOS / Linux</span><pre><code>./bruster test final-project.bru --visible --output final-results</code></pre><span class="command-label">Windows PowerShell</span><pre><code>.\bruster.exe test final-project.bru --visible --output final-results</code></pre></div>
+<p>The worked solution should report <strong>5 passed, 0 failed</strong>. Find the run folder and open <code>results.json</code>. Match its test names to the five requirements above.</p>
+<p>Then change the project name in the valid-submission case. Update its expected heading too, save, and run again. Explain to yourself why both values needed to change.</p>
+
+<section class="exercise"><h2>Finish with a short handover</h2><p>Write a note for your imaginary colleague. Include the command to run, the five behaviors covered, where results are saved, and one thing the suite does not establish.</p><p>For example, this practice suite checks browser-rendered receipts. It does not prove that a real service stored a project, because this demo has no backend.</p></section>
+
+<h2 id="glossary">Your plain-English testing glossary</h2>
+<dl>
+  <dt>Action</dt><dd>Something the browser does, such as opening a page, filling a field, or clicking a button.</dd>
+  <dt>Assertion</dt><dd>A statement about what must be true, such as the receipt containing the correct project name.</dd>
+  <dt>Automation</dt><dd>Having a tool repeat instructions rather than performing every action by hand.</dd>
+  <dt>Base URL</dt><dd>The starting website address used to interpret relative addresses in a test.</dd>
+  <dt>DSL</dt><dd>A small language for a specific job. Bruster’s <code>.bru</code> language describes browser tests.</dd>
+  <dt>Element and selector</dt><dd>An element is one part of a page. A selector is a description used to find that part.</dd>
+  <dt>Expected and actual result</dt><dd>What should happen, and what really happened. A test compares them.</dd>
+  <dt>Profile</dt><dd>A browser’s stored session data. Bruster gives each test a fresh browser and profile.</dd>
+  <dt>Regression suite</dt><dd>A set of tests repeated to check that previously working behavior still works.</dd>
+  <dt>Timeout</dt><dd>A limit on how long a step may wait. A matching assertion can finish before that limit.</dd>
+  <dt>Viewport</dt><dd>The browser’s current page-viewing area. It determines the visible part of a screenshot.</dd>
+  <dt>Artifact</dt><dd>A file kept from a test run, such as a report, screenshot, or diagnostic log.</dd>
+</dl>
+
+<h2>What comes next?</h2>
+<p>Choose one small task on your own website and repeat the process from lesson 18. Start with a clear plan, use stable selectors, and keep the result understandable.</p>
+<p>You can return to the <a href="{{base}}testing/">Bruster DSL guide</a> when you need another command, or explore the <a href="{{base}}guides/web-automation-testing/">longer automation tutorial</a> for website navigation and CI. Bruster uses your platform’s native webview and synthetic input; the <a href="{{base}}compare/">tool comparison</a> explains when another browser testing tool may fit your next project better.</p>
+<section class="checkpoint"><h2>You have a practical starting point</h2><p>You can describe a check, write a small test, run it, investigate a failure, and share the evidence. Keep building from checks you understand.</p></section>

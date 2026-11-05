@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  {{metadata}}
+  <meta name="theme-color" content="#fbfaf7">
+  <link rel="icon" href="{{base}}assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="{{course}}assets/course.css">
+  <script src="{{course}}assets/course.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to the lesson</a>
+  <header class="course-header">
+    <a class="course-brand" href="{{course}}"><span class="brand-mark" aria-hidden="true">b.</span><span>Learn website testing<small>A practical course by Bruster</small></span></a>
+    <a class="practice-link" href="{{base}}demo/" target="_blank" rel="noopener">Open practice page <span aria-hidden="true">↗</span><span class="sr-only"> (new tab)</span></a>
+  </header>
+  <div class="course-layout">
+    <aside class="course-sidebar"><p class="outline-title">Your learning path</p>{{contents}}</aside>
+    <main id="main" class="course-reader">
+      <details class="mobile-contents"><summary>Course contents <span>20 lessons</span></summary>{{contents}}</details>
+      <article>
+        <header class="lesson-header"><p class="lesson-kicker">Lesson {{number}} <span>of 20 · Beginner course</span></p><h1>{{title}}</h1></header>
+        <div class="lesson-body">{{content}}</div>
+      </article>
+      <nav class="lesson-pagination" aria-label="Lesson navigation">{{previous}}{{next}}</nav>
+      <footer class="course-footer"><p>One small step at a time. You can come back to any lesson.</p><div><a href="{{course}}">Course start</a><a href="{{base}}testing/">Bruster reference</a><a href="https://github.com/aliilyas/bruster/tree/main/example-tests/learn-testin">Practice files on GitHub</a></div></footer>
+    </main>
+  </div>
+  <p id="copy-status" class="sr-only" role="status" aria-live="polite"></p>
+</body>
+</html>

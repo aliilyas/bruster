@@ -1,0 +1,46 @@
+base_url "https://aliilyas.github.io/bruster/demo/"
+timeout 5000
+
+before_each
+  navigate "."
+end
+
+test "the page opens without an old receipt"
+  expect title "Bruster browser lab"
+  expect hidden "#result"
+end
+
+test "a valid project produces the correct receipt"
+  fill "#name" "Ada Lovelace"
+  fill "#project" "My first test"
+  click "button[type=submit]"
+  expect text "#result h2" "Smoke test created for My first test"
+  expect text "#result p" "Ada Lovelace · Navigation check · Screenshots: off"
+end
+
+test "a missing project blocks submission"
+  fill "#name" "Ada Lovelace"
+  click "button[type=submit]"
+  expect attached "#project:invalid"
+  expect hidden "#result"
+end
+
+test "the workflow and screenshot option reach the receipt"
+  fill "#name" "Ada Lovelace"
+  fill "#project" "My first test"
+  select "#workflow" "forms"
+  check "#screenshots"
+  click "button[type=submit]"
+  expect text "#result p" "Ada Lovelace · Form submission · Screenshots: on"
+end
+
+test "a second submission replaces the first receipt"
+  fill "#name" "Ada Lovelace"
+  fill "#project" "First project"
+  click "button[type=submit]"
+  expect text "#result h2" "Smoke test created for First project"
+  fill "#project" "Updated project"
+  click "button[type=submit]"
+  expect count "#result" 1
+  expect text "#result h2" "Smoke test created for Updated project"
+end

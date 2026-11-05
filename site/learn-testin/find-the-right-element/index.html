@@ -1,0 +1,25 @@
+<p class="lead">You can point at a field with a mouse. A test file needs another way to say which field it means. That description is called a selector.</p>
+<p>A <strong>page element</strong> is one part of a web page: a heading, input, button, or message. A <strong>selector</strong> is a short description used to find an element. Bruster’s test commands use CSS selectors, a standard way to identify parts of a page.</p>
+
+<h2>Start with IDs</h2>
+<p>An element can have an <strong>ID</strong>, which is a name written into the page’s HTML. Think of it as a label attached to one particular element. The practice page shows useful IDs beside its controls so you can learn without searching through a large page.</p>
+<p>The name field has the ID <code>name</code>. Its selector is <code>#name</code>. The <code>#</code> means “find the element with this ID.” It is part of the selector, not part of the value you type into the field.</p>
+<div class="table-wrap"><table><thead><tr><th scope="col">What you want</th><th scope="col">Selector</th></tr></thead><tbody><tr><td>Your name field</td><td><code>#name</code></td></tr><tr><td>Project field</td><td><code>#project</code></td></tr><tr><td>Workflow dropdown</td><td><code>#workflow</code></td></tr><tr><td>Include screenshots checkbox</td><td><code>#screenshots</code></td></tr><tr><td>The receipt section</td><td><code>#result</code></td></tr></tbody></table></div>
+<p>In a test file, put the selector in double quotes. For example, <code>fill "#name" "Ada Lovelace"</code> means “find the name field and replace its contents with Ada Lovelace.” Without the quotes, the <code>#</code> would start a comment.</p>
+
+<h2>Find something inside something else</h2>
+<p>The receipt contains more than one piece of text. It has a heading and a paragraph. The selector <code>#result h2</code> means “find an <code>h2</code> heading inside the element whose ID is result.”</p>
+<p>The space between the two parts means “inside”. You do not need to know every HTML tag. For these lessons, remember that <code>h1</code> and <code>h2</code> are headings, <code>p</code> is a paragraph, and <code>button</code> is a button.</p>
+<p>This lets you check just the receipt heading rather than all of the text inside the receipt at once.</p>
+
+<h2>Find the submit button</h2>
+<p>Our button selector is <code>button[type=submit]</code>. Read it in two pieces: <code>button</code> chooses a button element, and <code>[type=submit]</code> asks for one whose type is submit.</p>
+<p>The property written into the HTML, such as <code>type="submit"</code>, is called an <strong>attribute</strong>. The square brackets are a CSS way to match that attribute. You can copy this selector for the practice page without memorizing the full CSS language.</p>
+
+<h2>How do you find selectors on another website?</h2>
+<ol><li>Open the page in your normal browser.</li><li>Right-click the field or button and choose Inspect. The browser opens its developer tools near the corresponding HTML.</li><li>Look for an ID such as <code>id="email"</code>. If it has a stable, unique ID, <code>#email</code> may be a useful selector.</li><li>If you are unsure, ask the website’s developer for a stable selector for that control.</li></ol>
+<p>A stable selector stays the same when someone changes the layout or colors. Avoid long copied selectors full of positions if a simple ID is available. “The third button in the second panel” can stop meaning the right thing when the page layout changes.</p>
+<p>Also check that the selector identifies the control you intend. Some pages contain duplicate or hidden copies of a form. A very broad selector such as <code>input</code> may point to the wrong field.</p>
+
+<section class="exercise"><h2>Try it: translate the selectors</h2><p>Describe <code>#project</code>, <code>#result p</code>, and <code>button[type=submit]</code> in ordinary words.</p><details><summary>Read the translations</summary><p>The element with ID project; a paragraph inside the element with ID result; and a button whose type is submit. On the practice page, those are the project input, receipt detail line, and submission button.</p></details></section>
+<section class="checkpoint"><h2>Before you move on</h2><p>You know that a selector finds an element, while a value is the text you want to enter or check. They are different jobs, even when both appear inside quotes.</p></section>

@@ -1,0 +1,28 @@
+<p class="lead">A test plan can fit on a few lines. Its job is to make your intention clear before you choose commands or write a file.</p>
+<p>Use a notebook or a plain document for this lesson. Write in ordinary language. If another person can follow your steps and decide whether the result is correct, you have a useful plan.</p>
+
+<h2>Start with a specific question</h2>
+<p>For our first form test, the question is: <strong>Can someone enter a name and project and get the correct receipt?</strong> We will leave the optional choices at their defaults. That gives us a small first check.</p>
+<p>Do not try to test every feature in one long journey. If a long test fails near its beginning, you may learn nothing about the later steps. Short tests make the cause of a failure easier to locate.</p>
+
+<h2>Write these four lines</h2>
+<blockquote><p><strong>Name:</strong> A valid project produces a receipt.</p><p><strong>Start:</strong> Open the practice page with no previous receipt.</p><p><strong>Do:</strong> Enter Ada Lovelace and Bruster, then press Create smoke test.</p><p><strong>Check:</strong> The heading says “Smoke test created for Bruster”.</p></blockquote>
+<p>The name should describe the behavior, not just say “Test 1”. Good names make a list of results easier to read. When “A valid project produces a receipt” fails, a colleague already knows which behavior needs attention.</p>
+<p>The values matter too. “Enter some information” leaves too much to guess. Use a fixed practice name and project so the expected receipt is predictable.</p>
+
+<h2>Add one case where the user makes a mistake</h2>
+<p>A <strong>test case</strong> is one situation you want to check. A complete form and a form missing a project are two different cases. A website needs to handle both.</p>
+<blockquote><p><strong>Name:</strong> A missing project blocks submission.</p><p><strong>Start:</strong> Open a fresh practice page.</p><p><strong>Do:</strong> Enter Ada Lovelace, leave Project empty, and press Create smoke test.</p><p><strong>Check:</strong> No receipt appears, and Project is marked invalid.</p></blockquote>
+<p>This is often called a <strong>negative test</strong>: it deliberately uses input that should be rejected. A negative test passes when the page rejects that input correctly. The word “negative” does not mean the test itself should fail.</p>
+
+<h2>Separate facts from guesses</h2>
+<p>You know the practice form requires a project because the field has a required rule and the browser blocks an empty submission. You should not invent another rule, such as “project names must contain at least ten characters”, unless the application actually requires it.</p>
+<p>On a real project, ask the person responsible for the feature what should happen. A test is most useful when it checks an agreed behavior. It should not quietly turn your personal preference into a requirement.</p>
+<p>Likewise, this demo produces a receipt on the page. It does not store a project on a server. Your plan should say “a receipt appears”, rather than claim that a database record was created.</p>
+
+<h2>Choose a first set of checks</h2>
+<p>For this course, a sensible small plan is: the page opens, a valid form succeeds, a missing project is rejected, the choices reach the receipt, and a new submission updates the receipt. You will build toward those five checks in the final project.</p>
+<p>You can keep other ideas in a separate list. Thinking of more cases is valuable, but you do not have to automate them all immediately.</p>
+
+<section class="exercise"><h2>Try it: plan a checkbox check</h2><p>Write a case for turning Include screenshots on. Use the four labels Name, Start, Do, and Check. Include the exact words you expect in the receipt.</p><details><summary>Compare with an example</summary><p><strong>Name:</strong> The screenshot choice reaches the receipt. <strong>Start:</strong> A fresh form. <strong>Do:</strong> Enter Ada Lovelace and Bruster, leave Workflow on Navigation check, turn the checkbox on, and submit. <strong>Check:</strong> The detail line says “Ada Lovelace · Navigation check · Screenshots: on”.</p></details></section>
+<section class="checkpoint"><h2>You are ready for setup when…</h2><p>You can explain a small case without mentioning a command. The browser instructions you learn next will express that same plan.</p></section>

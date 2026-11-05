@@ -1,0 +1,30 @@
+<p class="lead">An assertion should answer the question your test was created to ask. Choose the smallest observation that clearly shows the intended result.</p>
+<p>For our form, the appearance of a receipt is useful, but its contents matter too. A receipt for the wrong person or project would still be a problem.</p>
+<p><a class="download-link" href="{{base}}example-tests/learn-testin/result-checks.bru" download="result-checks.bru">Download result-checks.bru ↓</a></p>
+{{result_checks}}
+
+<h2>Check the starting state</h2>
+<p><code>expect hidden "#result"</code> checks that the receipt is hidden or absent before submission. This gives the test a clear starting condition. It should not begin by accepting a receipt from an earlier action.</p>
+<p>Hidden and empty are different. A visible receipt with no words in it is not necessarily hidden. This command asks about visibility, not the amount of text.</p>
+
+<h2>Check that the result appears</h2>
+<p>After the click, <code>expect visible "#result"</code> checks that the result element is shown. This establishes that the receipt exists in a visible state on the page.</p>
+<p>“Visible” here does not promise that the element fits inside the current screenshot. It may be farther down a long page. You might need to scroll to see it in your own browser or in a viewport-sized image.</p>
+
+<h2>Check the exact words when they matter</h2>
+<p><code>expect text</code> compares the element’s text with the value you provide. It normalizes whitespace, so differences such as a line break between words do not necessarily cause a failure. It still checks the words, capitalization, and punctuation.</p>
+<p>We check the heading with <code>#result h2</code> and the detail line with <code>#result p</code>. This avoids mixing those two messages with the small “LAST SUBMISSION” label elsewhere in the receipt.</p>
+<p>The detail line in this test uses the default workflow, <strong>Navigation check</strong>, and the default checkbox state, <strong>Screenshots: off</strong>. The dots between the pieces are part of the text. Copy the complete expected line when you want an exact check.</p>
+
+<h2>Use a partial match for a partial requirement</h2>
+<p>Sometimes you only care about one piece of a longer message. In this example, the following assertion would check just the screenshot setting:</p>
+<div class="command"><span class="command-label">Alternative assertion for this default, unchecked form</span><pre><code>expect contains "#result p" "Screenshots: off"</code></pre></div>
+<p><code>expect contains</code> looks for that piece of text inside the whole element. It does not require the whole message to match.</p>
+<p>Choose it because a partial match expresses the requirement, not simply because an exact check failed. A very loose assertion can miss a real mistake. Checking only that the receipt contains “Smoke test” would not prove that it names the right project.</p>
+
+<h2>Run and review the stronger check</h2>
+<div class="command"><span class="command-label">macOS / Linux</span><pre><code>./bruster test result-checks.bru</code></pre><span class="command-label">Windows PowerShell</span><pre><code>.\bruster.exe test result-checks.bru</code></pre></div>
+<p>Expect one passed test. There are several assertions inside that test, but the summary counts named tests, not individual lines. A test only passes when all of its steps pass.</p>
+
+<section class="exercise"><h2>Try it: choose the right assertion</h2><p>You want to know whether the receipt names the exact project entered by the user. Would checking that <code>#result</code> is visible be enough?</p><details><summary>Read the answer</summary><p>No. Visibility tells you that a receipt is shown. Add an exact text assertion for the project heading, or another assertion that checks the intended project value.</p></details></section>
+<section class="checkpoint"><h2>Your rule of thumb</h2><p>Ask, “Could the website be wrong in the way I care about and still pass this assertion?” If the answer is yes, make the observation more specific.</p></section>

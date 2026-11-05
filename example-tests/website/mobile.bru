@@ -43,3 +43,20 @@ test "the tutorial and its code blocks fit a mobile viewport"
   expect js "document.querySelector('#recording-example').getBoundingClientRect().top >= document.querySelector('.site-header').getBoundingClientRect().bottom && document.querySelector('#recording-example').getBoundingClientRect().top < innerHeight"
   screenshot "mobile-guide.png"
 end
+
+test "the beginner course contents work on a narrow screen"
+  navigate "learn-testin/"
+  expect hidden ".course-sidebar"
+  expect visible ".mobile-contents summary"
+  expect hidden ".mobile-contents .course-contents"
+  expect js "document.documentElement.scrollWidth <= innerWidth"
+  screenshot "course-mobile.png"
+  click ".mobile-contents summary"
+  expect count ".mobile-contents .course-contents a" 20
+  click ".mobile-contents a[href$='make-a-test-file/']"
+  expect url "learn-testin/make-a-test-file/"
+  expect text "h1" "Create a folder and your first test file"
+  expect hidden ".mobile-contents .course-contents"
+  expect js "document.documentElement.scrollWidth <= innerWidth"
+  expect contains "#example-first-check" "expect title"
+end

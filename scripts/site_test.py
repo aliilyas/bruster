@@ -30,12 +30,16 @@ def run(binary, output, visible=False):
             thread.start()
             suites = (
                 ('website-desktop', '960x640', base_url,
-                 ['example-tests/website/pages.bru', 'example-tests/website/components.bru']),
+                 ['example-tests/website/pages.bru', 'example-tests/website/components.bru',
+                  'example-tests/website/learn-testin.bru']),
                 ('website-mobile', '375x640', base_url, ['example-tests/website/mobile.bru']),
                 ('demo-desktop', '960x640', base_url + 'demo/',
                  ['example-tests/demo/recording.bru', 'example-tests/demo/components.bru']),
                 ('demo-mobile', '375x640', base_url + 'demo/',
                  ['example-tests/demo/recording.bru', 'example-tests/demo/components.bru']),
+                ('course-examples', '960x640', base_url + 'demo/',
+                 [path.relative_to(ROOT).as_posix()
+                  for path in sorted((ROOT / 'example-tests/learn-testin').glob('*.bru'))]),
             )
             status = 0
             try:

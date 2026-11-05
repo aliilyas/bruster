@@ -1,0 +1,30 @@
+<p class="lead">A form can contain choices as well as text. You will now select a workflow, turn a checkbox on or off, and check that those choices reach the receipt.</p>
+<p>First try both controls on the <a href="{{base}}demo/" target="_blank" rel="noopener">practice page</a>. Notice that the dropdown shows human-readable labels, while the live preview shows shorter values such as <code>forms</code>.</p>
+
+<h2>Choose a dropdown option with select</h2>
+<p><code>select "#workflow" "forms"</code> means “choose the option whose value is forms in the workflow dropdown.” This option is labelled <strong>Form submission</strong> on the page.</p>
+<div class="table-wrap"><table><thead><tr><th scope="col">Label you see</th><th scope="col">Value used in these tests</th></tr></thead><tbody><tr><td>Navigation check</td><td><code>navigation</code></td></tr><tr><td>Form submission</td><td><code>forms</code></td></tr><tr><td>Screenshot review</td><td><code>screenshots</code></td></tr></tbody></table></div>
+<p>Bruster can select by option value or text. These examples use the values so you can connect the test with the live preview. Selecting an option tests the form choice; it does not test the operating system’s native popup appearance.</p>
+
+<h2>Set a checkbox to a known state</h2>
+<p><code>check "#screenshots"</code> makes the checkbox checked. <code>uncheck "#screenshots"</code> makes it unchecked.</p>
+<p>These commands express the state you want. Clicking a checkbox would instead toggle whatever state it currently has. If it was already checked, another click would turn it off.</p>
+<p>Checking an already checked checkbox leaves it checked. This makes <code>check</code> helpful when you want a clear, predictable setup rather than a guess about the current state.</p>
+
+<h2>Read the two complete cases</h2>
+<p><a class="download-link" href="{{base}}example-tests/learn-testin/choices.bru" download="choices.bru">Download choices.bru ↓</a></p>
+<p>This file has a <code>before_each</code> block. It is shared preparation that runs before every test in this file: open the page and fill the two required fields. Lesson 14 explains this setup in more detail.</p>
+{{choices}}
+<p>The first case chooses Form submission and checks the screenshot box. The second chooses Screenshot review, checks the box, and then unchecks it. Both submit before checking the final receipt.</p>
+<p>Notice that <strong>Screenshot review</strong> and <strong>Screenshots: off</strong> can appear together. The workflow dropdown and checkbox are independent controls. A test should not assume one changes the other unless the page is designed that way.</p>
+
+<h2>Run the file</h2>
+<div class="command"><span class="command-label">macOS / Linux</span><pre><code>./bruster test choices.bru --visible</code></pre><span class="command-label">Windows PowerShell</span><pre><code>.\bruster.exe test choices.bru --visible</code></pre></div>
+<p>The expected summary is <strong>2 passed, 0 failed</strong>. You should see each test name separately. The second test gets a fresh browser, so it cannot depend on the checkbox left by the first one.</p>
+
+<h2>Check the effect, not only the action</h2>
+<p>A successful select or check command tells you the browser could perform that action. The receipt assertion adds a different piece of evidence: the form used that choice when it built its result.</p>
+<p>This habit applies to real websites too. After changing a delivery method, check the resulting delivery information. After changing a filter, check the displayed results. The outcome should connect to the choice you made.</p>
+
+<section class="exercise"><h2>Try it: make a navigation case</h2><p>Copy the first test block, give the copy a new name, change the option value to <code>navigation</code>, and use <code>uncheck</code>. Update the expected detail line to “Ada Lovelace · Navigation check · Screenshots: off”.</p><details><summary>What should the summary become?</summary><p>If you added the new case to the file without removing the original two, a successful run should report three passed tests.</p></details></section>
+<section class="checkpoint"><h2>Before you move on</h2><p>You can explain why setting a checkbox with <code>check</code> is clearer than blindly clicking it when the goal is “the option must be on”.</p></section>

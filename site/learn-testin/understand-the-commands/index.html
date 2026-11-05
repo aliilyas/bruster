@@ -1,0 +1,31 @@
+<p class="lead">Your first test has only a few instructions. Read them as a small recipe: choose the website, name the check, open the page, check its title, and finish.</p>
+{{first_check}}
+
+<h2>The website address</h2>
+<p><code>base_url</code> gives the starting website address. A <strong>URL</strong> is an address such as the one in your browser’s address bar. In this example, the address ends with <code>/bruster/demo/</code>.</p>
+<p>The address is between double quotation marks because it is text. Keep the final slash. Later, you will use addresses relative to this starting point, and the final slash makes the directory you mean clear.</p>
+
+<h2>The test name</h2>
+<p><code>test "the practice page opens"</code> begins a named test. The name is for people: it appears in the result, helping you understand what passed or failed.</p>
+<p>You can change this name without changing what the browser does. A useful name describes the intended behavior. “The practice page opens” is easier to understand than “test123”.</p>
+
+<h2>The navigation action</h2>
+<p><code>navigate "."</code> tells the browser to open the current base directory. In this file, the dot means the demo directory given by <code>base_url</code>.</p>
+<p>The dot does not refer to a folder on your computer here. It is a relative website address. Bruster combines it with the base URL to decide which page to visit.</p>
+<p>You could use a full HTTP or HTTPS address in <code>navigate</code>. Keeping the address in <code>base_url</code> makes it easier to run the same test against another copy of the same page later.</p>
+
+<h2>The assertion</h2>
+<p><code>expect title "Bruster browser lab"</code> checks the page’s title. This is the text normally shown on the browser tab. It is different from the large heading printed inside the page.</p>
+<p>On our demo, the tab title is <strong>Bruster browser lab</strong>, while the visible heading says <strong>Browser smoke test</strong>. If you accidentally use the visible heading in this title assertion, the test will fail.</p>
+<p>The word <code>expect</code> introduces the assertion. Read the line as “check that the page title is exactly Bruster browser lab.”</p>
+
+<h2>The end of the block</h2>
+<p><code>end</code> closes the test. The lines between <code>test</code> and <code>end</code> belong to that test. A group of related lines like this is called a <strong>block</strong>.</p>
+<p>The extra spaces at the beginning of the action lines are called <strong>indentation</strong>. They make the block easier to read. Bruster does not require those spaces, but keeping them is a good habit.</p>
+
+<h2>A few small writing rules</h2>
+<ul><li>Put one command on each line.</li><li>Use straight double quotes around text and selectors.</li><li>Keep the opening and closing quotes together. A missing quote changes how the line is read.</li><li>Close each test with <code>end</code>.</li><li>Use <code>#</code> outside quotes to begin a comment for humans. Bruster ignores the rest of that comment line.</li></ul>
+<p>For example, <code># Check the page title</code> is a comment. Later you will see <code>"#name"</code> inside quotes; that is a selector, not a comment. The quotation marks make the difference.</p>
+
+<section class="exercise"><h2>Try it: rename the check</h2><p>Change the test name to <code>"my first website check"</code>, save the file, and run it again. Leave the expected title unchanged.</p><details><summary>What should change?</summary><p>The PASS line should use your new test name. The check should still pass, because changing its name did not change the page or expected title.</p></details></section>
+<section class="checkpoint"><h2>Explain it without reading the code</h2><p>Be able to say where the test goes, what it checks, and how it knows when that test block ends.</p></section>

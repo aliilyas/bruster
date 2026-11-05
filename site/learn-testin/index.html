@@ -1,0 +1,32 @@
+<p class="lead">You can learn to test a website without already knowing how to program. Start by noticing what a page does. Then learn how to ask a browser to repeat a small check for you.</p>
+<p>This course takes you from your first manual check to a small set of automated tests. There are twenty lessons, including this one. Each lesson explains one idea, shows a concrete example, and gives you something to try.</p>
+<p>You will use a simple practice form throughout the course. You will not need to invent an application or find sample data. The same familiar form will help you see what each new command changes.</p>
+
+<h2>What will you be able to do?</h2>
+<p>By the end, you should be able to describe a website check in plain English, turn it into a short Bruster test file, run it, and explain the result. You will also learn how to find a field on a page, test missing information, and keep useful screenshots.</p>
+<p>Imagine a colleague asks, “Does our form still work after yesterday’s change?” You will have a way to answer with a specific check: enter a name and project, submit the form, and confirm that the receipt contains the right project name.</p>
+<p>That is a useful first goal. Testing an entire large application comes later. A small check that you understand is a better starting point than a large script that you cannot explain.</p>
+
+<h2>How the course works</h2>
+<div class="course-map">
+  <h3>Lessons 1–4: think like a tester</h3>
+  <p>Learn what a test is, explore the practice page, and write a short plan. You only need your normal browser for these lessons.</p>
+  <h3>Lessons 5–8: set up and run</h3>
+  <p>Get a test-ready copy of Bruster, make a plain-text file, run it, and understand its few lines. Installation gets its own lesson because it can take longer than the first test.</p>
+  <h3>Lessons 9–14: build useful checks</h3>
+  <p>Find controls, fill forms, check results, change options, and try invalid input. Learn to give every test a fresh start.</p>
+  <h3>Lessons 15–20: make testing a habit</h3>
+  <p>Understand waiting, keep evidence, investigate failures, and adapt your approach to another website. Finish with a five-check project.</p>
+</div>
+
+<h2>What is Bruster?</h2>
+<p>Bruster is a program that can control a browser window. You give it a small text file containing instructions. It follows those instructions and reports whether your checks passed.</p>
+<p>The instructions are written in a <strong>DSL</strong>. That stands for “domain-specific language”: a small language for one job. Here, the job is browser testing. You will see commands such as <code>fill</code>, <code>click</code>, and <code>expect text</code>. We will explain each one before asking you to use it.</p>
+<p>The course uses Bruster’s <code>.bru</code> test runner from source builds. The released v0.3.6 archives predate that runner. <a href="{{course}}set-up-bruster/">Lesson 5 explains how to get the right build</a>, including the final check that confirms you have it.</p>
+
+<h2>A comfortable way to learn</h2>
+<p>Keep this course in one tab and the <a href="{{base}}demo/" target="_blank" rel="noopener">practice page in another tab</a>. Read a short section, try the action, and compare what you saw with the explanation. You can use the contents menu to return to a lesson whenever you need it.</p>
+<p>When you meet an unfamiliar word, look for its explanation nearby. At the end of the course, a <a href="{{course}}your-first-testing-project/#glossary">small glossary</a> brings the important words together. There is no account or completion timer. Your progress is the work you can now do.</p>
+
+<section class="exercise" id="try-it"><h2>Try it now</h2><p>Think of one thing you often do on a website: search for an item, send a message, or complete a form. Write one sentence describing what should happen afterward.</p><p>For example: “After I submit a valid project name, I should see that name in a confirmation.” Keep this sentence. You have already begun a test plan.</p></section>
+<section class="checkpoint"><h2>Before you move on</h2><p>You do not need to memorize any commands yet. Be ready to describe one website action and the result you would expect from it.</p></section>

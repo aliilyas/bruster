@@ -1,0 +1,22 @@
+base_url "https://aliilyas.github.io/bruster/demo/"
+
+before_each
+  navigate "."
+  fill "#name" "Ada Lovelace"
+  fill "#project" "Bruster"
+end
+
+test "the selected workflow and checked option reach the receipt"
+  select "#workflow" "forms"
+  check "#screenshots"
+  click "button[type=submit]"
+  expect text "#result p" "Ada Lovelace · Form submission · Screenshots: on"
+end
+
+test "the screenshot option can be turned off again"
+  select "#workflow" "screenshots"
+  check "#screenshots"
+  uncheck "#screenshots"
+  click "button[type=submit]"
+  expect text "#result p" "Ada Lovelace · Screenshot review · Screenshots: off"
+end

@@ -14,6 +14,7 @@ from xml.etree import ElementTree as ET
 
 import bench_report
 import site_build
+import site_learn
 from lab.build import assemble
 from site_layout import REPOSITORY, ROOT, SITE
 from test_bench_publish import fixture
@@ -172,7 +173,8 @@ class SiteBuild(unittest.TestCase):
             sitemap = ET.parse(output / 'sitemap.xml')
             locations = [item.text for item in sitemap.findall('.//{*}loc')]
             self.assertEqual(set(locations), {base_url + path for path in (
-                '', 'docs/', 'testing/', 'mcp/', 'compare/', 'benchmarks/', 'guides/web-automation-testing/')})
+                '', 'docs/', 'testing/', 'mcp/', 'compare/', 'benchmarks/', 'guides/web-automation-testing/',
+                *site_learn.paths())})
             for name, document in documents.items():
                 noindex = '/runs/' in name or name in ('404.html', 'demo/index.html')
                 self.assertEqual('noindex' in document.meta['robots'], noindex)
@@ -219,6 +221,8 @@ class SiteBuild(unittest.TestCase):
                              'guides/web-automation-testing/index.html', 'demo/index.html',
                              'example-tests/demo/recording.bru', 'example-tests/demo/components.bru',
                              'example-tests/website/mobile.bru',
+                             'learn-testin/index.html', 'learn-testin/practice-files.zip',
+                             'learn-testin/your-first-testing-project/index.html',
                              'llms.txt', 'llms-full.txt', 'docs/reference.md',
                              *(path.name for path in SITE.glob('google*.html'))):
                     self.assertEqual((published / name).read_bytes(), (output / name).read_bytes())

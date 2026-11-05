@@ -1,0 +1,19 @@
+base_url "https://aliilyas.github.io/bruster/demo/"
+
+before_each
+  navigate "."
+  expect hidden "#result"
+end
+
+test "a project can be submitted"
+  fill "#name" "Ada Lovelace"
+  fill "#project" "Bruster"
+  click "button[type=submit]"
+  expect text "#result h2" "Smoke test created for Bruster"
+end
+
+test "a new test starts without a receipt"
+  expect attached "#name:invalid"
+  expect attached "#project:invalid"
+  expect hidden "#result"
+end

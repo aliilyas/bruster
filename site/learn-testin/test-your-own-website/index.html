@@ -1,0 +1,33 @@
+<p class="lead">The method stays the same when you leave the practice page: choose a small behavior, find the relevant elements, perform the actions, and check the result. The address and selectors usually change.</p>
+<p>Begin with a website or preview that you manage. A <strong>preview</strong> is a copy of an application used to review changes before they reach its main audience. Ask your teammate for the right preview address and a simple behavior to check.</p>
+
+<h2>Start again with a manual plan</h2>
+<ol><li>Open the real page in your normal browser.</li><li>Choose one small task, such as submitting a contact form with practice information.</li><li>Write the starting condition, exact inputs, action, and expected result.</li><li>Perform the task yourself once.</li><li>Identify selectors for the controls and message you actually used.</li></ol>
+<p>Do this before copying the demo’s commands. The selector <code>#project</code> belongs to our practice form. Your website might use <code>#subject</code>, a test attribute, or another structure entirely.</p>
+<p>Also confirm what success means. A visible confirmation may be enough for a small UI smoke test. If the requirement is that an order is stored on a server, checking the visible message alone does not establish that server-side fact.</p>
+
+<h2>Change the address and the expectation together</h2>
+<p>Here is a starting template for a page-title check. The address and title are placeholders. Replace both before running it:</p>
+<div class="command"><span class="command-label">Template — replace the two example values</span><pre><code>base_url "https://your-preview.example/"
+
+test "my preview page opens"
+  navigate "."
+  expect title "Your actual browser-tab title"
+end</code></pre></div>
+<p>Once that check passes, add one useful interaction. Build up a little at a time. If you change the address, selectors, inputs, and assertions all at once, a failure becomes harder to explain.</p>
+
+<h2>Understand relative addresses</h2>
+<p>A <strong>relative address</strong> is interpreted using the base URL. With a base of <code>https://example.com/shop/</code>, <code>navigate "contact/"</code> goes to <code>https://example.com/shop/contact/</code>.</p>
+<p>A leading slash changes the meaning. <code>navigate "/contact/"</code> starts at the website’s root, so it goes to <code>https://example.com/contact/</code>. It leaves out <code>/shop/</code>.</p>
+<p>Keep <code>navigate "."</code> when you mean the exact base directory. The demo tests use this pattern so they can work at the published <code>/bruster/demo/</code> path or at the root of a local server.</p>
+
+<h2>Optional: run your own local copy of the demo</h2>
+<p>A <strong>local server</strong> serves a website from your own computer. The address <code>127.0.0.1</code> points back to that computer. A port, such as <code>8765</code>, identifies the particular server running there.</p>
+<ol><li>Inside bruster-practice, create a folder named <code>practice-site</code>.</li><li><a href="{{base}}demo/index.html" download="index.html">Download the practice HTML page</a> and save it as <code>practice-site/index.html</code>.</li><li>If you do not have Python 3, install it from <a href="https://www.python.org/downloads/">python.org</a>. It is only needed for this optional local server.</li><li>Open a terminal in bruster-practice and run the server command below. Leave that terminal open.</li></ol>
+<div class="command"><span class="command-label">macOS / Linux</span><pre><code>python3 -m http.server 8765 --bind 127.0.0.1 --directory practice-site</code></pre><span class="command-label">Windows with the Python launcher</span><pre><code>py -m http.server 8765 --bind 127.0.0.1 --directory practice-site</code></pre></div>
+<p>Open <code>http://127.0.0.1:8765/</code> in your browser. When the form appears, open a <strong>second terminal</strong> in bruster-practice and run:</p>
+<div class="command"><span class="command-label">macOS / Linux</span><pre><code>./bruster test form-submit.bru --base-url http://127.0.0.1:8765/</code></pre><span class="command-label">Windows PowerShell</span><pre><code>.\bruster.exe test form-submit.bru --base-url http://127.0.0.1:8765/</code></pre></div>
+<p>The command-line <code>--base-url</code> overrides the address in the file for this run. You can use the same test without editing its saved URL. When finished, stop the local server with Ctrl+C in its terminal.</p>
+
+<section class="exercise"><h2>Try it: list what would change</h2><p>Choose a small task on your own website. Write down its address, the selector for its main control, and the expected result. If you cannot determine one of those yet, write a precise question to ask your teammate.</p></section>
+<section class="checkpoint"><h2>One important boundary</h2><p>A fresh Bruster test does not inherit a login from your personal browser. If a page requires a login, that preparation needs to be part of the test’s workflow or handled through an appropriate test setup.</p></section>

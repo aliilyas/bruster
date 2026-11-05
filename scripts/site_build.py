@@ -10,6 +10,7 @@ from urllib.parse import urljoin, urlsplit
 from xml.etree import ElementTree as ET
 
 from bench_report import render_reports
+from site_learn import build as build_course
 from site_layout import REPOSITORY, ROOT, SITE, SITE_URL, project_version, render_metadata, render_page, site_url, substitute
 
 
@@ -167,6 +168,7 @@ def build(output, measurements=None, base_url=SITE_URL):
     version = project_version()
     write_ai_docs(output, base_url, version)
     write_demo(output, base_url)
+    course_paths = build_course(output, base_url)
     values = {
         'base': base, 'version': 'v' + html.escape(version),
         'api_table': reference_table('API', 'Browser methods, parameters, and results'),
@@ -201,7 +203,7 @@ def build(output, measurements=None, base_url=SITE_URL):
                  f'<a class="text-link" href="{base}docs/">Open the docs →</a></div></main>')
     write_page(output, '404.html', render_page('Page Not Found — Bruster', 'Find Bruster documentation and browser automation tools.',
                '404.html', not_found, base_url=base_url, noindex=True))
-    paths = [page[0] for page in PAGES] + (['benchmarks/'] if history else [])
+    paths = [page[0] for page in PAGES] + course_paths + (['benchmarks/'] if history else [])
     ET.register_namespace('', 'http://www.sitemaps.org/schemas/sitemap/0.9')
     namespace = '{http://www.sitemaps.org/schemas/sitemap/0.9}'
     sitemap = ET.Element(namespace + 'urlset')
@@ -213,7 +215,7 @@ def build(output, measurements=None, base_url=SITE_URL):
     if urlsplit(base_url).path == '/':
         write_page(output, 'robots.txt', f'User-agent: *\nAllow: /\nSitemap: {base_url}sitemap.xml\n')
     (output / '.nojekyll').touch()
-    print(f'Built {len(PAGES) + 3 + len(history)} HTML pages in {output}; {len(history)} benchmark runs.')
+    print(f'Built {len(PAGES) + len(course_paths) + 3 + len(history)} HTML pages in {output}; {len(history)} benchmark runs.')
     return history
 
 

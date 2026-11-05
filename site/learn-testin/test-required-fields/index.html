@@ -1,0 +1,29 @@
+<p class="lead">A useful form should guide people when information is missing. A test can check that an invalid submission is blocked and that the user can fix the problem afterward.</p>
+<p>Our practice form requires a name and project. Leaving one of those fields empty gives us a simple, repeatable invalid case. Remember that a test for invalid input should pass when the form correctly refuses it.</p>
+
+<h2>Try the behavior by hand first</h2>
+<ol><li>Open a fresh <a href="{{base}}demo/" target="_blank" rel="noopener">practice page</a>.</li><li>Enter Ada Lovelace as the name and leave Project empty.</li><li>Press Create smoke test.</li><li>Look for the browser’s required-field indication. Confirm that no receipt appears.</li><li>Enter Bruster as the project and submit again. Now a receipt should appear.</li></ol>
+<p>The browser’s small validation bubble may look different on different computers or use a different language. Our test will check the field’s invalid state rather than the exact wording of that browser-provided bubble.</p>
+
+<h2>One new selector: :invalid</h2>
+<p>You already know that <code>#project</code> finds the project field. Adding <code>:invalid</code> narrows the selector to that field when its current value does not meet its rules.</p>
+<p><code>#project:invalid</code> therefore means “the project field, if it is currently invalid.” An empty required project field matches that description.</p>
+<p>The command <code>expect attached</code> checks that an element matching a selector exists in the page. Used with this selector, it checks that the invalid field is present. It does not look for a particular popup message.</p>
+
+<h2>Two small tests</h2>
+<p><a class="download-link" href="{{base}}example-tests/learn-testin/required-fields.bru" download="required-fields.bru">Download required-fields.bru ↓</a></p>
+{{required_fields}}
+<p>The first case leaves the name empty while providing a project. The second leaves the project empty, checks the rejection, then corrects the project and checks the successful receipt.</p>
+<p>Keeping the two missing fields in separate cases helps locate a problem. If only the name requirement breaks, the test names will point you toward that field instead of reporting a vague form failure.</p>
+
+<h2>Why check both invalid state and the missing receipt?</h2>
+<p>The invalid selector confirms the field’s validation state. <code>expect hidden "#result"</code> confirms that the page has not shown a successful receipt for this attempt.</p>
+<p>These are related observations, but they answer different questions. A field could be marked invalid while faulty application code still displays a success message. Checking the receipt helps catch that inconsistency.</p>
+<p>The recovery steps matter too. A form that blocks invalid input but stays stuck after correction would be frustrating. The second case verifies that this user can continue after providing the missing value.</p>
+
+<h2>Run the required-field checks</h2>
+<div class="command"><span class="command-label">macOS / Linux</span><pre><code>./bruster test required-fields.bru</code></pre><span class="command-label">Windows PowerShell</span><pre><code>.\bruster.exe test required-fields.bru</code></pre></div>
+<p>You should see two passing tests. A negative case passing is a good result: the form rejected the input it was supposed to reject.</p>
+
+<section class="exercise"><h2>Try it: add recovery for the name</h2><p>At the end of the first case, fill the missing name with Ada Lovelace, click the button again, and check the project heading. Save and rerun the file.</p><details><summary>Which assertion should you add?</summary><p>After filling and clicking, use <code>expect text "#result h2" "Smoke test created for Bruster"</code>. The project was already filled earlier in that same test.</p></details></section>
+<section class="checkpoint"><h2>Your new skill</h2><p>You can test both “the form should accept this” and “the form should reject this”, and you can explain why both are useful.</p></section>

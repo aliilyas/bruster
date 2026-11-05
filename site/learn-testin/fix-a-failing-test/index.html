@@ -1,0 +1,28 @@
+<p class="lead">A failed test is information to investigate. Read it as a report of what did not match, rather than a judgment about how well you are learning.</p>
+<p>We will create a harmless failure in a copy of your first test. This lets you practice the whole process while knowing exactly what changed.</p>
+
+<h2>1. Make a deliberately wrong expectation</h2>
+<p>Copy <code>first-check.bru</code> and name the copy <code>failure-practice.bru</code>. Open the copy in your editor. Replace only its expected title line with:</p>
+<div class="command"><span class="command-label">Deliberately incorrect assertion for this exercise</span><pre><code>expect title "A title the demo does not have"</code></pre></div>
+<p>Keep the rest of the file unchanged. Save it. The page’s real title is still Bruster browser lab, so this expectation should not match.</p>
+
+<h2>2. Run the copy and read the failure</h2>
+<div class="command"><span class="command-label">macOS / Linux</span><pre><code>./bruster test failure-practice.bru --output practice-results</code></pre><span class="command-label">Windows PowerShell</span><pre><code>.\bruster.exe test failure-practice.bru --output practice-results</code></pre></div>
+<p>The assertion will keep observing until its deadline. The default is five seconds for the step; startup and collecting evidence can add more time. Wait for the command to finish.</p>
+<p>Find the <strong>FAIL</strong> line, the filename and line number, and the text of the failed assertion. The summary should report <strong>0 passed, 1 failed</strong>. You have successfully created the intended practice failure.</p>
+<p>Notice that the test can fail even though the page itself is fine. Here, the expected result is intentionally wrong. Investigation means comparing the requirement, the test, and the actual page.</p>
+
+<h2>3. Use the evidence to answer a small question</h2>
+<p>Open the printed artifact folder. Look at the failure screenshot and the snapshot if they were captured. Is the correct practice page open? If so, you can focus on the title assertion instead of assuming the browser never started.</p>
+<p>A line number refers to a line in your saved file. Your editor may show line numbers, or you can count from the top. Blank lines count too. This location tells you where to start, not necessarily the full cause.</p>
+
+<h2>4. Fix the expectation and run again</h2>
+<p>Change the expected title back to <code>Bruster browser lab</code>, save, and rerun the same file. It should now pass. Keep the two run folders long enough to compare a failing result with a successful one.</p>
+<p>If you are keeping a permanent suite, remove the deliberately incorrect copy from your list of files to run, or leave it corrected. An intentional teaching failure should not surprise a colleague later.</p>
+
+<h2>A practical order for other failures</h2>
+<ol><li><strong>Check the command and file.</strong> Are you in the correct folder? Did you save the file? Is its extension really <code>.bru</code>?</li><li><strong>Check the page.</strong> Is the intended address reachable? Does the screenshot show that page or an error page?</li><li><strong>Check the selector.</strong> Does it still identify the intended field, button, or message?</li><li><strong>Check the expectation.</strong> Did the agreed behavior change, or is the application showing an incorrect result?</li><li><strong>Check timing last.</strong> Was the result genuinely late? A longer deadline will not correct a wrong address or typo.</li></ol>
+<p>A syntax error, such as an unfinished quote, is different from a failed assertion. Bruster validates files before opening a browser. If the file cannot be understood, you may get an input error without a normal run report. Fix the quoted line or missing <code>end</code> first.</p>
+
+<section class="exercise"><h2>Try it: write a useful problem report</h2><p>Describe your practice failure in four pieces: the command you ran, what you expected, what the test observed, and the evidence path.</p><details><summary>See a compact example</summary><p>“I ran failure-practice.bru. It expected ‘A title the demo does not have’, but the page title was ‘Bruster browser lab’. The failure points to the title assertion. The screenshot shows the demo page, and the evidence is in the printed practice-results run folder.”</p></details></section>
+<section class="checkpoint"><h2>Your new skill</h2><p>You can create, investigate, and correct a failed assertion. You can also explain why a failure does not automatically prove a website bug.</p></section>

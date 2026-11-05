@@ -1,0 +1,12 @@
+base_url "https://aliilyas.github.io/bruster/demo/"
+
+test "the receipt shows the submitted information"
+  navigate "."
+  expect hidden "#result"
+  fill "#name" "Ada Lovelace"
+  fill "#project" "Bruster"
+  click "button[type=submit]"
+  expect visible "#result"
+  expect text "#result h2" "Smoke test created for Bruster"
+  expect text "#result p" "Ada Lovelace · Navigation check · Screenshots: off"
+end

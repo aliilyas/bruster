@@ -6,6 +6,7 @@
       <h1>Web automation testing: a practical guide with Bruster</h1>
       <p class="lead">Web automation testing uses software to open a browser, interact with a website, and check the result. In this guide, you will turn a recorded demo workflow into repeatable tests for forms, UI components, website navigation, and mobile layouts using Bruster’s <code>.bru</code> DSL.</p>
       <p>By <a href="https://github.com/aliilyas/bruster">Bruster contributors</a> · Examples from the executable website and demo suites.</p>
+      <p>Want a slower, step-by-step introduction? Start with the <a href="{{base}}learn-testin/">twenty-page beginner course</a>, including setup, plain-English explanations, and exercises.</p>
     </header>
 
     <nav class="toc-inline" aria-label="On this page"><a href="#what-is-web-automation">The basics</a><a href="#setup">Setup</a><a href="#first-test">First test</a><a href="#components">Components</a><a href="#website">Website tests</a><a href="#debugging">Debugging</a><a href="#ci">CI</a><a href="#faq">FAQ</a></nav>
@@ -39,7 +40,7 @@ target/release/bruster test --help</code></pre></div>
 
     <section id="first-test" aria-labelledby="first-test-title">
       <h2 id="first-test-title">2. Turn the demo recording into an automated test</h2>
-      <p>The recording fills in Ada Lovelace and Bruster, chooses Form submission, enables screenshots, and submits. This is the actual <a href="{{base}}example-tests/demo/recording.bru" download>downloadable <code>recording.bru</code> test</a>; its contents are embedded from the file that the test suite runs. All five suites are in the repository’s <a href="https://github.com/aliilyas/bruster/tree/main/example-tests"><code>example-tests/</code> directory</a>.</p>
+      <p>The recording fills in Ada Lovelace and Bruster, chooses Form submission, enables screenshots, and submits. This is the actual <a href="{{base}}example-tests/demo/recording.bru" download>downloadable <code>recording.bru</code> test</a>; its contents are embedded from the file that the test suite runs. The website and demo suites are in the repository’s <a href="https://github.com/aliilyas/bruster/tree/main/example-tests"><code>example-tests/</code> directory</a>.</p>
       <div class="code-block"><div class="code-toolbar"><span>example-tests/demo/recording.bru</span><button type="button" class="copy-button" data-copy="recording-example" aria-label="Copy the recording workflow test" hidden>Copy</button></div><pre tabindex="0"><code id="recording-example">{{demo_recording}}</code></pre></div>
       <p>Run it in another terminal:</p>
       <div class="code-block"><div class="code-toolbar"><span>Terminal 2</span><button type="button" class="copy-button" data-copy="guide-run" aria-label="Copy demo test command" hidden>Copy</button></div><pre tabindex="0"><code id="guide-run">target/release/bruster test example-tests/demo/recording.bru --output target/demo-results</code></pre></div>

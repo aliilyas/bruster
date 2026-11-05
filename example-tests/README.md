@@ -11,6 +11,8 @@ embeds the executable test sources at build time.
 - [`website/pages.bru`](website/pages.bru): page navigation, metadata, and the tutorial-to-demo journey.
 - [`website/components.bru`](website/components.bru): FAQ, tabs, keyboard focus, and copy feedback.
 - [`website/mobile.bru`](website/mobile.bru): mobile navigation and tutorial layout.
+- [`website/learn-testin.bru`](website/learn-testin.bru): course navigation, practice answers, and copying.
+- [`learn-testin/`](learn-testin/): eight beginner practice files, used by the [twenty-lesson course](https://aliilyas.github.io/bruster/learn-testin/).
 
 Try the [published demo](https://aliilyas.github.io/bruster/demo/) in a browser.
 The tutorial links to downloadable copies of these files under `/example-tests/`.
@@ -31,16 +33,17 @@ On headless Linux, install Xvfb and xauth; you can prefix the command with
 `xvfb-run -a` to share a virtual display across all tests.
 
 The helper builds the actual website, binds an OS-assigned localhost port, serves
-it under `/bruster/` to catch project-path mistakes, and runs four groups. It
+it under `/bruster/` to catch project-path mistakes, and runs five groups. It
 shuts down the server afterward, preserves reports, and returns nonzero if any
 group fails. Execution requires no network services, accounts, or Node.js.
 
 | Group | Tests | What it checks |
 | --- | --- | --- |
-| Website desktop, 960×640 | `pages.bru`, `components.bru` | Product and install content, navigation/history, docs anchors, comparison/benchmarks, article metadata and demo link, FAQ, MCP tabs and keyboard focus, clipboard feedback |
-| Website mobile, 375×640 | `mobile.bru` | Menu open/close, Escape/focus, link navigation, page overflow, tutorial code layout |
+| Website desktop, 960×640 | `pages.bru`, `components.bru`, `learn-testin.bru` | Product and install content, navigation/history, docs anchors, comparison/benchmarks, article metadata and demo link, FAQ, MCP tabs and keyboard focus, clipboard feedback, course navigation and exercises |
+| Website mobile, 375×640 | `mobile.bru` | Menu open/close, Escape/focus, link navigation, page overflow, tutorial code layout, course contents |
 | Demo desktop, 960×640 | `recording.bru`, `components.bru` | Recorded submission with screenshots, default state, text editing, select options, check/uncheck, required-field validation and recovery, repeat submission, literal text rendering |
 | Demo mobile, 375×640 | Same demo files | The same form workflows at a narrow viewport, including an overflow check |
+| Course examples, 960×640 | `learn-testin/*.bru` | All 15 tests shown in the beginner lessons, including the five-check final project |
 
 Clipboard tests stub only the clipboard API to exercise both success and
 rejection deterministically. They assert the passed text, UI feedback, and
@@ -62,6 +65,7 @@ In another:
 ```sh
 target/release/bruster test example-tests/website/pages.bru example-tests/website/components.bru --viewport 960x640
 target/release/bruster test example-tests/website/mobile.bru --viewport 375x640
+target/release/bruster test example-tests/website/learn-testin.bru --viewport 960x640
 target/release/bruster test example-tests/demo/recording.bru example-tests/demo/components.bru --base-url http://127.0.0.1:8000/demo/
 ```
 

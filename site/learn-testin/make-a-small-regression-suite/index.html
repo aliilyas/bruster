@@ -1,0 +1,32 @@
+<p class="lead">The value of a useful test grows when you run it again after a change. A small, understandable collection is a good place to start.</p>
+<p>A <strong>regression</strong> is a behavior that used to work but breaks after a change. A <strong>test suite</strong> is a collection of tests. A regression suite is a collection you repeat to check that important behavior still works.</p>
+
+<h2>Choose checks that answer real questions</h2>
+<p>For the practice form, you might choose the page-opening check, a valid submission, and the two required-field checks. Together, those cases tell you more than opening the homepage several times would.</p>
+<p>On a real website, ask which failures would most interrupt the work people need to do. A sign-in page, a search function, or a form submission might deserve an early smoke test. The right choice depends on the application.</p>
+<p>Keep a short note beside your suite: what each test covers and why it exists. If nobody can explain the purpose of a test, review it before adding more complexity.</p>
+
+<h2>Run several files in one command</h2>
+<p>Save the three files below in your practice folder. They are available individually in earlier lessons and together in the <a href="{{course}}practice-files.zip" download>practice ZIP</a>.</p>
+<div class="command"><span class="command-label">macOS / Linux</span><pre><code>./bruster test first-check.bru form-submit.bru required-fields.bru --output routine-results</code></pre><span class="command-label">Windows PowerShell</span><pre><code>.\bruster.exe test first-check.bru form-submit.bru required-fields.bru --output routine-results</code></pre></div>
+<p>Expect <strong>4 passed, 0 failed</strong>: one test in the first file, one in the second, and two in the third. File count and test count are not necessarily the same.</p>
+<p>Listing filenames explicitly works across these command shells. You may see examples using <code>*.bru</code> to mean all matching files, but not every shell expands that pattern in the same way.</p>
+<p>If a valid test fails during a run, its later steps stop, but Bruster can continue with the next named test. Syntax errors are different: all input files are validated before browser execution begins.</p>
+
+<h2>Try a narrow browser window</h2>
+<p>A <strong>responsive layout</strong> adapts to the available screen width. You can run the same form check with a narrower viewport:</p>
+<div class="command"><span class="command-label">macOS / Linux</span><pre><code>./bruster test form-submit.bru --viewport 375x640 --visible</code></pre><span class="command-label">Windows PowerShell</span><pre><code>.\bruster.exe test form-submit.bru --viewport 375x640 --visible</code></pre></div>
+<p>The first number is the width and the second is the height, in viewport pixels. This checks the same form behavior in a narrower layout.</p>
+<p>A narrow viewport is not a complete phone simulation. It does not change your operating system’s webview into a mobile browser or reproduce touch hardware. Use it as one useful layout check, and choose additional device testing when your project needs it.</p>
+
+<h2>Make a repeatable routine</h2>
+<ol><li>Open the intended website or start its preview server.</li><li>Run the same small suite after an important change.</li><li>Read every failure and preserve the relevant result folder.</li><li>Check whether the problem is in the application, the test, or its environment.</li><li>Update tests when an agreed requirement changes, and keep their names meaningful.</li></ol>
+<p>Bruster does not automatically rerun an entire failed test until it passes. Repeating a failing test can help investigation, but do not let an occasional success erase a failure you have not understood.</p>
+
+<h2>Where CI fits</h2>
+<p><strong>Continuous integration</strong>, usually shortened to CI, is a service that runs checks after changes are pushed to a repository. It can run the same Bruster command on another computer and save its reports.</p>
+<p>The basic idea is familiar: prepare the environment, start the website, run the tests, and read the result. Bruster returns exit code 0 for all tests passed, 1 for test/browser failures, and 2 for invalid inputs or report problems. CI uses that signal to mark a step successful or failed.</p>
+<p>You do not need to configure CI to complete this course. When your local suite is useful, the <a href="{{base}}guides/web-automation-testing/#ci">CI walkthrough</a> shows a concrete GitHub Actions example.</p>
+
+<section class="exercise"><h2>Try it: choose your first routine</h2><p>Choose three behaviors you would want to recheck after a website change. For each one, write a sentence explaining what a passing test would establish.</p></section>
+<section class="checkpoint"><h2>You are ready for the final project</h2><p>You can choose a small set of checks, run more than one file, and explain why a stable routine matters more than the largest possible test count.</p></section>

@@ -1,0 +1,46 @@
+# Course navigation and interactions at the desktop viewport used by site_test.py.
+base_url "http://127.0.0.1:8000/"
+timeout 5000
+
+test "the beginner course has twenty lessons and previous next navigation"
+  navigate "learn-testin/"
+  expect text "h1" "Learn website testing, one small step at a time"
+  expect visible ".course-sidebar"
+  expect hidden ".mobile-contents"
+  expect count ".course-sidebar .course-contents a" 20
+  expect count ".course-sidebar [aria-current=page]" 1
+  expect js "document.documentElement.scrollWidth <= innerWidth"
+  screenshot "course-desktop.png"
+  click ".lesson-pagination [rel=next]"
+  expect url "learn-testin/what-a-test-checks/"
+  expect text "h1" "What does a website test actually check?"
+  click ".lesson-pagination [rel=prev]"
+  expect url "learn-testin/"
+end
+
+test "a practice answer can be revealed and hidden"
+  navigate "learn-testin/what-a-test-checks/"
+  expect hidden ".exercise details p"
+  click ".exercise details summary"
+  expect visible ".exercise details p"
+  expect contains ".exercise details p" "Garden club"
+  click ".exercise details summary"
+  expect hidden ".exercise details p"
+end
+
+test "course copy buttons copy the complete runnable example"
+  navigate "learn-testin/fill-and-submit-a-form/"
+  expect visible "[data-copy=example-form-submit]"
+  eval "Object.defineProperty(navigator, 'clipboard', {configurable: true, value: {writeText: async text => { window.copiedTest = text; }}})"
+  click "[data-copy=example-form-submit]"
+  expect text "#copy-status" "Test copied. Paste it into your plain-text file."
+  expect js "window.copiedTest === document.querySelector('#example-form-submit').textContent && window.copiedTest.includes('expect text')"
+end
+
+test "course copying falls back to text selection"
+  navigate "learn-testin/make-a-test-file/"
+  eval "Object.defineProperty(navigator, 'clipboard', {configurable: true, value: {writeText: async () => { throw new Error('Denied for this test'); }}})"
+  click "[data-copy=example-first-check]"
+  expect contains "#copy-status" "Text selected."
+  expect js "getSelection().toString() === document.querySelector('#example-first-check').textContent"
+end

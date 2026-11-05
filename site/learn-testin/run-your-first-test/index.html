@@ -1,0 +1,30 @@
+<p class="lead">Now you will ask Bruster to read your file and perform its check. Keep the test small so you can see the whole journey from command to result.</p>
+<p>Before starting, confirm that the <a href="{{base}}demo/" target="_blank" rel="noopener">practice page opens in your normal browser</a>. The downloaded example uses that public address, so this first exercise needs an internet connection.</p>
+
+<h2>1. Open a terminal in your practice folder</h2>
+<p>Use the same folder-opening method from the setup lesson. The terminal needs to be in <strong>bruster-practice</strong>, where you saved the program and <code>first-check.bru</code>.</p>
+<p>The folder a terminal is currently using is called its <strong>working directory</strong>. When you give it a filename without a full path, it looks in this directory. This is why being in the right folder matters.</p>
+<p>You can list the folder contents with <code>ls</code> on macOS/Linux or <code>Get-ChildItem</code> in PowerShell. You should see both the program and your test file in the list.</p>
+
+<h2>2. Run the test</h2>
+<p>Choose the command for your computer. Copy the whole line into the terminal and press Enter once.</p>
+<div class="command"><span class="command-label">macOS / Linux</span><pre><code>./bruster test first-check.bru --visible</code></pre><span class="command-label">Windows PowerShell</span><pre><code>.\bruster.exe test first-check.bru --visible</code></pre></div>
+<p><code>test</code> tells Bruster to use its test runner. <code>first-check.bru</code> is the file it should read. <code>--visible</code> asks it to show the browser window while it works.</p>
+<p>A small test may finish quickly, and its window may close before you have time to study it. That is normal. The terminal result is the reliable place to see whether the check passed.</p>
+
+<h2>3. Read the result</h2>
+<p>On a successful run, you should see a line beginning with <strong>PASS</strong> and the test name <strong>the practice page opens</strong>. At the end, you should see:</p>
+<div class="command"><span class="command-label">Expected summary</span><pre><code>1 passed, 0 failed</code></pre></div>
+<p>Bruster also prints a path beginning with <code>Artifacts:</code>. An <strong>artifact</strong> is a file kept from a run, such as a report or screenshot. You will learn to use these files in lesson 16. For now, notice that a result folder was created.</p>
+<p>The terminal prompt returns when the command has finished. You can then type another command. You do not need to open a new terminal for every test.</p>
+
+<h2>4. Run it a second time</h2>
+<p>Repeat the same command. You should again see one pass. This is the first benefit of automation: you can repeat a specific check without performing each browser action yourself.</p>
+<p>Each test gets a fresh browser process and profile. It does not reuse the tabs you already have open in your personal browser. Editing the demo in your normal browser therefore does not change the starting state of this test.</p>
+
+<h2>If the run does not pass</h2>
+<ul><li><strong>Program not found:</strong> check that the Bruster executable is in this folder and that you used the command for your operating system.</li><li><strong>Test file not found:</strong> check the filename and working directory. Look for a hidden <code>.txt</code> extension.</li><li><strong>Unknown test command:</strong> return to the setup lesson and use a build with the test runner.</li><li><strong>Page or connection error:</strong> confirm the demo address works in your browser and try again when the connection is available.</li></ul>
+<p>If a different error appears, save its wording. It is more useful than a description such as “nothing worked.” <a href="{{course}}fix-a-failing-test/">Lesson 17 explains how to investigate failures</a>.</p>
+
+<section class="exercise"><h2>Try it: change one run option</h2><p>Run the same command without <code>--visible</code>. The test should still work, but the browser window stays off-screen. The check in the file has not changed; only how the run is displayed has changed.</p></section>
+<section class="checkpoint"><h2>You have completed your first automated check</h2><p>You can locate a test file, run it, and find the pass/fail summary. Next, you will learn what its lines actually mean.</p></section>

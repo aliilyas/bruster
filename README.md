@@ -137,6 +137,7 @@ The runner is available in source builds from `main`; older release binaries may
 not include `bruster test` yet.
 
 [UI testing guide](https://aliilyas.github.io/bruster/testing/) ·
+[Beginner course: 20 lessons](https://aliilyas.github.io/bruster/learn-testin/) ·
 [DSL reference](docs/reference.md#ui-tests) ·
 [Runnable local example](examples/testing/greeting.bru) ·
 [Website and demo example tests](example-tests/README.md) ·

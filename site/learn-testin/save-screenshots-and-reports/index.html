@@ -1,0 +1,30 @@
+<p class="lead">A test result is easier to understand when you can see what happened. Reports tell you which check failed. Screenshots and page snapshots help you investigate why.</p>
+<p>In this lesson, you will save two pictures during a successful form submission and find them in the run’s result folder.</p>
+<p><a class="download-link" href="{{base}}example-tests/learn-testin/evidence.bru" download="evidence.bru">Download evidence.bru ↓</a></p>
+{{evidence}}
+
+<h2>What screenshot does</h2>
+<p><code>screenshot "before.png"</code> saves an image of the current browser viewport. A <strong>viewport</strong> is the part of the page inside the browser’s content area. It is not necessarily the whole page from top to bottom.</p>
+<p>The first image shows the form before the fields are filled. The second is captured after the receipt heading has passed its text check. The filenames make their purpose clear.</p>
+<p>These commands save screenshots regardless of the demo form’s Include screenshots checkbox. That checkbox only changes the demo’s state and receipt. It is not a control for the Bruster runner.</p>
+
+<h2>Choose where the evidence goes</h2>
+<p>Run the file with an output folder that is easy to find:</p>
+<div class="command"><span class="command-label">macOS / Linux</span><pre><code>./bruster test evidence.bru --output practice-results</code></pre><span class="command-label">Windows PowerShell</span><pre><code>.\bruster.exe test evidence.bru --output practice-results</code></pre></div>
+<p>The runner creates <code>practice-results</code> in your working directory if it does not exist. Inside it, each run gets a unique subfolder. Bruster prints the exact location after <code>Artifacts:</code>.</p>
+<p>Open that new run folder in your file manager. Inside <code>test-001</code>, find <code>before.png</code> and <code>after.png</code>. Open both and compare them. On the default desktop viewport, the form and receipt should fit in these example images.</p>
+
+<h2>Read the folder as a record of one run</h2>
+<div class="table-wrap"><table><thead><tr><th scope="col">File or folder</th><th scope="col">What it is for</th></tr></thead><tbody><tr><td><code>results.json</code></td><td>The overall report: test names, pass/fail results, steps, and artifact locations.</td></tr><tr><td><code>test-001/</code></td><td>The first test’s own evidence folder. Later tests get their own numbered folders.</td></tr><tr><td><code>stderr.log</code></td><td>Diagnostic messages from the browser process.</td></tr><tr><td><code>before.png</code> and <code>after.png</code></td><td>The pictures requested by this test.</td></tr></tbody></table></div>
+<p>JSON is a text format. You can open <code>results.json</code> in your editor and search for your test name or the word <code>error</code>. You do not have to understand every field immediately.</p>
+
+<h2>What is saved when a test fails?</h2>
+<p>On a failed step, Bruster also attempts to save <code>failure.png</code>, <code>snapshot.json</code>, and <code>console.json</code>. A snapshot describes the page’s elements. The console file can contain messages from the page’s scripts.</p>
+<p>These captures are best-effort. If the browser has already crashed, some evidence may be unavailable. Read the original failing step first; a missing screenshot does not replace that original error.</p>
+
+<h2>A picture is evidence, not a comparison</h2>
+<p>Saving <code>after.png</code> does not automatically check whether its pixels match an approved design. The text assertion is what decides whether this receipt is correct. You can review the image to understand the context.</p>
+<p>On a narrow screen, the receipt may be below the captured viewport. A visibility assertion can pass even when the element is farther down the page. For a worked example that scrolls before capturing the receipt, see the <a href="{{base}}guides/web-automation-testing/#first-test">recording workflow tutorial</a>.</p>
+
+<section class="exercise"><h2>Try it: find the right run</h2><p>Run the evidence example twice. Find both run folders and open the second run’s pictures. Notice that the old run was kept rather than overwritten.</p></section>
+<section class="checkpoint"><h2>Before you move on</h2><p>You can follow the printed artifact path and identify a report, a screenshot, and a browser log. That will make the next lesson’s deliberate failure easier to investigate.</p></section>

@@ -61,6 +61,31 @@ The guide has a search title/description, canonical and social metadata,
 documentation, footer, and `llms.txt`. The interactive demo uses `noindex, follow`
 and stays out of the sitemap, like the Test Lab's individual fixtures.
 
+## Beginner learning site
+
+[`learn-testin/`](learn-testin/) is a separate, minimal reading-focused site at
+`/learn-testin/`. The spelling of this public path is intentional. It has exactly
+twenty lesson pages, including the start page, for readers without programming
+experience. Each lesson provides explanations, a concrete exercise, and a
+checkpoint. The final lesson includes a five-check project and glossary.
+
+`scripts/site_learn.py` owns the ordered lesson metadata, generates previous/next
+links and course contents, and adds all lesson URLs to the main sitemap. Lesson
+fragments live under `site/learn-testin/`; its own `_layout.html`, CSS, and optional
+copy-button JavaScript provide the reading interface. Navigation, exercises,
+answers, and downloads work without JavaScript. Keep lesson slugs stable.
+
+Code blocks come directly from `example-tests/learn-testin/*.bru`. The same files
+are downloadable individually and in the generated `learn-testin/practice-files.zip`.
+The website runner executes all 15 course example tests against a local demo and
+checks course navigation, answers, copying, and mobile layout. Static contracts
+verify the complete twenty-page reading path, links, metadata, ZIP contents, and
+source-backed snippets on root and project-path builds.
+
+The setup lesson explicitly uses a source build because the v0.3.6 release
+archives predate the testing DSL. Update its availability instructions when a
+release containing the runner is published.
+
 The social preview is a checked-in 1200×630 PNG with its editable SVG source next
 to it. Regenerate it with librsvg (or another SVG renderer) when branding changes:
 

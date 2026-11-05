@@ -1,0 +1,30 @@
+<p class="lead">Your next test will do something useful: enter a name and project, press the submit button, and check the receipt. This is the manual plan from lesson 4 written as browser instructions.</p>
+<p><a class="download-link" href="{{base}}example-tests/learn-testin/form-submit.bru" download="form-submit.bru">Download form-submit.bru ↓</a> Save it beside the Bruster program in your practice folder.</p>
+{{form_submit}}
+
+<h2>Read the steps in order</h2>
+<p>The test first opens the demo. It then fills Your name with Ada Lovelace and Project with Bruster. The next line clicks the submit button. Finally, it checks the heading inside the receipt.</p>
+<p>The browser follows the lines in order within this test. The submission therefore happens after both fields have been filled. If the name field could not be found, the test would stop at that problem instead of continuing blindly.</p>
+
+<h2>What does fill do?</h2>
+<p><code>fill</code> has two pieces of text after it. The first is the selector for the field. The second is the value to put into that field.</p>
+<p>In <code>fill "#project" "Bruster"</code>, the selector is <code>#project</code> and the value is <code>Bruster</code>. The command replaces the field’s existing contents. This helps keep the test predictable even if that field previously contained something.</p>
+<p>Bruster also has a <code>type</code> command for typing additional text. Start with <code>fill</code> when your goal is to set the whole value. It is easier to understand a test that says exactly what each field should contain.</p>
+
+<h2>Why check the receipt afterward?</h2>
+<p>The final line begins with <code>expect</code>, so it is an assertion. It asks for the text inside <code>#result h2</code> to match <strong>Smoke test created for Bruster</strong>.</p>
+<p>This check connects the input to the outcome. If the button did nothing, the expected heading would not appear. If the receipt used the wrong project name, the text would not match.</p>
+<p>Notice that we left Workflow and Include screenshots alone. The page’s defaults are enough for this first submission test. Testing the optional choices separately will make those cases easier to explain.</p>
+
+<h2>Run the new file</h2>
+<div class="command"><span class="command-label">macOS / Linux</span><pre><code>./bruster test form-submit.bru --visible</code></pre><span class="command-label">Windows PowerShell</span><pre><code>.\bruster.exe test form-submit.bru --visible</code></pre></div>
+<p>Look for the test name <strong>Ada can create a smoke test</strong> and a summary of one passed test. You now have a small automated form workflow, not only a page-opening check.</p>
+<p>If a test fails, compare its saved file with the example. Check the quotes, the exact selector names, and the expected receipt. Save the file before running it again.</p>
+
+<h2>Change the example deliberately</h2>
+<p>Suppose you want the project to be Garden club. You need to change two things: the value in the Project fill command, and the expected receipt heading. Those two values describe the same scenario.</p>
+<p>Changing the input alone should cause the old assertion to fail. That is useful feedback: the assertion is actually checking the outcome, rather than passing regardless of what you entered.</p>
+<p>You can also change the human-readable test name to describe your scenario. The name does not need to match a field value, but it should still make sense when you read the result list.</p>
+
+<section class="exercise"><h2>Try it: submit your own practice project</h2><p>Make a copy named <code>garden-project.bru</code>. Change the project value to Garden club and update the expected heading to “Smoke test created for Garden club”. Save the file and run it by its new filename.</p><details><summary>What should stay the same?</summary><p>The selectors stay the same because you are using the same page controls. The input and expected receipt change because you are testing different data.</p></details></section>
+<section class="checkpoint"><h2>Your new skill</h2><p>You can tell the browser which field to fill, what value to use, which button to press, and which result must follow.</p></section>

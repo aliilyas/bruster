@@ -1,0 +1,37 @@
+<p class="lead">Before you automate a page, use it yourself. Knowing how the page behaves makes it much easier to notice when your test does the wrong thing.</p>
+<p><a href="{{base}}demo/" target="_blank" rel="noopener">Open the practice page in a new tab</a>. Keep this lesson open beside it. The page is a small form called <strong>Browser smoke test</strong>. It is a learning example: submitting it changes the page in your browser and does not create a project on a server.</p>
+
+<h2>Meet the five controls</h2>
+<p>A <strong>control</strong> is a part of a page you can use, such as a text field or button. Our practice page has five important controls:</p>
+<ol>
+  <li><strong>Your name:</strong> a text field. You can type Ada Lovelace here.</li>
+  <li><strong>Project:</strong> another text field. You can type Bruster here.</li>
+  <li><strong>Workflow:</strong> a dropdown with three choices. It starts on Navigation check.</li>
+  <li><strong>Include screenshots:</strong> a checkbox that starts unchecked.</li>
+  <li><strong>Create smoke test:</strong> the button that submits the form.</li>
+</ol>
+<p>The name and project fields are <strong>required</strong>. Required means the form expects you to provide a value before it can be submitted. We will test that rule in a later lesson.</p>
+
+<h2>The preview and the receipt are different</h2>
+<p>The section labelled <strong>Form state</strong> is a live preview. It changes as you edit the fields. Its text uses a format called JSON, which is simply a way to write named values. You do not need to learn JSON to follow the course.</p>
+<p>The preview might contain <code>"project": "Bruster"</code>. Read that as “the current project value is Bruster.” The value <code>true</code> means the checkbox is on; <code>false</code> means it is off.</p>
+<p>The <strong>receipt</strong> appears after a successful submission. It has a heading and a detail line. Unlike the live preview, it describes the last submitted values. If you edit Project afterward, the old receipt stays until you submit again.</p>
+<p>This difference gives us two useful questions to test: do edits reach the live form state, and do submitted values reach the receipt?</p>
+
+<h2>Walk through a complete submission</h2>
+<ol>
+  <li>Enter <strong>Ada Lovelace</strong> in Your name.</li>
+  <li>Enter <strong>Bruster</strong> in Project.</li>
+  <li>Choose <strong>Form submission</strong> from Workflow.</li>
+  <li>Turn on <strong>Include screenshots</strong>.</li>
+  <li>Press <strong>Create smoke test</strong>.</li>
+</ol>
+<p>The receipt heading should say <strong>Smoke test created for Bruster</strong>. The detail line should say <strong>Ada Lovelace · Form submission · Screenshots: on</strong>. If you are on a small screen, scroll down to find it.</p>
+<p>The screenshot checkbox is a value in this demonstration form. Turning it on changes the preview and receipt. It does not itself save an image to your computer. Later, the Bruster <code>screenshot</code> command will do that.</p>
+
+<h2>Start over deliberately</h2>
+<p>Reload the practice page to remove the receipt. Some browsers restore values in form fields after a reload. If that happens, clear the name and project, choose Navigation check, and uncheck Include screenshots yourself.</p>
+<p>When Bruster runs separate tests later, it starts each one in a fresh browser and profile. For now, resetting the page by hand helps you practice describing a known starting point.</p>
+
+<section class="exercise"><h2>Try it: watch the two kinds of state</h2><p>Submit a project called Garden club. Then change the Project field to Book club without pressing the button. Look at the preview and receipt.</p><details><summary>What should you see?</summary><p>The preview should show Book club. The receipt should still name Garden club. After you press Create smoke test again, the receipt should name Book club.</p></details></section>
+<section class="checkpoint"><h2>Before you move on</h2><p>Be able to point to the name field, project field, dropdown, checkbox, button, live preview, and receipt. You will use those same parts throughout the course.</p></section>

@@ -1,0 +1,116 @@
+:root {
+  color-scheme: light;
+  --paper: #fbfaf7;
+  --ink: #252b28;
+  --muted: #656c66;
+  --line: #dedfd6;
+  --accent: #355b46;
+  --soft: #f0f2e9;
+  font: 18px/1.8 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink); }
+a { color: var(--accent); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+a:hover { text-decoration-thickness: 2px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+[hidden] { display: none !important; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.skip-link { position: absolute; left: 1rem; top: -5rem; background: var(--paper); padding: .5rem 1rem; z-index: 3; }
+.skip-link:focus { top: .5rem; }
+.course-header { max-width: 1180px; margin: 0 auto; min-height: 110px; padding: 1.3rem 2rem; display: flex; align-items: center; justify-content: space-between; gap: 2rem; border-bottom: 1px solid var(--line); }
+.course-brand { display: flex; align-items: center; gap: .8rem; text-decoration: none; font-size: .95rem; font-weight: 650; color: var(--ink); line-height: 1.4; }
+.brand-mark { font-family: Georgia, serif; font-size: 2rem; color: var(--accent); }
+.course-brand small { display: block; margin-top: .2rem; font-size: .68rem; font-weight: 400; color: var(--muted); }
+.practice-link { font-size: .78rem; white-space: nowrap; }
+.course-layout { max-width: 1180px; margin: 0 auto; padding: 2.5rem 2rem 0; display: grid; grid-template-columns: 235px minmax(0, 1fr); gap: 3.6rem; align-items: start; }
+.course-sidebar { position: sticky; top: 1.3rem; max-height: calc(100vh - 2.6rem); overflow-y: auto; padding: .25rem .8rem .5rem 0; scrollbar-width: thin; }
+.outline-title { font-size: .78rem; margin: 0 0 1.4rem; font-weight: 650; }
+.contents-group { color: var(--muted); font-size: .63rem; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; margin: 1.25rem 0 .4rem; }
+.course-contents ol { margin: 0; padding: 0; list-style: none; }
+.course-contents a { display: flex; align-items: baseline; gap: .6rem; padding: .35rem .45rem; text-decoration: none; color: var(--muted); font-size: .73rem; line-height: 1.5; border-radius: 3px; }
+.course-contents a:hover { background: var(--soft); color: var(--ink); }
+.course-contents a[aria-current] { color: var(--accent); background: var(--soft); font-weight: 650; }
+.lesson-number { flex: none; font-size: .64rem; font-variant-numeric: tabular-nums; }
+.course-reader { min-width: 0; max-width: 690px; }
+.mobile-contents { display: none; }
+.lesson-kicker { margin: 0 0 1.2rem; font-size: .72rem; color: var(--accent); font-weight: 600; }
+.lesson-kicker span { color: var(--muted); font-weight: 400; margin-left: .25rem; }
+h1, h2, h3 { font-weight: 600; line-height: 1.25; letter-spacing: -.025em; text-wrap: balance; }
+h1 { font-size: clamp(2rem, 3.5vw, 2.9rem); margin: 0 0 1.75rem; }
+h2 { font-size: 1.5rem; margin: 2.7rem 0 1rem; }
+h3 { font-size: 1.1rem; margin: 1.8rem 0 .7rem; }
+p { margin: 0 0 1.1rem; }
+.lead { font-size: 1.12rem; line-height: 1.7; color: #4c564e; margin-bottom: 1.5rem; }
+.lesson-body ul, .lesson-body ol { padding-left: 1.35rem; margin: .8rem 0 1.3rem; }
+.lesson-body li { padding-left: .15rem; margin-bottom: .55rem; }
+strong { font-weight: 650; }
+code, pre { font-family: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
+code { font-size: .84em; overflow-wrap: anywhere; }
+p code, li code, dd code, td code { background: var(--soft); padding: .1em .25em; border-radius: 3px; }
+pre { margin: 0; padding: 1rem 1.1rem; font-size: .75rem; line-height: 1.75; overflow-x: auto; tab-size: 2; }
+pre code { font-size: inherit; overflow-wrap: normal; }
+.code-example, .command { border: 1px solid var(--line); border-radius: 4px; margin: 1.3rem 0; background: #f6f6f0; overflow: hidden; }
+.code-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .5rem 1rem; border-bottom: 1px solid var(--line); font-size: .66rem; color: var(--muted); overflow-wrap: anywhere; }
+.code-heading button { flex: none; font: inherit; padding: .2rem .55rem; border: 1px solid #bbc4b8; border-radius: 3px; background: transparent; color: var(--accent); cursor: pointer; }
+.command-label { display: block; padding: .65rem 1rem 0; font-size: .65rem; color: var(--muted); font-weight: 600; }
+.command pre + .command-label { border-top: 1px solid var(--line); }
+.note, .exercise, .checkpoint { margin: 1.8rem 0; padding: 1.2rem 1.35rem; border-left: 3px solid #a8b5a0; background: var(--soft); }
+.note > :last-child, .exercise > :last-child, .checkpoint > :last-child { margin-bottom: 0; }
+.note h2, .exercise h2, .checkpoint h2 { font-size: 1rem; margin: 0 0 .65rem; }
+.note { font-size: .9rem; background: transparent; border-left-color: var(--line); }
+.exercise { margin-top: 2.7rem; }
+.checkpoint { background: transparent; border: 1px solid var(--line); border-radius: 4px; }
+details { border-block: 1px solid var(--line); margin: 1.2rem 0; padding: .8rem 0; }
+summary { cursor: pointer; color: var(--accent); font-weight: 550; }
+details[open] > summary { margin-bottom: 1rem; }
+blockquote { margin: 1.5rem 0; padding: .3rem 1.2rem; border-left: 2px solid var(--accent); color: #4c564e; }
+blockquote p:last-child { margin-bottom: 0; }
+.table-wrap { max-width: 100%; overflow-x: auto; margin: 1.5rem 0; }
+table { width: 100%; border-collapse: collapse; font-size: .83rem; }
+th, td { text-align: left; vertical-align: top; padding: .7rem .7rem .7rem 0; border-bottom: 1px solid var(--line); }
+th { font-weight: 600; }
+dt { font-weight: 600; margin-top: 1rem; }
+dd { margin: .25rem 0 1rem; }
+.download-link { display: inline-block; font-weight: 550; margin: .3rem 0 .7rem; }
+.course-map { border-top: 1px solid var(--line); padding-top: .5rem; }
+.lesson-pagination { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; border-top: 1px solid var(--line); margin-top: 3rem; padding-top: 1.4rem; }
+.lesson-pagination a { text-decoration: none; font-size: .86rem; }
+.lesson-pagination span { display: block; font-size: .68rem; color: var(--muted); margin-bottom: .35rem; }
+.lesson-pagination strong { font-weight: 550; }
+.lesson-pagination .next-lesson { grid-column: 2; text-align: right; }
+.course-footer { margin: 3rem 0 2rem; padding-top: 1.2rem; border-top: 1px solid var(--line); color: var(--muted); font-size: .67rem; }
+.course-footer p { margin-bottom: .5rem; }
+.course-footer div { display: flex; flex-wrap: wrap; gap: .3rem 1rem; }
+@media (max-width: 900px) {
+  .course-header { min-height: 95px; padding: 1.2rem 1.5rem; }
+  .course-layout { display: block; padding: 1.5rem; }
+  .course-sidebar { display: none; }
+  .course-reader { margin-inline: auto; }
+  .mobile-contents { display: block; margin: 0 0 2rem; }
+  .mobile-contents summary { font-size: .85rem; }
+  .mobile-contents summary > span { font-size: .7rem; color: var(--muted); font-weight: 400; margin-left: .5rem; }
+  .mobile-contents .course-contents a { font-size: .85rem; padding-block: .45rem; }
+}
+@media (max-width: 480px) {
+  :root { font-size: 17px; }
+  .course-header { padding: 1rem; gap: .8rem; align-items: start; }
+  .course-brand { font-size: .85rem; gap: .45rem; }
+  .course-brand small { font-size: .62rem; }
+  .practice-link { font-size: .7rem; white-space: normal; max-width: 6rem; text-align: right; padding-top: .2rem; }
+  .course-layout { padding: 1.4rem 1rem 0; }
+  h1 { font-size: 2.1rem; }
+  .lesson-kicker { font-size: .66rem; }
+  .lead { font-size: 1.06rem; }
+  .note, .exercise, .checkpoint { padding: 1rem; }
+  .lesson-pagination { gap: 1rem; }
+}
+@media print {
+  :root { font-size: 11pt; color-scheme: light; }
+  body { background: white; }
+  .course-sidebar, .mobile-contents, .practice-link, .code-heading button, .skip-link, .lesson-pagination { display: none; }
+  .course-layout { display: block; padding: 0; }
+  .course-reader { max-width: none; }
+  .course-header { padding: 0 0 1rem; min-height: 0; margin-bottom: 1rem; }
+  pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .code-example, .checkpoint, .exercise { break-inside: avoid; }
+}
