@@ -644,7 +644,10 @@ fn network_body_capture_is_bounded_and_preserves_the_response() {
             assert_eq!(body, &json!("雪😀a".repeat(4096)));
             break;
         }
-        assert!(start.elapsed() < REPLY_TIMEOUT, "prefix waited for end of stream");
+        assert!(
+            start.elapsed() < REPLY_TIMEOUT,
+            "prefix waited for end of stream"
+        );
         std::thread::sleep(Duration::from_millis(10));
     }
     assert_eq!(b.ok("eval", json!({ "expression": "bodyDone" })), false);
@@ -682,13 +685,19 @@ fn network_body_capture_is_bounded_and_preserves_the_response() {
             assert_eq!(body, &json!("雪😀a".repeat(4096)));
             break;
         }
-        assert!(start.elapsed() < REPLY_TIMEOUT, "large chunk prefix missing");
+        assert!(
+            start.elapsed() < REPLY_TIMEOUT,
+            "large chunk prefix missing"
+        );
         std::thread::sleep(Duration::from_millis(10));
     }
     let sizes = b.ok("eval", json!({ "expression": "decodeSizes" }));
     let sizes = sizes.as_array().unwrap();
     assert!(!sizes.is_empty());
-    assert!(sizes.iter().all(|size| size.as_u64().unwrap() <= 16384), "unbounded decoding: {sizes:?}");
+    assert!(
+        sizes.iter().all(|size| size.as_u64().unwrap() <= 16384),
+        "unbounded decoding: {sizes:?}"
+    );
 
     b.ok("network", json!({ "clear": true }));
     let clones = b.ok("eval", json!({ "expression": r#"(async () => {
@@ -739,12 +748,399 @@ fn repeated_large_fetches_keep_the_page_responsive() {
                 assert_eq!(body, &json!("x".repeat(16384)));
                 break;
             }
-            assert!(start.elapsed() < REPLY_TIMEOUT, "large response prefix missing");
+            assert!(
+                start.elapsed() < REPLY_TIMEOUT,
+                "large response prefix missing"
+            );
             std::thread::sleep(Duration::from_millis(10));
         }
     }
     server.join().unwrap();
     assert_eq!(b.ok("eval", json!({ "expression": "21 * 2" })), 42);
+}
+
+#[test]
+fn network_readers_release_slots_on_clear_and_deadline() {
+    let mut b = Browser::spawn();
+    b.open(&format!("{}/other", serve()));
+    let results = b.ok("eval", json!({ "expression": r#"(async () => {
+        window.clonedReaders = 0; window.cancelledReaders = 0;
+        window.savedClone = Response.prototype.clone;
+        Response.prototype.clone = function() {
+            clonedReaders++;
+            return new Response(new ReadableStream({
+                start(c) { c.enqueue(new TextEncoder().encode('partial')); },
+                cancel() { cancelledReaders++; }
+            }));
+        };
+        return Promise.all(Array.from({length:12}, (_,i) => fetch('data:text/plain,original#'+i).then(r=>r.text())));
+    })()"# }));
+    assert!(results.as_array().unwrap().iter().all(|v| v == "original"));
+    assert_eq!(b.ok("eval", json!({ "expression": "clonedReaders" })), 4);
+    b.ok("network", json!({ "clear": true }));
+    b.wait_js("cancelledReaders", json!(4));
+    assert_eq!(b.ok("network", json!({})), json!([]));
+    assert_eq!(
+        b.ok(
+            "eval",
+            json!({ "expression": "fetch('data:text/plain,still-original').then(r=>r.text())" })
+        ),
+        "still-original"
+    );
+    b.wait_js("cancelledReaders", json!(5));
+    let entry = b.ok("network_request", json!({ "index": 0 }));
+    assert_eq!(entry["body"], "partial");
+    assert_eq!(entry["body_truncated"], true);
+    b.ok(
+        "eval",
+        json!({ "expression": "Response.prototype.clone = savedClone; true" }),
+    );
+}
+
+#[test]
+fn network_aggregate_budget_and_metadata_only_capture_preserve_responses() {
+    let mut b = Browser::spawn();
+    b.open(&format!("{}/other", serve()));
+    b.ok(
+        "eval",
+        json!({ "expression": r#"
+        window.bodyUrl = URL.createObjectURL(new Blob(['雪'.repeat(20000)], {type:'text/plain'}));
+        window.bodyClones = 0;
+        const clone = Response.prototype.clone;
+        Response.prototype.clone = function() { bodyClones++; return clone.call(this); };
+        true
+    "# }),
+    );
+    b.ok("network", json!({ "clear": true, "bodies": false }));
+    assert_eq!(
+        b.ok(
+            "eval",
+            json!({ "expression": "fetch(bodyUrl).then(r=>r.text()).then(t=>t.length)" })
+        ),
+        20000
+    );
+    assert_eq!(b.ok("eval", json!({ "expression": "bodyClones" })), 0);
+    let metadata = b.ok("network_request", json!({ "index": 0 }));
+    assert_eq!(metadata["body_skipped"], true);
+    assert!(metadata.get("body").is_none());
+    b.ok("network", json!({ "clear": true, "bodies": true }));
+    b.ok(
+        "eval",
+        json!({ "expression": r#"(async () => {
+        for (let i = 0; i < 100; i++) {
+            const text = await (await fetch(bodyUrl)).text();
+            if (text !== '雪'.repeat(20000)) throw Error('response changed');
+        }
+        return true;
+    })()"# }),
+    );
+    let clones = b
+        .ok("eval", json!({ "expression": "bodyClones" }))
+        .as_u64()
+        .unwrap();
+    assert!(
+        clones > 0 && clones < 100,
+        "aggregate budget must stop cloning before the entry limit: {clones}"
+    );
+    let entries = b.ok("network", json!({}));
+    let mut body_bytes = 0;
+    for entry in entries
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|e| e["type"] == "fetch")
+    {
+        let detail = b.ok("network_request", json!({ "index": entry["index"] }));
+        body_bytes += detail["body"].as_str().unwrap_or("").encode_utf16().count() * 2;
+    }
+    assert!(
+        body_bytes > 1024 * 1024 && body_bytes <= 2 * 1024 * 1024,
+        "body bytes: {body_bytes}"
+    );
+    b.ok("network", json!({ "clear": true }));
+    b.ok(
+        "eval",
+        json!({ "expression": "fetch('data:application/octet-stream,binary').then(r=>r.text())" }),
+    );
+    assert_eq!(b.ok("eval", json!({ "expression": "bodyClones" })), clones);
+    assert_eq!(
+        b.ok("network_request", json!({ "index": 0 }))["body_skipped"],
+        true
+    );
+    b.ok("network", json!({ "clear": true }));
+    b.ok(
+        "eval",
+        json!({ "expression": "fetch('data:text/plain,recovered').then(r=>r.text())" }),
+    );
+    assert_eq!(
+        b.ok("eval", json!({ "expression": "bodyClones" })),
+        clones + 1
+    );
+    assert_eq!(
+        b.ok("network_request", json!({ "index": 0 }))["body"],
+        "recovered"
+    );
+}
+
+#[test]
+fn reused_xhr_keeps_one_observer_and_independent_entries() {
+    let mut b = Browser::spawn();
+    b.open(&format!("{}/other", serve()));
+    b.ok(
+        "eval",
+        json!({ "expression": r#"
+        window.reused = new XMLHttpRequest(); window.observers = 0;
+        const add = reused.addEventListener;
+        reused.addEventListener = function(type, ...args) {
+            if (type === 'loadend') observers++;
+            return add.call(this, type, ...args);
+        };
+        window.requestText = text => new Promise((resolve, reject) => {
+            reused.open('GET', 'data:text/plain,' + text);
+            reused.onloadend = () => resolve(reused.responseText);
+            reused.onerror = reject;
+            reused.send();
+        }); true
+    "# }),
+    );
+    for _ in 0..3 {
+        b.ok("network", json!({ "clear": true }));
+        assert_eq!(
+            b.ok("eval", json!({ "expression": "requestText('first')" })),
+            "first"
+        );
+        assert_eq!(
+            b.ok("eval", json!({ "expression": "requestText('second')" })),
+            "second"
+        );
+        assert_eq!(
+            b.ok("network_request", json!({ "index": 0 }))["body"],
+            "first"
+        );
+        assert_eq!(
+            b.ok("network_request", json!({ "index": 1 }))["body"],
+            "second"
+        );
+        b.ok("eval", json!({ "expression": "for(let i=0;i<30;i++) reused.open('GET','data:text/plain,never-sent'); true" }));
+    }
+    assert_eq!(b.ok("eval", json!({ "expression": "observers" })), 1);
+    b.ok("wait_for", json!({ "idle": true }));
+}
+
+#[test]
+fn diagnostics_bound_formatting_and_dialog_history() {
+    let mut b = Browser::spawn();
+    b.open(&format!("{}/other", serve()));
+    b.ok("eval", json!({ "expression": r#"
+        window.formatted = 0;
+        const value = {a:1, toJSON() { formatted++; return 'bad'; }};
+        Object.defineProperty(value, 'getter', {enumerable:true, get() { formatted++; return 'bad'; }});
+        value.cycle = value;
+        console.log(value);
+        const error = new Error('test');
+        // The original native console may inspect Error accessors itself. Our
+        // retained record must describe the accessor without calling it.
+        Object.defineProperty(error, 'message', {get() { return 'native-message'; }});
+        console.log(error);
+        const huge = 'x'.repeat(1024*1024);
+        for(let i=0;i<600;i++) console.log(huge, value);
+        for(let i=0;i<250;i++) alert(huge);
+        true
+    "# }));
+    assert_eq!(b.ok("eval", json!({ "expression": "formatted" })), 0);
+    let console = b.ok("console", json!({ "clear": true }));
+    assert_eq!(console.as_array().unwrap().len(), 500);
+    assert!(console[1]["text"].as_str().unwrap().contains("[Getter]"));
+    assert!(console.as_array().unwrap().iter().all(|e| e["text"]
+        .as_str()
+        .unwrap()
+        .encode_utf16()
+        .count()
+        <= 1000));
+    let dialogs = b.ok("dialog", json!({ "clear": true }));
+    assert!(dialogs.as_array().unwrap().len() <= 100);
+    assert!(
+        dialogs.as_array().unwrap().last().unwrap()["dropped"]
+            .as_u64()
+            .unwrap()
+            > 0
+    );
+    assert_eq!(b.ok("dialog", json!({})), json!([]));
+    assert_eq!(b.ok("console", json!({})), json!([]));
+}
+
+#[test]
+fn expired_actions_do_not_modify_later_elements() {
+    let mut b = Browser::spawn();
+    b.open(&format!("{}/other", serve()));
+    assert!(b.err("fill", json!({ "selector": "#late", "value": "abandoned", "timeout": 10000, "request_timeout": 100 })).contains("timed out"));
+    b.ok(
+        "eval",
+        json!({ "expression": "document.body.innerHTML='<input id=late>'; true" }),
+    );
+    b.ok("wait_for", json!({ "time": 200 }));
+    assert_eq!(
+        b.ok(
+            "eval",
+            json!({ "expression": "document.getElementById('late').value" })
+        ),
+        ""
+    );
+}
+
+#[test]
+fn screenshots_enforce_geometry_deadlines_and_serialize_per_tab() {
+    let mut b = Browser::spawn();
+    b.open(&format!("{}/other", serve()));
+    assert!(b
+        .err("screenshot", json!({ "request_timeout": 0 }))
+        .contains("timed out"));
+    for clip in [
+        json!({"x":-1,"y":0,"width":10,"height":10}),
+        json!({"x":0,"y":0,"width":1000000000,"height":10}),
+    ] {
+        assert!(!b.err("screenshot", json!({ "clip": clip })).is_empty());
+    }
+    b.ok(
+        "eval",
+        json!({ "expression": "document.body.style.cssText='width:16000px;height:16000px'; true" }),
+    );
+    assert!(b
+        .err("screenshot", json!({ "full": true }))
+        .contains("pixel budget"));
+    b.ok(
+        "eval",
+        json!({ "expression": "document.body.style.cssText=''; true" }),
+    );
+    let first = b.send("screenshot", json!({}));
+    let second = b.send("screenshot", json!({}));
+    for id in [first, second] {
+        assert!(b.recv(id).unwrap()["png_base64"]
+            .as_str()
+            .unwrap()
+            .starts_with("iVBORw0KGgo"));
+    }
+    assert!(b
+        .err("resize", json!({"width":4294967616u64,"height":200}))
+        .contains("width"));
+
+    // A late geometry callback from an expired request must not finish a new
+    // screenshot that reuses its public ID. Make only the old measurement huge.
+    b.ok(
+        "eval",
+        json!({ "expression": r#"
+        window.savedWidth = Object.getOwnPropertyDescriptor(window, 'innerWidth');
+        const width = innerWidth;
+        let first = true;
+        Object.defineProperty(window, 'innerWidth', {configurable:true, get() {
+            if (!first) return width;
+            first = false;
+            const until = performance.now() + 1000;
+            while (performance.now() < until) {}
+            return 100000;
+        }});
+        true
+    "# }),
+    );
+    let expired = b.send(
+        "screenshot",
+        json!({ "full": true, "request_timeout": 100 }),
+    );
+    assert!(b.recv(expired).unwrap_err().contains("timed out"));
+    writeln!(
+        b.stdin,
+        "{}",
+        json!({"id": expired, "method":"screenshot", "params":{"request_timeout":5000}})
+    )
+    .unwrap();
+    assert!(b.recv(expired).unwrap()["png_base64"]
+        .as_str()
+        .unwrap()
+        .starts_with("iVBORw0KGgo"));
+    b.ok(
+        "eval",
+        json!({ "expression": "Object.defineProperty(window, 'innerWidth', savedWidth); true" }),
+    );
+}
+
+#[test]
+fn uploads_are_bounded_and_preserve_block_boundaries() {
+    let mut b = Browser::spawn();
+    b.open(&format!("{}/extra", serve()));
+    let path =
+        std::env::temp_dir().join(format!("bruster-upload-budget-{}.bin", std::process::id()));
+    let data: Vec<u8> = (0..98309).map(|n| (n % 251) as u8).collect();
+    std::fs::write(&path, &data).unwrap();
+    assert!(b
+        .err(
+            "upload",
+            json!({ "selector": "#up", "paths": vec![&path; 33] })
+        )
+        .contains("32 files"));
+    b.ok("upload", json!({ "selector": "#up", "paths": [path] }));
+    assert_eq!(b.ok("eval", json!({ "expression": "document.getElementById('up').files[0].arrayBuffer().then(b=>Array.from(new Uint8Array(b)).every((v,i)=>v===i%251))" })), true);
+    std::fs::File::create(&path)
+        .unwrap()
+        .set_len(17 * 1024 * 1024)
+        .unwrap();
+    assert!(b
+        .err("upload", json!({ "selector": "#up", "paths": [path] }))
+        .contains("16 MiB"));
+    assert_eq!(
+        b.ok(
+            "eval",
+            json!({ "expression": "document.getElementById('up').files[0].size" })
+        ),
+        data.len()
+    );
+    std::fs::remove_file(&path).unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::ffi::OsStrExt;
+        let name = std::ffi::CString::new(path.as_os_str().as_bytes()).unwrap();
+        assert_eq!(unsafe { libc::mkfifo(name.as_ptr(), 0o600) }, 0);
+        assert!(b
+            .err("upload", json!({ "selector": "#up", "paths": [path] }))
+            .contains("regular file"));
+        std::fs::remove_file(path).unwrap();
+    }
+}
+
+#[test]
+fn request_capacity_recovers_after_inflight_work_finishes() {
+    let mut b = Browser::spawn();
+    b.open(&format!("{}/other", serve()));
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!("http://{}/gate", listener.local_addr().unwrap());
+    let (release, released) = std::sync::mpsc::channel();
+    let server = std::thread::spawn(move || {
+        let (mut stream, _) = listener.accept().unwrap();
+        let mut request = BufReader::new(&stream);
+        loop {
+            let mut line = String::new();
+            if request.read_line(&mut line).unwrap() == 0 || line == "\r\n" {
+                break;
+            }
+        }
+        let _ = released.recv_timeout(REPLY_TIMEOUT);
+        let _ = write!(stream, "HTTP/1.1 200 OK\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok");
+    });
+    b.ok(
+        "eval",
+        json!({ "expression": format!("window.capacityGate = fetch({url:?}); true") }),
+    );
+    b.ok("network", json!({ "clear": true }));
+    let ids: Vec<_> = (0..128)
+        .map(|_| b.send("eval", json!({ "expression": "capacityGate.then(()=>42)" })))
+        .collect();
+    assert!(b.err("title", json!({})).contains("capacity exceeded"));
+    release.send(()).unwrap();
+    for id in ids {
+        assert_eq!(b.recv(id).unwrap(), 42);
+    }
+    assert_eq!(b.ok("eval", json!({ "expression": "6*7" })), 42);
+    assert_eq!(b.ok("network", json!({})), json!([]));
+    server.join().unwrap();
 }
 
 #[test]
@@ -766,9 +1162,16 @@ fn snapshots_and_selectors_keep_nested_root_order() {
     })()"# }));
     assert_eq!(b.ok("text", json!({ "selector": ".target" })), "root first");
     assert_eq!(b.ok("count", json!({ "selector": ".target" })), 3);
-    assert_eq!(b.ok("text", json!({ "selector": ".targ\\65 t" })), "root first");
-    assert!(b.err("text", json!({ "selector": ":scope > .target" })).contains("no element matches"));
-    assert!(b.err("text", json!({ "selector": ":sco\\70 e > .target" })).contains("no element matches"));
+    assert_eq!(
+        b.ok("text", json!({ "selector": ".targ\\65 t" })),
+        "root first"
+    );
+    assert!(b
+        .err("text", json!({ "selector": ":scope > .target" }))
+        .contains("no element matches"));
+    assert!(b
+        .err("text", json!({ "selector": ":sco\\70 e > .target" }))
+        .contains("no element matches"));
     b.err("text", json!({ "selector": "& > body" }));
     b.err("text", json!({ "selector": "[broken" }));
 
@@ -852,9 +1255,16 @@ fn snapshot_visibility_with_and_without_native_checks() {
         );
         b.ok("eval", json!({ "expression": "document.querySelector('details').open = true; document.querySelector('details button').textContent = 'opened'; document.querySelector('button').setAttribute('aria-hidden', 'true')" }));
         let fresh = b.ok("snapshot", json!({}));
-        let names: Vec<&str> = fresh["elements"].as_array().unwrap().iter()
-            .filter_map(|el| el["name"].as_str()).collect();
-        assert!(names.contains(&"opened") && !names.contains(&"shown"), "stale snapshot state: {names:?}");
+        let names: Vec<&str> = fresh["elements"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|el| el["name"].as_str())
+            .collect();
+        assert!(
+            names.contains(&"opened") && !names.contains(&"shown"),
+            "stale snapshot state: {names:?}"
+        );
     }
 }
 
@@ -1170,14 +1580,16 @@ fn calls_wait_for_navigation() {
 #[test]
 fn navigate_returns_at_page_load() {
     let mut b = Browser::spawn();
-    let mut page = GatedPage::new(r#"<html><body><p>late</p><script>
+    let mut page = GatedPage::new(
+        r#"<html><body><p>late</p><script>
         window.frameLoaded = false;
         addEventListener('load', () => {
             const frame = document.createElement('iframe');
             frame.onload = () => { window.frameLoaded = true; };
             frame.src = '/held'; document.body.appendChild(frame);
         });
-    </script></body></html>"#);
+    </script></body></html>"#,
+    );
 
     // The subframe cannot finish before we release it. A native Finished-based
     // navigate reply would hang here instead of racing a 900 ms assertion.
@@ -1205,10 +1617,7 @@ fn navigate_until() {
     // Hold the image until after checking DOM completion. Even a paused test
     // process cannot miss the distinction between DOM and load.
     let mut page = GatedPage::new("<html><body><p>img</p><img src='/held'></body></html>");
-    b.ok(
-        "navigate",
-        json!({ "url": page.url, "until": "dom" }),
-    );
+    b.ok("navigate", json!({ "url": page.url, "until": "dom" }));
     page.wait_requested();
     assert_eq!(
         b.ok(
@@ -1377,7 +1786,10 @@ fn profile_persists_cookies_and_storage_on_shutdown() {
     );
     b.open(&format!("{base}/other"));
     assert_eq!(
-        b.ok("eval", json!({ "expression": "localStorage.getItem('persisted')" })),
+        b.ok(
+            "eval",
+            json!({ "expression": "localStorage.getItem('persisted')" })
+        ),
         "first"
     );
     // Exercise writes after the load's cache grace has elapsed, immediately
@@ -1392,7 +1804,10 @@ fn profile_persists_cookies_and_storage_on_shutdown() {
     let mut b = Browser::spawn_with(&args);
     b.open(&format!("{base}/other"));
     assert_eq!(
-        b.ok("eval", json!({ "expression": "localStorage.getItem('persisted')" })),
+        b.ok(
+            "eval",
+            json!({ "expression": "localStorage.getItem('persisted')" })
+        ),
         "late"
     );
     b.close();
@@ -1429,15 +1844,14 @@ fn until_on_history_and_idle_edges() {
 
     // Keep a fetch pending continuously: a timer-driven polling fixture can
     // accidentally become idle when a shared runner pauses its web process.
-    let mut page = GatedPage::new(r#"<html><body><p>pending</p><script>
+    let mut page = GatedPage::new(
+        r#"<html><body><p>pending</p><script>
         window.fetchDone = false;
         fetch('/held').then(() => { window.fetchDone = true; });
-    </script></body></html>"#);
-    let t = Instant::now();
-    b.ok(
-        "navigate",
-        json!({ "url": page.url, "until": "idle" }),
+    </script></body></html>"#,
     );
+    let t = Instant::now();
+    b.ok("navigate", json!({ "url": page.url, "until": "idle" }));
     let took = t.elapsed();
     assert!(took >= Duration::from_secs(9), "{took:?}");
     page.wait_requested();
@@ -1820,7 +2234,8 @@ fn speaks_mcp() {
     assert_eq!(prop("url", "request_timeout")["type"], "integer");
     assert_eq!(prop("navigate", "timeout")["type"], "integer");
     assert_eq!(prop("new_tab", "timeout")["type"], "integer");
-    assert!(prop("screenshot", "request_timeout").is_null());
+    assert_eq!(prop("screenshot", "request_timeout")["type"], "integer");
+    assert_eq!(prop("network", "bodies")["type"], "boolean");
     assert!(tools.iter().any(|t| t["name"] == "dialog"));
 
     assert_eq!(
@@ -1874,7 +2289,8 @@ fn speaks_mcp() {
         "{snap}"
     );
     let snap = rpc(call(json!("sj"), "snapshot", json!({ "format": "json" })));
-    let snap: Value = serde_json::from_str(snap["result"]["content"][0]["text"].as_str().unwrap()).unwrap();
+    let snap: Value =
+        serde_json::from_str(snap["result"]["content"][0]["text"].as_str().unwrap()).unwrap();
     assert_eq!(snap["title"], "smoke");
     assert!(!snap["elements"].as_array().unwrap().is_empty());
 
@@ -1953,24 +2369,102 @@ fn speaks_mcp() {
     let pong = rpc(json!({ "jsonrpc": "2.0", "id": 12, "method": "ping" }));
     assert_eq!(pong["id"], 12, "notification must not produce a reply");
 
-    // Cancelled request never gets a reply, even once the browser answers it.
+    // Cancellation releases the wait and prevents its eventual DOM action.
     writeln!(
         stdin.borrow_mut(),
         "{}",
         call(
             json!("c"),
-            "wait_for",
-            json!({ "selector": "#never", "timeout": 10000 })
+            "fill",
+            json!({ "selector": "#never", "value": "cancelled", "timeout": 10000 })
         )
     )
     .unwrap();
     notify("notifications/cancelled", json!({ "requestId": "c" }));
+    rpc(call(
+        json!("make-target"),
+        "eval",
+        json!({ "expression": "document.body.insertAdjacentHTML('beforeend','<input id=never>'); true" }),
+    ));
+    rpc(call(
+        json!("settle-cancel"),
+        "wait_for",
+        json!({ "time": 200 }),
+    ));
+    let untouched = rpc(call(
+        json!("cancelled-value"),
+        "eval",
+        json!({ "expression": "document.getElementById('never').value" }),
+    ));
+    assert_eq!(untouched["result"]["content"][0]["text"], "");
     let nav = rpc(call(
         json!(13),
         "navigate",
         json!({ "url": format!("{base}/other") }),
     ));
-    assert_eq!(nav["id"], 13, "cancelled wait_for must stay silent");
+    assert_eq!(nav["id"], 13, "cancelled fill must stay silent");
+
+    // Hold a load so the mutation is definitely queued, then cancel before
+    // releasing it. A stdin ping confirms that cancellation was consumed.
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let held_url = format!("http://{}/held", listener.local_addr().unwrap());
+    let (release, released) = std::sync::mpsc::channel();
+    let server = std::thread::spawn(move || {
+        let (mut stream, _) = listener.accept().unwrap();
+        let mut request = BufReader::new(&stream);
+        loop {
+            let mut line = String::new();
+            if request.read_line(&mut line).unwrap() == 0 || line == "\r\n" {
+                break;
+            }
+        }
+        let _ = released.recv_timeout(REPLY_TIMEOUT);
+        let page = "<title>held</title><p>ready</p>";
+        let _ = write!(stream, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{page}", page.len());
+    });
+    writeln!(
+        stdin.borrow_mut(),
+        "{}",
+        call(json!("held-nav"), "navigate", json!({"url": held_url}))
+    )
+    .unwrap();
+    writeln!(
+        stdin.borrow_mut(),
+        "{}",
+        call(
+            json!("queued-cancel"),
+            "eval",
+            json!({"expression": "window.cancelledMutation = true"})
+        )
+    )
+    .unwrap();
+    notify(
+        "notifications/cancelled",
+        json!({"requestId": "queued-cancel"}),
+    );
+    let pong = rpc(json!({"jsonrpc": "2.0", "id": "cancel-barrier", "method": "ping"}));
+    assert_eq!(pong["id"], "cancel-barrier");
+    release.send(()).unwrap();
+    loop {
+        let value: Value =
+            serde_json::from_str(&lines.borrow_mut().next().unwrap().unwrap()).unwrap();
+        if value.get("id").is_some() {
+            assert_eq!(
+                value["id"], "held-nav",
+                "cancelled queued work replied: {value}"
+            );
+            assert!(value["result"].get("isError").is_none(), "{value}");
+            break;
+        }
+        notes.borrow_mut().push(value);
+    }
+    server.join().unwrap();
+    let untouched = rpc(call(
+        json!("queued-untouched"),
+        "eval",
+        json!({"expression": "window.cancelledMutation === undefined"}),
+    ));
+    assert_eq!(untouched["result"]["content"][0]["text"], "true");
 
     // logging/setLevel above info mutes events; back to info restores them.
     // Repeatedly race the preceding navigation's load notification against the

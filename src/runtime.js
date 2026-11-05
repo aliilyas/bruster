@@ -33,8 +33,15 @@
   const PREFETCH_HOSTS_MAX = 8;
   const NET_MAX = 500;
   const BODY_MAX = 16384;
+  const NET_BYTES = 2 * 1024 * 1024;
+  const HEADER_MAX = 4096;
+  const URL_MAX = 4096;
+  const CAPTURE_MAX = 4;
+  const CAPTURE_MS = 5000;
   const CONSOLE_MAX = 500;
   const LOG_MAX = 1000;
+  const DIALOG_MAX = 100;
+  const DIALOG_BYTES = 128 * 1024;
 
   const TAG_ROLE = {
     a: 'link', button: 'button', textarea: 'textbox', select: 'combobox', summary: 'button',
@@ -47,9 +54,24 @@
   };
 
   let refs = new Map();
+  const WeakReference = globalThis.WeakRef;
+  // Older engines can resolve a token by walking the live DOM. Neither path
+  // owns detached elements or documents from navigated-away frames.
+  const refTokens = new WeakMap();
+  function refElement(ref) {
+    const stored = refs.get(ref);
+    if (!stored) return;
+    if (WeakReference) return stored.deref();
+    for (const el of nodesInRoots(document, NodeFilter.SHOW_ELEMENT)) {
+      if (refTokens.get(el) === stored) return el;
+    }
+  }
 
   // Pages can replace JSON.stringify after injection; IPC must still work.
   const stringify = JSON.stringify.bind(JSON);
+  // Do not retain an engine substring's potentially much larger backing string.
+  // Call only on already-bounded diagnostic text, preserving UTF-16 code units.
+  const compact = s => s.split('').join('');
   const documentQuery = Document.prototype.querySelector;
   const elementQuery = Element.prototype.querySelector;
   const fragmentQuery = DocumentFragment.prototype.querySelector;
@@ -57,12 +79,26 @@
   let generation = 0;
   const post = (msg) => window.ipc.postMessage(stringify({ ...msg, document: documentId, generation }));
   const trunc = (s, n) => (s = (s || '').replace(/\s+/g, ' ').trim()).length > n ? s.slice(0, n) + '…' : s;
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const checkCancelled = signal => { if (signal?.aborted) throw new Error('request cancelled'); };
+  function sleep(ms, signal) {
+    checkCancelled(signal);
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(done, ms);
+      function done() {
+        clearTimeout(timer);
+        signal?.removeEventListener('abort', done);
+        if (signal?.aborted) reject(new Error('request cancelled'));
+        else resolve();
+      }
+      signal?.addEventListener('abort', done, { once: true });
+    });
+  }
 
   // Subscribe only while a command is waiting. DOM mutations wake it promptly;
   // the timer still covers CSSOM edits, animations and newly attached roots.
-  function changed(el) {
-    return new Promise(resolve => {
+  function changed(el, signal) {
+    checkCancelled(signal);
+    return new Promise((resolve, reject) => {
       const roots = new Set([document, el?.getRootNode()].filter(Boolean));
       const observer = new MutationObserver(done);
       const timer = setTimeout(done, POLL_MS);
@@ -70,86 +106,223 @@
         clearTimeout(timer);
         observer.disconnect();
         for (const root of roots) root.removeEventListener('load', done, true);
-        resolve();
+        signal?.removeEventListener('abort', done);
+        if (signal?.aborted) reject(new Error('request cancelled'));
+        else resolve();
       }
       for (const root of roots) {
         observer.observe(root, { subtree: true, childList: true, attributes: true, characterData: true });
         root.addEventListener('load', done, true);
       }
+      signal?.addEventListener('abort', done, { once: true });
     });
   }
-  const fmt = (v) => {
-    if (typeof v === 'string') return v;
-    if (v instanceof Error) {
-      // WebKit stacks contain frames without the error's name/message.
-      const message = String(v), stack = typeof v.stack === 'string' ? v.stack : '';
-      return stack.includes(message) ? stack : message + (stack ? '\n' + stack : '');
+  // Format before serialization, with a shared output/item/depth budget. Avoid
+  // getters and toJSON: logging must not traverse an application's entire graph.
+  function formatLog(args) {
+    let out = '', items = 40;
+    const seen = new WeakSet();
+    const add = s => { out += s.slice(0, LOG_MAX - out.length); };
+    function value(v, depth, quoted) {
+      if (out.length >= LOG_MAX || --items < 0) return add('…');
+      if (typeof v === 'string') return add(quoted ? stringify(v.slice(0, LOG_MAX - out.length)) : v);
+      if (v === null || typeof v !== 'object') return add(typeof v === 'function' ? '[Function]' : String(v));
+      if (v instanceof Error) {
+        const field = key => {
+          let obj = v;
+          for (let i = 0; obj && i < 4; i++, obj = Object.getPrototypeOf(obj)) {
+            const d = Object.getOwnPropertyDescriptor(obj, key);
+            if (d) return 'value' in d ? (typeof d.value === 'string' ? d.value : '') : '[Getter]';
+          }
+          return '';
+        };
+        add(field('name')); add(': '); add(field('message'));
+        const stack = field('stack');
+        if (stack) { add('\n'); add(stack); }
+        return;
+      }
+      if (seen.has(v)) return add('[Circular]');
+      if (depth >= 3) return add(Array.isArray(v) ? '[…]' : '{…}');
+      seen.add(v);
+      const array = Array.isArray(v);
+      add(array ? '[' : '{');
+      let n = 0;
+      for (const k in v) {
+        if (!Object.prototype.hasOwnProperty.call(v, k)) continue;
+        if (n++ >= 20 || items <= 0 || out.length >= LOG_MAX) { add('…'); break; }
+        if (n > 1) add(',');
+        if (!array) { add(stringify(k.slice(0, LOG_MAX))); add(':'); }
+        const d = Object.getOwnPropertyDescriptor(v, k);
+        if (d && 'value' in d) value(d.value, depth + 1, true);
+        else add('[Getter]');
+      }
+      add(array ? ']' : '}');
+      seen.delete(v);
     }
-    try { return stringify(v); } catch { return String(v); }
-  };
+    try {
+      for (let i = 0; i < args.length && out.length < LOG_MAX && items > 0; i++) {
+        if (i) add(' ');
+        value(args[i], 0, false);
+      }
+    } catch { add('[unavailable]'); }
+    return compact(out);
+  }
 
   // Request log. Patched fetch/XHR give status, headers and a body prefix;
   // the page's own loads (img, script, css) come from the Performance API.
   // Cleared on navigation by virtue of living in the page.
   const net = [];
   let inflight = 0;
-  const headersOf = (h) => { try { return Object.fromEntries(new Headers(h)); } catch { return {}; } };
+  let netBytes = 0, netEpoch = 0, captureBodies = true;
+  const netStates = new WeakMap(), captures = new Set(), loggedXhrs = new Set(), loggedFetches = new Set();
+  const activeEntry = entry => entry && netStates.get(entry)?.epoch === netEpoch;
+  const bytesOf = v => typeof v === 'string' ? v.length * 2 : v && typeof v === 'object'
+    ? Object.entries(v).reduce((n, [k, s]) => n + 32 + k.length * 2 + bytesOf(s), 0) : 0;
+  function netField(entry, key, value) {
+    if (!activeEntry(entry)) return;
+    const delta = bytesOf(value) - bytesOf(entry[key]);
+    if (netBytes + delta > NET_BYTES) { entry.truncated = true; return; }
+    netBytes += delta;
+    entry[key] = typeof value === 'string' ? compact(value) : value;
+  }
+  function admit(type, method, url) {
+    if (net.length >= NET_MAX || netBytes + 256 > NET_BYTES) return null;
+    const entry = { type, start: performance.now() };
+    netStates.set(entry, { epoch: netEpoch });
+    netBytes += 256; // scalar fields and bounded truncation/skipping markers
+    net.push(entry);
+    netField(entry, 'method', String(method).slice(0, 32));
+    try {
+      if (typeof url === 'string' && url.length > URL_MAX) {
+        netField(entry, 'url', url.slice(0, URL_MAX));
+        entry.truncated = true;
+      } else { netField(entry, 'url', new URL(url, location.href).href.slice(0, URL_MAX)); }
+    } catch {}
+    return entry;
+  }
+  function headersOf(headers) {
+    const out = Object.create(null);
+    let left = Math.min(HEADER_MAX, Math.floor((NET_BYTES - netBytes) / 2));
+    try {
+      for (let [key, value] of headers) {
+        if (typeof key !== 'string' || left < key.length + 16) break;
+        key = compact(key.toLowerCase());
+        if (typeof value !== 'string') {
+          if (typeof value !== 'number' && typeof value !== 'boolean') continue;
+          value = String(value);
+        }
+        const text = compact(value.slice(0, left - key.length - 16).trim());
+        out[key] = out[key] === undefined ? text : out[key] + ', ' + text;
+        left -= key.length + text.length + 16;
+      }
+    } catch {}
+    return out;
+  }
+  function* requestHeaders(h) {
+    if (!h) return;
+    if (typeof h[Symbol.iterator] === 'function') { yield* h; return; }
+    for (const key in h) {
+      if (Object.prototype.hasOwnProperty.call(h, key)) yield [key, h[key]];
+    }
+  }
+  function clearNetwork() {
+    netEpoch++;
+    for (const stop of captures) stop();
+    for (const state of loggedXhrs) state.entry = null;
+    loggedXhrs.clear();
+    for (const state of loggedFetches) state.entry = null;
+    loggedFetches.clear();
+    net.length = 0;
+    netBytes = 0;
+    performance.clearResourceTimings();
+  }
 
-  async function bodyPrefix(res) {
-    if (!res.body) return '';
-    const reader = res.body.getReader(), decoder = new TextDecoder();
+  async function captureBody(res, entry) {
+    if (!activeEntry(entry)) return;
+    const type = res.headers.get('content-type') || '';
+    const limit = Math.min(BODY_MAX, Math.floor((NET_BYTES - netBytes) / 2));
+    if (!captureBodies || !limit || captures.size >= CAPTURE_MAX || (type && !/^(text\/|application\/(json|[^;]+\+json|javascript|xml|[^;]+\+xml|x-www-form-urlencoded))/i.test(type))) {
+      entry.body_skipped = true;
+      return;
+    }
+    // Reserve the worst-case UTF-16 payload before cloning/starting a reader.
+    netBytes += limit * 2;
+    let reader, timer, stopped = false;
+    const stop = () => {
+      stopped = true;
+      if (reader) reader.cancel().catch(() => {});
+    };
+    captures.add(stop);
     let text = '';
     try {
-      while (text.length < BODY_MAX) {
+      const clone = res.clone();
+      if (!clone.body) return;
+      reader = clone.body.getReader();
+      const decoder = new TextDecoder();
+      timer = setTimeout(stop, CAPTURE_MS);
+      while (!stopped && text.length < limit) {
         const { value, done } = await reader.read();
         if (done) {
-          text += decoder.decode().slice(0, BODY_MAX - text.length);
+          text += decoder.decode().slice(0, limit - text.length);
           break;
         }
         // A cached response can arrive as one enormous chunk. Bound decoding
         // as well as retained text, including UTF-8 split between these slices.
-        for (let at = 0; at < value.length && text.length < BODY_MAX; at += BODY_MAX) {
+        for (let at = 0; at < value.length && text.length < limit; at += BODY_MAX) {
           const chunk = decoder.decode(value.subarray(at, at + BODY_MAX), { stream: true });
-          text += chunk.slice(0, BODY_MAX - text.length);
+          text += chunk.slice(0, limit - text.length);
         }
       }
-      return text;
+    } catch {
+      if (activeEntry(entry)) entry.body_skipped = true;
     } finally {
       // Cancel only the cloned tee branch. Awaiting cancellation would wait
       // for the page's branch too, defeating the prefix bound on live streams.
-      reader.cancel().catch(() => {});
+      clearTimeout(timer);
+      if (activeEntry(entry)) {
+        netBytes -= limit * 2;
+        netField(entry, 'body', text);
+        if (stopped || text.length === limit) entry.body_truncated = true;
+      }
+      stop();
       // This private clone is discarded, so its reader need not be unlocked.
       // releaseLock() can allocate during GC while holding WebKit's stream
       // mutex, deadlocking the page: https://bugs.webkit.org/show_bug.cgi?id=326046
       // The cancelled reader and clone can be collected together instead.
+      captures.delete(stop);
     }
   }
 
   const origFetch = window.fetch;
   window.fetch = async function (input, init) {
-    const url = typeof input === 'string' ? input : input.url;
-    const entry = net.length < NET_MAX ? {
-      type: 'fetch', method: (init && init.method) || (input && input.method) || 'GET', url: new URL(url, location.href).href,
-      start: performance.now(), req_headers: headersOf((init && init.headers) || (input && input.headers)),
-    } : null;
-    if (entry) net.push(entry);
+    // Indirection lets clear release metadata even if the page's original fetch
+    // has not received headers yet. Never abort that original request.
+    const state = { entry: admit('fetch', init?.method || input?.method || 'GET', typeof input === 'string' ? input : input?.url || input?.href) };
+    if (state.entry) {
+      loggedFetches.add(state);
+      try { netField(state.entry, 'req_headers', headersOf(requestHeaders(init?.headers || input?.headers))); } catch {}
+    }
     inflight++;
     try {
       const res = await origFetch.apply(this, arguments);
-      if (entry) {
+      const entry = state.entry;
+      if (activeEntry(entry)) {
         entry.status = res.status;
         entry.ms = Math.round(performance.now() - entry.start);
-        entry.res_headers = Object.fromEntries(res.headers);
-        bodyPrefix(res.clone()).then((t) => { entry.body = t; }).catch(() => {});
+        netField(entry, 'res_headers', headersOf(res.headers));
+        captureBody(res, entry).catch(() => {});
       }
       return res;
     } catch (e) {
-      if (entry) {
-        entry.error = String(e);
+      const entry = state.entry;
+      if (activeEntry(entry)) {
+        netField(entry, 'error', formatLog([e]));
         entry.ms = Math.round(performance.now() - entry.start);
       }
       throw e;
     } finally {
+      state.entry = null;
+      loggedFetches.delete(state);
       inflight--;
       resourceDone();
     }
@@ -157,25 +330,47 @@
 
   const xhrOpen = XMLHttpRequest.prototype.open;
   const xhrSend = XMLHttpRequest.prototype.send;
+  const xhrStates = new WeakMap();
   XMLHttpRequest.prototype.open = function (method, url) {
-    if (net.length >= NET_MAX) return xhrOpen.apply(this, arguments);
-    const entry = { type: 'xhr', method, url: new URL(url, location.href).href, start: performance.now() };
-    net.push(entry);
-    this.addEventListener('loadend', () => {
-      entry.status = this.status;
-      entry.ms = Math.round(performance.now() - entry.start);
-      entry.res_headers = Object.fromEntries(this.getAllResponseHeaders().trim().split(/\r?\n/).filter(Boolean).map((l) => {
-        const i = l.indexOf(':');
-        return [l.slice(0, i), l.slice(i + 1).trim()];
-      }));
-      if (this.responseType === '' || this.responseType === 'text') entry.body = this.responseText.slice(0, BODY_MAX);
-    });
-    return xhrOpen.apply(this, arguments);
+    let state = xhrStates.get(this);
+    if (!state) {
+      state = { entry: null, pending: false };
+      xhrStates.set(this, state);
+      this.addEventListener('loadend', function () {
+        if (state.pending) { state.pending = false; inflight--; resourceDone(); }
+        const entry = state.entry;
+        state.entry = null;
+        loggedXhrs.delete(state);
+        if (!activeEntry(entry)) return;
+        entry.status = this.status;
+        entry.ms = Math.round(performance.now() - entry.start);
+        const headers = this.getAllResponseHeaders().slice(0, HEADER_MAX).split(/\r?\n/).filter(l => l.includes(':'))
+          .map(l => { const i = l.indexOf(':'); return [l.slice(0, i), l.slice(i + 1).trim()]; });
+        netField(entry, 'res_headers', headersOf(headers));
+        if (captureBodies && (this.responseType === '' || this.responseType === 'text')) {
+          const limit = Math.min(BODY_MAX, Math.floor((NET_BYTES - netBytes) / 2));
+          netField(entry, 'body', this.responseText.slice(0, limit));
+          if (this.responseText.length > limit) entry.body_truncated = true;
+        } else { entry.body_skipped = true; }
+      });
+    }
+    // Reopen can synchronously abort the old request. Let its loadend consume
+    // the old state before assigning the next entry; an invalid open leaves it.
+    const result = xhrOpen.apply(this, arguments);
+    if (state.pending) { state.pending = false; inflight--; resourceDone(); }
+    loggedXhrs.delete(state);
+    state.entry = admit('xhr', method, url);
+    if (state.entry) loggedXhrs.add(state);
+    return result;
   };
   XMLHttpRequest.prototype.send = function () {
-    inflight++;
-    this.addEventListener('loadend', () => { inflight--; resourceDone(); }, { once: true });
-    return xhrSend.apply(this, arguments);
+    const state = xhrStates.get(this), added = state && !state.pending;
+    if (added) { state.pending = true; inflight++; }
+    try { return xhrSend.apply(this, arguments); }
+    catch (e) {
+      if (added && state.pending) { state.pending = false; inflight--; resourceDone(); }
+      throw e;
+    }
   };
 
   // Console and page errors, readable through `console`.
@@ -186,23 +381,34 @@
   for (const level of ['log', 'info', 'warn', 'error', 'debug']) {
     const orig = console[level];
     console[level] = function (...args) {
-      logConsole(level, args.map(fmt).join(' '));
+      if (consoleLog.length < CONSOLE_MAX) logConsole(level, formatLog(args));
       return orig.apply(this, args);
     };
   }
-  window.addEventListener('error', (e) => logConsole('error', e.message + (e.filename ? ` (${e.filename}:${e.lineno})` : '')));
-  window.addEventListener('unhandledrejection', (e) => logConsole('error', 'Unhandled rejection: ' + fmt(e.reason)));
+  window.addEventListener('error', (e) => {
+    if (consoleLog.length < CONSOLE_MAX) logConsole('error', formatLog([e.message, e.filename || '', e.lineno || '']));
+  });
+  window.addEventListener('unhandledrejection', (e) => {
+    if (consoleLog.length < CONSOLE_MAX) logConsole('error', formatLog(['Unhandled rejection:', e.reason]));
+  });
 
   // Native alert/confirm/prompt would block the page and every later call.
   // Answer them here with the last `dialog` setting and tell the agent.
   let dialogAnswer = { accept: true, text: '' };
   const dialogs = [];
+  let dialogBytes = 0;
   const onDialog = (type, message, def) => {
-    const d = { type, message: String(message), accept: dialogAnswer.accept };
-    dialogs.push(d);
-    post({ event: 'dialog', ...d });
-    if (type === 'prompt') return d.accept ? (dialogAnswer.text || def || '') : null;
-    return type === 'confirm' ? d.accept : undefined;
+    if (dialogs.length < DIALOG_MAX && dialogBytes + LOG_MAX * 2 + 64 <= DIALOG_BYTES) {
+      const d = { type, message: formatLog([message]), accept: dialogAnswer.accept };
+      dialogBytes += d.message.length * 2 + 64;
+      dialogs.push(d);
+      post({ event: 'dialog', ...d });
+    } else if (dialogs.length) {
+      const last = dialogs[dialogs.length - 1];
+      last.dropped = (last.dropped || 0) + 1;
+    }
+    if (type === 'prompt') return dialogAnswer.accept ? (dialogAnswer.text || def || '') : null;
+    return type === 'confirm' ? dialogAnswer.accept : undefined;
   };
   window.alert = (m) => { onDialog('alert', m); };
   window.confirm = (m) => onDialog('confirm', m);
@@ -391,7 +597,7 @@
   // matches nothing yet. Stale refs and missing params throw at once.
   function lookup(p) {
     if (p.ref) {
-      const el = refs.get(p.ref);
+      const el = refElement(p.ref);
       if (!connected(el)) throw new Error(`stale or unknown ref '${p.ref}', take a new snapshot`);
       return el;
     }
@@ -432,14 +638,15 @@
   // Waits until the target exists, is visible, enabled, in view and not
   // covered, like Playwright's actionability checks. `force` skips the
   // checks but still waits for the element to appear.
-  async function actionable(p, needEnabled = true) {
+  async function actionable(p, needEnabled = true, signal) {
     const deadline = Date.now() + (p.timeout || ACTION_TIMEOUT_MS);
     for (;;) {
+      checkCancelled(signal);
       const el = lookup(p);
       const why = el ? (p.force ? null : blocker(el, needEnabled)) : `no element matches '${p.selector}'`;
       if (!why) return el;
       if (Date.now() > deadline) throw new Error(el ? `${describe(el)} is ${why}` : why);
-      await changed(el);
+      await changed(el, signal);
     }
   }
 
@@ -471,12 +678,12 @@
 
   // Right after a load starts, the document has a head but no body yet.
   // XML and JSON documents never get one: fall back to the root once parsed.
-  async function body() {
+  async function body(signal) {
     const deadline = Date.now() + ACTION_TIMEOUT_MS;
     while (!document.body) {
       if (document.readyState !== 'loading') return document.documentElement;
       if (Date.now() > deadline) throw new Error('page has no body yet, still loading');
-      await changed();
+      await changed(undefined, signal);
     }
     return document.body;
   }
@@ -620,7 +827,9 @@
       if (out.length >= max) { truncated = true; break; }
 
       n++;
-      refs.set(item.ref, el);
+      const stored = WeakReference ? new WeakReference(el) : {};
+      if (!WeakReference) refTokens.set(el, stored);
+      refs.set(item.ref, stored);
       out.push(item);
     }
 
@@ -635,8 +844,8 @@
     const hosts = new Set();
     for (const e of items) {
       if (!e.href || !/^https?:/.test(e.href)) continue;
-      const host = new URL(e.href).host;
-      if (host !== location.host) hosts.add(host);
+      const host = new URL(e.href).hostname;
+      if (host !== location.hostname) hosts.add(host);
       if (hosts.size >= PREFETCH_HOSTS_MAX) break;
     }
     if (hosts.size) post({ prefetch: [...hosts] });
@@ -711,11 +920,15 @@
     },
 
     network(p) {
+      if (p.bodies !== undefined) {
+        captureBodies = p.bodies !== false;
+        if (!captureBodies) for (const stop of captures) stop();
+      }
       const perf = performance.getEntriesByType('resource')
         .filter((e) => e.initiatorType !== 'fetch' && e.initiatorType !== 'xmlhttprequest')
         .map((e) => ({ type: e.initiatorType, url: e.name, ms: Math.round(e.duration) }));
       const out = net.map(({ start, req_headers, res_headers, body, ...e }, index) => ({ index, ...e })).concat(perf);
-      if (p.clear) { net.length = 0; performance.clearResourceTimings(); }
+      if (p.clear) clearNetwork();
       return out;
     },
 
@@ -734,26 +947,26 @@
     },
 
     dialog(p) {
-      if (p.accept !== undefined || p.text !== undefined) dialogAnswer = { accept: p.accept !== false, text: p.text || '' };
+      if (p.accept !== undefined || p.text !== undefined) dialogAnswer = { accept: p.accept !== false, text: compact((p.text || '').slice(0, LOG_MAX)) };
       const out = dialogs.slice();
-      if (p.clear) dialogs.length = 0;
+      if (p.clear) { dialogs.length = 0; dialogBytes = 0; }
       return out;
     },
 
-    async click(p) {
+    async click(p, signal) {
       if (p.x !== undefined && p.y !== undefined && !p.selector && !p.ref) {
         const el = document.elementFromPoint(p.x, p.y);
         if (!el) throw new Error(`nothing at ${p.x},${p.y}`);
         clickOn(el, p.x, p.y);
         return null;
       }
-      const el = await actionable(p);
+      const el = await actionable(p, true, signal);
       clickOn(el, ...center(el));
       return null;
     },
 
-    async hover(p) {
-      const el = await actionable(p, false);
+    async hover(p, signal) {
+      const el = await actionable(p, false, signal);
       const [x, y] = center(el);
       mouse(el, 'pointerover', x, y);
       mouse(el, 'mouseover', x, y);
@@ -761,8 +974,8 @@
       return null;
     },
 
-    async fill(p) {
-      const el = await actionable(p);
+    async fill(p, signal) {
+      const el = await actionable(p, true, signal);
       assertEditable(el);
       el.focus();
       setValue(el, p.value);
@@ -773,33 +986,34 @@
     // Types one character at a time so per-key handlers fire. Number inputs
     // sanitise on every write ("-1." becomes ""), so the typed text is kept
     // aside and letters are dropped, as a browser would.
-    async type(p) {
-      const el = await actionable(p);
+    async type(p, signal) {
+      const el = await actionable(p, true, signal);
       assertEditable(el);
       el.focus();
       const number = el.type === 'number';
       let typed = valueOf(el);
       for (const ch of p.text) {
+        checkCancelled(signal);
         if (number && !NUMBER_CHARS.test(ch)) continue;
         key(el, 'keydown', ch);
         key(el, 'keypress', ch);
         typed += ch;
         setValue(el, typed);
         key(el, 'keyup', ch);
-        if (p.delay) await sleep(p.delay);
+        if (p.delay) await sleep(p.delay, signal);
       }
       if (p.submit) pressOn(el, 'Enter');
       return null;
     },
 
-    async press(p) {
-      const el = p.selector || p.ref ? await actionable(p) : document.activeElement || document.body;
+    async press(p, signal) {
+      const el = p.selector || p.ref ? await actionable(p, true, signal) : document.activeElement || document.body;
       pressOn(el, p.key);
       return null;
     },
 
-    async select(p) {
-      const el = await actionable(p);
+    async select(p, signal) {
+      const el = await actionable(p, true, signal);
       if (el.tagName !== 'SELECT') throw new Error(`${describe(el)} is not a select`);
       const wanted = [].concat(p.value);
       const options = [...el.options];
@@ -811,8 +1025,8 @@
       return [...el.selectedOptions].map((o) => o.value);
     },
 
-    async check(p) {
-      const el = await actionable(p);
+    async check(p, signal) {
+      const el = await actionable(p, true, signal);
       if (el.type !== 'checkbox' && el.type !== 'radio') throw new Error(`${describe(el)} is not a checkbox or radio, use click`);
       const want = p.checked !== false;
       if (el.checked !== want) el.click();
@@ -821,20 +1035,21 @@
 
     // One call for a whole form. Each field is a target plus `value`;
     // checkboxes take a boolean, selects a value or array.
-    async fill_form(p) {
+    async fill_form(p, signal) {
       for (const f of p.fields) {
+        checkCancelled(signal);
         const el = find(f);
-        if (el.type === 'checkbox' || el.type === 'radio') await methods.check({ ...f, checked: !!f.value });
-        else if (el.tagName === 'SELECT') await methods.select(f);
-        else await methods.fill(f);
+        if (el.type === 'checkbox' || el.type === 'radio') await methods.check({ ...f, checked: !!f.value }, signal);
+        else if (el.tagName === 'SELECT') await methods.select(f, signal);
+        else await methods.fill(f, signal);
       }
       return null;
     },
 
     // HTML5 drag and drop with a shared DataTransfer, from one target to another.
-    async drag(p) {
-      const from = await actionable(p.from || {});
-      const to = await actionable(p.to || {}, false);
+    async drag(p, signal) {
+      const from = await actionable(p.from || {}, true, signal);
+      const to = await actionable(p.to || {}, false, signal);
       const dt = new DataTransfer();
       const ev = (el, type) => el.dispatchEvent(new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: dt }));
       mouse(from, 'pointerdown', ...center(from));
@@ -856,7 +1071,13 @@
       if (el.tagName !== 'INPUT' || el.type !== 'file') throw new Error(`${describe(el)} is not a file input`);
       const dt = new DataTransfer();
       for (const f of p.files) {
-        const bytes = Uint8Array.from(atob(f.data), (c) => c.charCodeAt(0));
+        // Decode in blocks instead of materializing a second full binary string.
+        const padding = f.data.endsWith('==') ? 2 : f.data.endsWith('=') ? 1 : 0;
+        const bytes = new Uint8Array(f.data.length / 4 * 3 - padding);
+        for (let at = 0, to = 0; at < f.data.length; at += 32768) {
+          const block = atob(f.data.slice(at, at + 32768));
+          for (let i = 0; i < block.length; i++) bytes[to++] = block.charCodeAt(i);
+        }
         dt.items.add(new File([bytes], f.name, { type: f.type }));
       }
       el.files = dt.files;
@@ -873,9 +1094,9 @@
 
     // Waits until a condition holds: selector/ref state, text present or gone,
     // url substring, network idle, or just `time` ms.
-    async wait_for(p) {
+    async wait_for(p, signal) {
       if (p.time) {
-        await sleep(p.time);
+        await sleep(p.time, signal);
         return null;
       }
       if (!['url', 'text', 'textGone', 'idle', 'ref', 'selector'].some((k) => p[k] !== undefined)) {
@@ -897,7 +1118,7 @@
           idleSince = idleSince || Date.now();
           return Date.now() - idleSince >= IDLE_MS;
         }
-        const el = target = p.ref ? refs.get(p.ref) : query(document, p.selector);
+        const el = target = p.ref ? refElement(p.ref) : query(document, p.selector);
         const attached = connected(el);
         if (state === 'attached') return attached;
         if (state === 'hidden') return !attached || !visible(el);
@@ -905,35 +1126,56 @@
       };
 
       while (!check()) {
+        checkCancelled(signal);
         if (Date.now() > deadline) throw new Error(`wait_for timed out after ${timeout}ms: ${stringify(p)}`);
-        if (p.idle || p.url !== undefined) await sleep(POLL_MS);
-        else await changed(target);
+        if (p.idle || p.url !== undefined) await sleep(POLL_MS, signal);
+        else await changed(target, signal);
       }
       return null;
     },
 
-    async snapshot(p) {
-      return collect(p.selector ? find(p) : await body(), p);
+    async snapshot(p, signal) {
+      return collect(p.selector ? find(p) : await body(signal), p);
     },
 
     // Snapshot narrowed to elements whose name, text, value or href contains
     // `text` or matches `regex`. Hands out fresh refs like snapshot does.
-    async find(p) {
+    async find(p, signal) {
       const re = p.regex ? new RegExp(p.regex, 'i') : null;
       const needle = (p.text || '').toLowerCase();
       // Each field on its own, so ^...$ anchors work on a link with an href.
       const match = (item) => [item.name, item.text, item.value, item.href].filter(Boolean)
         .some((f) => (re ? re.test(f) : f.toLowerCase().includes(needle)));
-      return collect(p.selector ? find(p) : await body(), p, match);
+      return collect(p.selector ? find(p) : await body(signal), p, match);
     },
   };
 
+  const calls = new Map();
+  function cancel(id, attempt) {
+    const call = calls.get(id);
+    if (call && (!attempt || attempt === call.attempt)) call.controller.abort();
+  }
   async function run(id, method, params, attempt) {
+    cancel(id, 0);
+    const call = { attempt, controller: new AbortController() };
+    calls.set(id, call);
+    const signal = call.controller.signal;
     navExpected = false;
     try {
       const fn = methods[method];
       if (!fn) throw new Error(`unknown method '${method}'`);
-      let result = await fn(params || {});
+      let abort;
+      const stopped = new Promise((_, reject) => {
+        abort = () => reject(new Error('request cancelled'));
+        signal.addEventListener('abort', abort, { once: true });
+      });
+      let result;
+      try {
+        const operation = fn(params || {}, signal);
+        params = null;
+        result = await Promise.race([operation, stopped]);
+      } finally { signal.removeEventListener('abort', abort); }
+      checkCancelled(signal);
       if (result === undefined) result = null;
       const reply = navExpected ? { id, attempt, result, navigating: true } : { id, attempt, result };
       try {
@@ -942,7 +1184,9 @@
         post({ ...reply, result: String(result) }); // not JSON-safe (DOM node, cycle)
       }
     } catch (e) {
-      post({ id, attempt, error: String((e && e.message) || e) });
+      if (!signal.aborted) post({ id, attempt, error: String((e && e.message) || e) });
+    } finally {
+      if (calls.get(id) === call) calls.delete(id);
     }
   }
 
@@ -950,6 +1194,12 @@
   // here, so the source is compiled as script, not through eval().
   const evalFn = (id, fn, attempt) => run(id, '__fn', fn, attempt);
 
-  window.__bruster = { run, evalFn, bind, document: documentId, get generation() { return generation; } };
+  window.addEventListener('pagehide', () => {
+    clearNetwork();
+    refs.clear();
+    for (const call of calls.values()) call.controller.abort();
+  });
+
+  window.__bruster = { run, evalFn, bind, cancel, document: documentId, get generation() { return generation; } };
   if (window.top === window) bind(0);
 })();

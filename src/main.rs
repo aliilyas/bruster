@@ -18,8 +18,8 @@
 //! With `--mcp` stdin/stdout speak Model Context Protocol instead; see mcp.rs.
 
 use std::cell::RefCell;
-use std::collections::HashMap;
-use std::io::{BufRead, Write};
+use std::collections::{HashMap, VecDeque};
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::time::Duration;
@@ -34,6 +34,7 @@ use wry::{
     WebViewBuilder,
 };
 
+mod limits;
 mod mcp;
 #[cfg(target_os = "macos")]
 mod navigation_macos;
@@ -93,8 +94,6 @@ const PAGE_TIMEOUT_MARGIN_MS: u64 = 5_000;
 const HISTORY_START_TIMEOUT: Duration = Duration::from_millis(500);
 /// A request re-run after this many navigations is given up on.
 const MAX_REDISPATCH: u8 = 3;
-/// cairo image surfaces cannot exceed this many pixels per side.
-const CAIRO_MAX_SIDE: f64 = 32767.0;
 /// WebView2 error pages load from here.
 const CHROME_ERROR_SCHEME: &str = "chrome-error://";
 /// Reply from the eval wrapper script when the expression compiled.
@@ -115,38 +114,42 @@ struct Request {
     #[serde(default)]
     params: Value,
     tab: Option<TabId>,
+    #[serde(skip)]
+    permit: Option<std::sync::Arc<limits::Permit>>,
 }
 
 enum UserEvent {
     Command(Request),
+    Cancel(u64),
+    Prefetch {
+        tab: TabId,
+        hosts: Vec<String>,
+    },
     /// A page asked for a new window (target=_blank, window.open).
     OpenTab(String),
-    /// macOS only: document height arrived, window can be resized for a full capture.
-    FullShot {
+    /// Geometry arrived before native capture allocation.
+    MeasureShot {
         tab: TabId,
-        id: u64,
-        path: Option<String>,
-        height: f64,
+        token: u64,
+        dimensions: Option<[f64; 5]>,
     },
-    /// Puts the window back to the viewport size after a full capture.
-    RestoreSize {
+    ShotDone {
         tab: TabId,
-        size: tao::dpi::LogicalSize<f64>,
+        token: u64,
+        result: Result<screenshot::Output, String>,
+        slot: Option<std::sync::Arc<screenshot::Slot>>,
+        permit: Option<std::sync::Arc<limits::Permit>>,
     },
     /// Linux: the window was resized for a tall capture; poll until the page sees the new height.
     TallShot {
         tab: TabId,
-        id: u64,
-        path: Option<String>,
+        token: u64,
         height: f64,
         tries: u8,
-        restore: tao::dpi::LogicalSize<f64>,
     },
     TallShotReady {
         tab: TabId,
-        id: u64,
-        path: Option<String>,
-        restore: tao::dpi::LogicalSize<f64>,
+        token: u64,
     },
     /// back/forward/reload gave the webview HISTORY_START_TIMEOUT to start loading.
     HistoryTimeout {
@@ -217,7 +220,7 @@ impl Until {
 #[derive(Clone)]
 struct Queued {
     method: String,
-    params: Value,
+    params: Rc<Value>,
     retries: u8,
     deadline: std::time::Instant,
     /// Set on dispatch, so an old document cannot answer a redispatched call.
@@ -231,6 +234,18 @@ impl Queued {
     }
 
     fn new_at(method: String, params: Value, now: std::time::Instant) -> Result<Self, String> {
+        let deadline = Self::deadline(&params, now)?;
+        Ok(Self {
+            method,
+            params: Rc::new(params),
+            retries: 0,
+            deadline,
+            document: None,
+            attempt: 0,
+        })
+    }
+
+    fn deadline(params: &Value, now: std::time::Instant) -> Result<std::time::Instant, String> {
         // Let action/wait timeouts complete first. request_timeout is a
         // separate outer deadline for page code that never replies.
         let timeout_ms = match params.get("request_timeout") {
@@ -247,17 +262,8 @@ impl Queued {
                     .max(expected.saturating_add(PAGE_TIMEOUT_MARGIN_MS))
             }
         };
-        let deadline = now
-            .checked_add(Duration::from_millis(timeout_ms))
-            .ok_or("request_timeout is too large")?;
-        Ok(Self {
-            method,
-            params,
-            retries: 0,
-            deadline,
-            document: None,
-            attempt: 0,
-        })
+        now.checked_add(Duration::from_millis(timeout_ms))
+            .ok_or_else(|| "request_timeout is too large".into())
     }
 }
 
@@ -546,6 +552,21 @@ fn milestone(
 
 type Shared = Rc<RefCell<Pending>>;
 
+struct Shot {
+    id: u64,
+    // Public IDs may be reused after a timeout while an old measurement returns.
+    token: u64,
+    path: Option<String>,
+    region: Region,
+    deadline: std::time::Instant,
+    cancel: screenshot::Cancellation,
+    restore: Option<tao::dpi::LogicalSize<f64>>,
+    capturing: bool,
+    finished: bool,
+    permit: Option<std::sync::Arc<limits::Permit>>,
+    slot: Option<std::sync::Arc<screenshot::Slot>>,
+}
+
 struct Tab {
     webview: WebView,
     // WKWebView keeps a weak delegate; retain our forwarding observer per tab.
@@ -592,12 +613,18 @@ struct App {
     proxy: EventLoopProxy<UserEvent>,
     deadline_timer: std::sync::mpsc::Sender<Option<std::time::Instant>>,
     next_deadline: Option<std::time::Instant>,
+    next_shot: u64,
+    shots: HashMap<TabId, Shot>,
+    shot_queue: VecDeque<(TabId, Shot)>,
 }
 
 fn emit(v: Value) {
     // Check MCP's logging level under the same lock as its acknowledgment. An
     // event accepted before logging/setLevel must not be written after its reply.
     let out = std::io::stdout().lock();
+    if let Some(id) = v.get("id").and_then(Value::as_u64) {
+        limits::complete(id);
+    }
     let Some(v) = mcp::outgoing(v) else { return };
     write_json_to(out, &v);
 }
@@ -664,7 +691,14 @@ fn opt(args: &[String], name: &str) -> Option<String> {
 /// "1280x800" -> (1280, 800).
 fn parse_viewport(s: &str) -> Option<(u32, u32)> {
     let (w, h) = s.split_once('x')?;
-    Some((w.parse().ok()?, h.parse().ok()?))
+    let (w, h) = (w.parse().ok()?, h.parse().ok()?);
+    valid_viewport(w, h).then_some((w, h))
+}
+
+fn valid_viewport(w: u32, h: u32) -> bool {
+    (1..=MAX_VIEWPORT_SIDE).contains(&w)
+        && (1..=MAX_VIEWPORT_SIDE).contains(&h)
+        && screenshot::validate_size(w as f64, h as f64, 1.0).is_ok()
 }
 
 fn main() -> wry::Result<()> {
@@ -767,6 +801,9 @@ fn main() -> wry::Result<()> {
         proxy: event_loop.create_proxy(),
         deadline_timer: spawn_deadline_timer(event_loop.create_proxy()),
         next_deadline: None,
+        next_shot: 0,
+        shots: HashMap::new(),
+        shot_queue: VecDeque::new(),
     };
     app.open_tab(&event_loop, None)?;
     // Only once WebKit is up: calling into WKWebsiteDataStore before the
@@ -799,35 +836,42 @@ fn main() -> wry::Result<()> {
                     emit(json!({ "event": "tab_opened", "tab": id, "url": url }));
                 }
             }
-            Event::UserEvent(UserEvent::FullShot {
+            Event::UserEvent(UserEvent::Prefetch { tab, hosts }) => {
+                if let Some(tab) = app.tabs.get(&tab) {
+                    prefetch_dns(&tab.webview, hosts.iter().map(String::as_str));
+                }
+            }
+            Event::UserEvent(UserEvent::Cancel(id)) => app.cancel(id),
+            Event::UserEvent(UserEvent::MeasureShot {
                 tab,
-                id,
-                path,
-                height,
+                token,
+                dimensions,
+            }) => app.measured_shot(tab, token, dimensions),
+            Event::UserEvent(UserEvent::ShotDone {
+                tab,
+                token,
+                result,
+                slot,
+                permit,
             }) => {
-                app.full_shot(tab, id, path, height);
+                app.shot_done(tab, token, result);
+                drop((slot, permit));
             }
             Event::UserEvent(UserEvent::TallShot {
                 tab,
-                id,
-                path,
+                token,
                 height,
                 tries,
-                restore,
             }) => {
-                app.tall_shot_poll(tab, id, path, height, tries, restore);
+                app.tall_shot_poll(tab, token, height, tries);
             }
-            Event::UserEvent(UserEvent::TallShotReady {
-                tab,
-                id,
-                path,
-                restore,
-            }) => {
-                app.viewport_shot_then_restore(tab, id, path, restore);
-            }
-            Event::UserEvent(UserEvent::RestoreSize { tab, size }) => {
-                if let Some(t) = app.tabs.get(&tab) {
-                    t.window.set_inner_size(size);
+            Event::UserEvent(UserEvent::TallShotReady { tab, token }) => {
+                if app
+                    .shots
+                    .get(&tab)
+                    .is_some_and(|s| s.token == token && !s.finished)
+                {
+                    app.capture_shot(tab, Region::Viewport);
                 }
             }
             Event::UserEvent(UserEvent::Flush { tab, generation }) => {
@@ -902,6 +946,10 @@ fn main() -> wry::Result<()> {
                 }
             }
             Event::UserEvent(UserEvent::Command(req)) => {
+                if limits::cancelled(req.id) {
+                    limits::complete(req.id);
+                    return;
+                }
                 if req.method == "close" {
                     reply(req.id, Value::Null);
                     app.shutdown();
@@ -914,6 +962,7 @@ fn main() -> wry::Result<()> {
         }
         if *control_flow != ControlFlow::Exit {
             app.deadlines();
+            app.start_shots();
         }
     });
 }
@@ -968,15 +1017,37 @@ fn silence_stderr() {}
 /// Reads one JSON request per line and forwards it to the event loop.
 fn spawn_stdin_reader(proxy: EventLoopProxy<UserEvent>) {
     std::thread::spawn(move || {
-        for line in std::io::stdin().lock().lines() {
-            let Ok(line) = line else { break };
+        let mut input = std::io::stdin().lock();
+        while let Ok(Some(line)) = limits::read_line(&mut input, limits::LINE_BYTES) {
+            let line = match line {
+                Ok(line) => line,
+                Err(e) => {
+                    mcp::input_error(e);
+                    continue;
+                }
+            };
             if line.trim().is_empty() {
                 continue;
             }
 
-            match mcp::incoming(&line) {
-                Ok(Some(req)) => {
-                    let _ = proxy.send_event(UserEvent::Command(req));
+            match mcp::incoming(&line, |id| {
+                limits::cancel(id);
+                let _ = proxy.send_event(UserEvent::Cancel(id));
+            }) {
+                Ok(Some(mut req)) => {
+                    // Account conservatively for the parsed tree as well as the
+                    // wire string. Upload expansion reserves its own bytes later.
+                    match limits::admit(req.id, line.len().saturating_mul(4).max(1024)) {
+                        Ok(permit) => {
+                            req.permit = Some(permit);
+                            let id = req.id;
+                            if proxy.send_event(UserEvent::Command(req)).is_err() {
+                                limits::complete(id);
+                                break;
+                            }
+                        }
+                        Err(e) => mcp::rejected(req.id, e),
+                    }
                 }
                 Ok(None) => {} // handled entirely by the mcp layer
                 Err(e) => emit(json!({ "error": format!("bad request: {e}") })),
@@ -1021,10 +1092,69 @@ fn spawn_deadline_timer(
 }
 
 impl App {
+    fn cancel(&mut self, id: u64) {
+        self.cancel_shot(id);
+        for (&tab_id, tab) in &self.tabs {
+            let mut p = tab.pending.borrow_mut();
+            let request = p.js.remove(&id);
+            p.queue.retain(|(queued, _)| *queued != id);
+            let navigating = p.navigate.is_some_and(|(nav, _)| nav == id);
+            if navigating {
+                p.navigate = None;
+                p.navigate_url = None;
+                p.navigation_deadline = None;
+                p.history_deadline = None;
+                p.loading = false;
+                p.awaiting_start = false;
+                p.hinted = None;
+            }
+            let generation = p.generation;
+            #[cfg(target_os = "windows")]
+            let stop = p.native_start.is_none();
+            #[cfg(not(target_os = "windows"))]
+            let stop = true;
+            drop(p);
+            if let Some(q) = request {
+                cancel_page(&tab.webview, id, q.attempt);
+            }
+            if navigating {
+                if stop {
+                    stop_loading(&tab.webview);
+                }
+                let _ = self.proxy.send_event(UserEvent::Flush {
+                    tab: tab_id,
+                    generation,
+                });
+            }
+        }
+        limits::complete(id);
+    }
     /// Expire unanswered calls and arrange a wakeup for the next deadline.
     fn deadlines(&mut self) {
         let now = std::time::Instant::now();
         let mut next = None;
+        self.shot_queue.retain(|(_, shot)| {
+            if shot.deadline <= now {
+                fail(shot.id, "screenshot: request timed out while queued");
+                false
+            } else {
+                next =
+                    Some(next.map_or(shot.deadline, |n: std::time::Instant| n.min(shot.deadline)));
+                true
+            }
+        });
+        let mut expired_shots = Vec::new();
+        for shot in self.shots.values().filter(|s| !s.finished) {
+            if shot.deadline <= now {
+                expired_shots.push(shot.id);
+            } else {
+                next = Some(next.map_or(shot.deadline, |n| n.min(shot.deadline)));
+            }
+        }
+        for id in expired_shots {
+            self.cancel_shot(id);
+            fail(id, "screenshot: request timed out");
+        }
         for (&tab_id, tab) in &self.tabs {
             let mut pending = tab.pending.borrow_mut();
             for history in [false, true] {
@@ -1063,9 +1193,15 @@ impl App {
                     }
                 }
             }
+            let mut expired = Vec::new();
             pending.expire_page_requests(now, &mut next, |id, method| {
+                expired.push(id);
                 fail(id, format!("{method}: page request timed out"));
             });
+            drop(pending);
+            for id in expired {
+                cancel_page(&tab.webview, id, 0);
+            }
         }
         if next != self.next_deadline {
             self.next_deadline = next;
@@ -1094,6 +1230,13 @@ impl App {
             let _timing = timing::Span::new("window_init");
             builder.build(target).expect("window")
         };
+        if let Err(error) = screenshot::validate_size(
+            self.viewport.0 as f64,
+            self.viewport.1 as f64,
+            window.scale_factor(),
+        ) {
+            return Err(wry::Error::Io(std::io::Error::other(error)));
+        }
         if !self.opts.hidden {
             self.window_state.state.apply(&window);
         }
@@ -1140,6 +1283,20 @@ impl App {
     }
 
     fn close_tab_inner(&mut self, id: TabId, _terminate: bool) -> bool {
+        if let Some(shot) = self.shots.remove(&id) {
+            shot.cancel.cancel();
+            if !shot.finished {
+                fail(shot.id, "screenshot: tab closed");
+            }
+        }
+        self.shot_queue.retain(|(tab, shot)| {
+            if *tab == id {
+                fail(shot.id, "screenshot: tab closed");
+                false
+            } else {
+                true
+            }
+        });
         let Some(tab) = self.tabs.remove(&id) else {
             return false;
         };
@@ -1222,6 +1379,9 @@ impl App {
 
     /// Second try of an eval whose expression form did not compile.
     fn eval_retry(&self, t: TabId, id: u64, attempt: u64) {
+        if limits::cancelled(id) {
+            return;
+        }
         let Some(tab) = self.tabs.get(&t) else { return };
         let Some(q) = tab.pending.borrow().js.get(&id).cloned() else {
             return;
@@ -1289,6 +1449,7 @@ impl App {
             method,
             params,
             tab,
+            permit: _permit,
         } = req;
         if !params.is_null() && !params.is_object() {
             return fail(id, format!("{method}: params must be an object"));
@@ -1393,15 +1554,27 @@ impl App {
         }
 
         if method == "resize" {
-            let size = |k: &str| params.get(k).and_then(Value::as_u64).map(|v| v as u32);
+            if self.shots.contains_key(&t) {
+                return fail(id, "resize: screenshot in progress");
+            }
+            let size = |k: &str| {
+                params
+                    .get(k)
+                    .and_then(Value::as_u64)
+                    .and_then(|v| u32::try_from(v).ok())
+            };
             let (Some(w), Some(h)) = (size("width"), size("height")) else {
                 return fail(id, "resize: need width and height");
             };
-            if !(1..=MAX_VIEWPORT_SIDE).contains(&w) || !(1..=MAX_VIEWPORT_SIDE).contains(&h) {
+            if !valid_viewport(w, h) {
                 return fail(
                     id,
-                    format!("resize: width and height must be between 1 and {MAX_VIEWPORT_SIDE}"),
+                    format!("resize: width and height must be between 1 and {MAX_VIEWPORT_SIDE}, within the 24-megapixel budget"),
                 );
+            }
+            if let Err(e) = screenshot::validate_size(w as f64, h as f64, tab.window.scale_factor())
+            {
+                return fail(id, e);
             }
             self.viewport = (w, h);
             tab.window.set_inner_size(tao::dpi::LogicalSize::new(w, h));
@@ -1410,7 +1583,7 @@ impl App {
 
         // Files are read here; the page gets them as base64.
         let params = match method.as_str() {
-            "upload" => match attach_files(params) {
+            "upload" => match attach_files(id, params) {
                 Ok(p) => p,
                 Err(e) => return fail(id, e),
             },
@@ -1423,20 +1596,26 @@ impl App {
         }
     }
 
-    fn screenshot(&self, t: TabId, id: u64, params: &Value) {
-        let tab = &self.tabs[&t];
+    fn screenshot(&mut self, t: TabId, id: u64, params: &Value) {
         let path = params
             .get("path")
             .and_then(Value::as_str)
             .map(str::to_owned);
         let full = params.get("full").and_then(Value::as_bool).unwrap_or(false);
+        if path.as_ref().is_some_and(|p| p.len() > 4096) {
+            return fail(id, "screenshot: path is too long");
+        }
 
         let region = match params.get("clip") {
             Some(c) => {
                 let f = |k: &str| c.get(k).and_then(Value::as_f64);
                 match (f("x"), f("y"), f("width"), f("height")) {
                     (Some(x), Some(y), Some(width), Some(height))
-                        if width >= 1.0 && height >= 1.0 =>
+                        if [x, y, width, height].iter().all(|v| v.is_finite())
+                            && x >= 0.0
+                            && y >= 0.0
+                            && width >= 1.0
+                            && height >= 1.0 =>
                     {
                         Region::Clip(Clip {
                             x,
@@ -1451,150 +1630,263 @@ impl App {
             None if full => Region::Full,
             None => Region::Viewport,
         };
-
-        // A full capture first asks the page for its height: WKWebView only
-        // renders the visible area, and cairo cannot hold a very tall surface.
-        if matches!(region, Region::Full) {
-            let proxy = self.proxy.clone();
-            let fallback = tab
-                .window
-                .inner_size()
-                .to_logical::<f64>(tab.window.scale_factor())
-                .height;
-            let res = tab.webview.evaluate_script_with_callback(
-                "Math.max(document.documentElement.scrollHeight, document.body.scrollHeight)",
-                move |h| {
-                    let height = h.parse::<f64>().unwrap_or(fallback);
-                    let _ = proxy.send_event(UserEvent::FullShot {
-                        tab: t,
-                        id,
-                        path: path.clone(),
-                        height,
-                    });
-                },
-            );
-            if let Err(e) = res {
-                fail(id, e);
-            }
-            return;
-        }
-
-        screenshot::capture(&tab.webview, region, finish_shot(id, path));
+        let deadline = match Queued::deadline(params, std::time::Instant::now()) {
+            Ok(deadline) => deadline,
+            Err(e) => return fail(id, e),
+        };
+        self.next_shot += 1;
+        self.shot_queue.push_back((
+            t,
+            Shot {
+                id,
+                token: self.next_shot,
+                path,
+                region,
+                deadline,
+                cancel: Default::default(),
+                restore: None,
+                capturing: false,
+                finished: false,
+                permit: limits::permit(id),
+                slot: None,
+            },
+        ));
     }
 
-    fn full_shot(&self, t: TabId, id: u64, path: Option<String>, height: f64) {
-        let Some(tab) = self.tabs.get(&t) else {
-            return fail(id, format!("no such tab {t}"));
-        };
-
-        // WebKitGTK renders the whole document in one go when it fits in cairo.
-        if cfg!(target_os = "linux") && height <= CAIRO_MAX_SIDE {
-            return screenshot::capture(&tab.webview, Region::Full, finish_shot(id, path));
+    fn start_shots(&mut self) {
+        // FIFO per tab, with at most two native captures across the process.
+        while self.shots.len() < 2 {
+            let Some(index) = self
+                .shot_queue
+                .iter()
+                .position(|(tab, _)| !self.shots.contains_key(tab))
+            else {
+                break;
+            };
+            let Some(slot) = screenshot::Slot::acquire() else {
+                break;
+            };
+            let (t, mut shot) = self.shot_queue.remove(index).unwrap();
+            shot.slot = Some(slot);
+            let id = shot.id;
+            let token = shot.token;
+            if limits::cancelled(id) {
+                limits::complete(id);
+                continue;
+            }
+            if shot.deadline <= std::time::Instant::now() {
+                fail(id, "screenshot: request timed out while queued");
+                continue;
+            }
+            let Some(tab) = self.tabs.get(&t) else {
+                fail(id, "screenshot: tab closed");
+                continue;
+            };
+            self.shots.insert(t, shot);
+            let proxy = self.proxy.clone();
+            let result = tab.webview.evaluate_script_with_callback(
+                "[Math.max(innerWidth,document.documentElement?.scrollWidth||0,document.body?.scrollWidth||0),Math.max(innerHeight,document.documentElement?.scrollHeight||0,document.body?.scrollHeight||0),innerWidth,innerHeight,devicePixelRatio]",
+                move |value| {
+                    let dimensions = serde_json::from_str(&value).ok();
+                    let _ = proxy.send_event(UserEvent::MeasureShot { tab: t, token, dimensions });
+                });
+            if let Err(e) = result {
+                self.shot_done(t, token, Err(e.to_string()));
+            }
         }
+    }
 
+    fn measured_shot(&mut self, t: TabId, token: u64, dimensions: Option<[f64; 5]>) {
+        let Some(shot) = self
+            .shots
+            .get(&t)
+            .filter(|s| s.token == token && !s.finished)
+        else {
+            return;
+        };
+        let Some([width, height, vw, vh, dpr]) = dimensions else {
+            return self.shot_done(
+                t,
+                token,
+                Err("screenshot: cannot measure page geometry".into()),
+            );
+        };
+        if ![width, height, vw, vh, dpr]
+            .iter()
+            .all(|v| v.is_finite() && *v > 0.0)
+        {
+            return self.shot_done(t, token, Err("screenshot: invalid page geometry".into()));
+        }
+        let tab = &self.tabs[&t];
+        let scale = dpr.max(tab.window.scale_factor());
+        let region = shot.region;
+        let budget = screenshot::validate_size(vw, vh, scale).and_then(|_| match region {
+            Region::Full => screenshot::validate_size(width, height.min(MAX_FULL_HEIGHT), scale),
+            Region::Clip(c) if c.x + c.width > vw || c.y + c.height > vh => {
+                Err("screenshot: clip must fit within the viewport".into())
+            }
+            Region::Clip(c) => screenshot::validate_size(c.width, c.height, scale),
+            Region::Viewport => Ok(()),
+        });
+        if let Err(e) = budget {
+            return self.shot_done(t, token, Err(e));
+        }
+        if !matches!(region, Region::Full)
+            || (cfg!(target_os = "linux") && height <= MAX_FULL_HEIGHT)
+        {
+            return self.capture_shot(t, region);
+        }
         let height = height.min(MAX_FULL_HEIGHT);
         let restore = tab
             .window
             .inner_size()
             .to_logical::<f64>(tab.window.scale_factor());
+        self.shots.get_mut(&t).unwrap().restore = Some(restore);
         tab.window
             .set_inner_size(tao::dpi::LogicalSize::new(restore.width, height));
-
-        // GTK applies the resize asynchronously; WKWebView is ready right away.
         if cfg!(target_os = "linux") {
             let _ = self.proxy.send_event(UserEvent::TallShot {
                 tab: t,
-                id,
-                path,
+                token,
                 height,
                 tries: 0,
-                restore,
             });
-            return;
+        } else {
+            self.capture_shot(t, Region::Viewport);
         }
-        self.viewport_shot_then_restore(t, id, path, restore);
     }
 
     /// Captures once the page reports the enlarged viewport, or after TALL_SHOT_TRIES polls.
-    fn tall_shot_poll(
-        &self,
-        t: TabId,
-        id: u64,
-        path: Option<String>,
-        height: f64,
-        tries: u8,
-        restore: tao::dpi::LogicalSize<f64>,
-    ) {
-        let Some(tab) = self.tabs.get(&t) else {
-            return fail(id, format!("no such tab {t}"));
-        };
+    fn tall_shot_poll(&mut self, t: TabId, token: u64, height: f64, tries: u8) {
+        if !self
+            .shots
+            .get(&t)
+            .is_some_and(|s| s.token == token && !s.finished)
+        {
+            return;
+        }
+        let tab = &self.tabs[&t];
         let proxy = self.proxy.clone();
         let res = tab
             .webview
             .evaluate_script_with_callback("innerHeight", move |h| {
                 let seen = h.parse::<f64>().unwrap_or(0.0);
                 let ev = if seen >= height - 1.0 || tries >= TALL_SHOT_TRIES {
-                    UserEvent::TallShotReady {
-                        tab: t,
-                        id,
-                        path: path.clone(),
-                        restore,
-                    }
+                    UserEvent::TallShotReady { tab: t, token }
                 } else {
                     std::thread::sleep(TALL_SHOT_POLL);
                     UserEvent::TallShot {
                         tab: t,
-                        id,
-                        path: path.clone(),
+                        token,
                         height,
                         tries: tries + 1,
-                        restore,
                     }
                 };
                 let _ = proxy.send_event(ev);
             });
         if let Err(e) = res {
-            tab.window.set_inner_size(restore);
-            fail(id, e);
+            self.shot_done(t, token, Err(e.to_string()));
         }
     }
 
-    fn viewport_shot_then_restore(
-        &self,
-        t: TabId,
-        id: u64,
-        path: Option<String>,
-        restore: tao::dpi::LogicalSize<f64>,
-    ) {
-        let Some(tab) = self.tabs.get(&t) else {
-            return fail(id, format!("no such tab {t}"));
+    fn capture_shot(&mut self, t: TabId, region: Region) {
+        let Some(shot) = self.shots.get_mut(&t).filter(|s| !s.finished) else {
+            return;
         };
+        if shot.deadline <= std::time::Instant::now() || limits::cancelled(shot.id) {
+            let id = shot.id;
+            self.cancel_shot(id);
+            return fail(id, "screenshot: request cancelled or timed out");
+        }
+        shot.capturing = true;
+        let token = shot.token;
+        let permit = shot.permit.clone();
+        let slot = shot.slot.clone();
         let proxy = self.proxy.clone();
-        let done = finish_shot(id, path);
         screenshot::capture(
-            &tab.webview,
-            Region::Viewport,
-            Box::new(move |png| {
-                let _ = proxy.send_event(UserEvent::RestoreSize {
+            &self.tabs[&t].webview,
+            region,
+            shot.path.clone(),
+            shot.cancel.clone(),
+            Box::new(move |result| {
+                let _ = proxy.send_event(UserEvent::ShotDone {
                     tab: t,
-                    size: restore,
+                    token,
+                    result,
+                    slot,
+                    permit,
                 });
-                done(png);
             }),
         );
+    }
+
+    fn shot_done(&mut self, t: TabId, token: u64, result: Result<screenshot::Output, String>) {
+        if !self.shots.get(&t).is_some_and(|s| s.token == token) {
+            return;
+        }
+        let shot = self.shots.remove(&t).unwrap();
+        if let (Some(size), Some(tab)) = (shot.restore, self.tabs.get(&t)) {
+            tab.window.set_inner_size(size);
+        }
+        if !shot.finished {
+            finish_shot(shot.id, result);
+        }
+    }
+
+    fn cancel_shot(&mut self, id: u64) {
+        self.shot_queue.retain(|(_, shot)| shot.id != id);
+        let tab = self
+            .shots
+            .iter()
+            .find_map(|(tab, shot)| (shot.id == id).then_some(*tab));
+        if let Some(t) = tab {
+            let shot = self.shots.get_mut(&t).unwrap();
+            shot.finished = true;
+            // Keep the slot until native completion, even on platforms without
+            // a cancellable snapshot API. A timeout must not admit more pixels.
+            let cancel = shot.cancel.clone();
+            let capturing = shot.capturing;
+            if let (Some(size), Some(tab)) = (shot.restore.take(), self.tabs.get(&t)) {
+                tab.window.set_inner_size(size);
+            }
+            cancel.cancel();
+            if !capturing {
+                self.shots.remove(&t);
+            }
+        }
     }
 }
 
 /// Builds the screenshot completion: write to `path` or return base64.
-fn finish_shot(id: u64, path: Option<String>) -> screenshot::Done {
-    Box::new(move |png| match (png, path) {
-        (Err(e), _) => fail(id, e),
-        (Ok(png), Some(p)) => match std::fs::write(&p, &png) {
-            Ok(_) => reply(id, json!({ "path": p, "bytes": png.len() })),
-            Err(e) => fail(id, e),
-        },
-        (Ok(png), None) => reply(id, json!({ "png_base64": screenshot::base64(&png) })),
-    })
+fn finish_shot(id: u64, result: Result<screenshot::Output, String>) {
+    match result {
+        Err(e) => fail(id, e),
+        Ok(screenshot::Output::File { path, bytes }) => {
+            reply(id, json!({ "path": path, "bytes": bytes }))
+        }
+        Ok(screenshot::Output::Bytes(png)) => {
+            let data = screenshot::base64(&png);
+            drop(png);
+            if mcp::enabled() {
+                mcp::image_reply(id, &data);
+            } else {
+                #[derive(serde::Serialize)]
+                struct Image<'a> {
+                    png_base64: &'a str,
+                }
+                #[derive(serde::Serialize)]
+                struct Reply<'a> {
+                    id: u64,
+                    result: Image<'a>,
+                }
+                limits::complete(id);
+                write_json(&Reply {
+                    id,
+                    result: Image { png_base64: &data },
+                });
+            }
+        }
+    }
 }
 
 fn build_webview(
@@ -1636,6 +1928,7 @@ fn build_webview(
                     if mcp::enabled() {
                         mcp::raw_reply(body.id, body.result);
                     } else {
+                        limits::complete(body.id);
                         write_json(&Reply {
                             id: body.id,
                             result: body.result,
@@ -1702,7 +1995,14 @@ fn build_webview(
                 }
             }
             if let Some(hosts) = body.get("prefetch").and_then(Value::as_array) {
-                prefetch_dns(hosts.iter().filter_map(Value::as_str));
+                let hosts = hosts
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .filter(|h| h.len() <= 253)
+                    .take(8)
+                    .map(str::to_owned)
+                    .collect();
+                let _ = ipc_proxy.send_event(UserEvent::Prefetch { tab, hosts });
                 return;
             }
             if let Some(id) = body.get("id").and_then(Value::as_u64) {
@@ -1854,9 +2154,10 @@ fn try_flock(_: &std::fs::File) -> bool {
 
 /// Warms DNS for hosts the agent is likely to visit next (Linux; WebKitGTK has no preconnect).
 #[cfg(target_os = "linux")]
-fn prefetch_dns<'a>(hosts: impl Iterator<Item = &'a str>) {
-    use webkit2gtk::WebContextExt;
-    if let Some(ctx) = webkit2gtk::WebContext::default() {
+fn prefetch_dns<'a>(wv: &WebView, hosts: impl Iterator<Item = &'a str>) {
+    use webkit2gtk::{WebContextExt, WebViewExt};
+    use wry::WebViewExtUnix;
+    if let Some(ctx) = wv.webview().context() {
         for h in hosts {
             ctx.prefetch_dns(h);
         }
@@ -1864,7 +2165,11 @@ fn prefetch_dns<'a>(hosts: impl Iterator<Item = &'a str>) {
 }
 
 #[cfg(not(target_os = "linux"))]
-fn prefetch_dns<'a>(_hosts: impl Iterator<Item = &'a str>) {}
+fn prefetch_dns<'a>(_wv: &WebView, _hosts: impl Iterator<Item = &'a str>) {}
+
+fn cancel_page(wv: &WebView, id: u64, attempt: u64) {
+    let _ = wv.evaluate_script(&format!("window.__bruster?.cancel({id}, {attempt})"));
+}
 
 /// Absolute url with a scheme and a host, or an about: page.
 fn valid_url(url: &str) -> bool {
@@ -2011,14 +2316,74 @@ fn profile_id(dir: &Path) -> [u8; 16] {
 }
 
 /// Reads `paths` and adds `files: [{name, type, data}]` for runtime.js.
-fn attach_files(mut params: Value) -> Result<Value, String> {
-    let paths: Vec<String> =
-        serde_json::from_value(params.get("paths").cloned().unwrap_or(Value::Null))
-            .map_err(|_| "upload: need params.paths (array of file paths)")?;
-    let mut files = Vec::with_capacity(paths.len());
+fn attach_files(id: u64, mut params: Value) -> Result<Value, String> {
+    let paths: Vec<String> = serde_json::from_value(
+        params
+            .get_mut("paths")
+            .map(Value::take)
+            .unwrap_or(Value::Null),
+    )
+    .map_err(|_| "upload: need params.paths (array of file paths)")?;
+    if paths.len() > 32 {
+        return Err("upload: at most 32 files per request".into());
+    }
+    let mut total = 0u64;
+    let mut inputs = Vec::with_capacity(paths.len());
     for p in &paths {
+        let mut options = std::fs::OpenOptions::new();
+        options.read(true);
+        #[cfg(unix)]
+        {
+            // Opening a FIFO must not block the UI before metadata can reject it.
+            use std::os::unix::fs::OpenOptionsExt;
+            options.custom_flags(libc::O_NONBLOCK);
+        }
+        let file = options.open(p).map_err(|e| format!("upload {p}: {e}"))?;
+        let meta = file.metadata().map_err(|e| format!("upload {p}: {e}"))?;
+        if !meta.is_file() {
+            return Err(format!("upload {p}: expected a regular file"));
+        }
+        total = total
+            .checked_add(meta.len())
+            .ok_or("upload: files are too large")?;
+        if total > limits::UPLOAD_BYTES {
+            return Err("upload: total file size exceeds 16 MiB".into());
+        }
+        inputs.push((file, meta.len()));
+    }
+    // Base64 plus its JS source representation; retry state shares the Value.
+    limits::reserve(id, total.div_ceil(3) as usize * 8).map_err(str::to_owned)?;
+    let mut files = Vec::with_capacity(paths.len());
+    let mut read_total = 0u64;
+    for (p, (file, size)) in paths.iter().zip(inputs) {
         let path = Path::new(p);
-        let bytes = std::fs::read(path).map_err(|e| format!("upload {p}: {e}"))?;
+        let mut data = String::with_capacity(size.div_ceil(3) as usize * 4);
+        let mut input = file.take(size + 1);
+        let mut block = [0u8; 48 * 1024];
+        loop {
+            if limits::cancelled(id) {
+                return Err("upload: request cancelled".into());
+            }
+            // Fill blocks to a multiple of three; Read may return short reads.
+            let mut n = 0;
+            while n < block.len() {
+                let got = input
+                    .read(&mut block[n..])
+                    .map_err(|e| format!("upload {p}: {e}"))?;
+                if got == 0 {
+                    break;
+                }
+                n += got;
+            }
+            if n == 0 {
+                break;
+            }
+            read_total += n as u64;
+            if read_total > total || input.limit() == 0 {
+                return Err(format!("upload {p}: file grew while reading"));
+            }
+            screenshot::base64_append(&block[..n], &mut data);
+        }
         let ext = path
             .extension()
             .and_then(|e| e.to_str())
@@ -2029,13 +2394,16 @@ fn attach_files(mut params: Value) -> Result<Value, String> {
             .find(|(e, _)| *e == ext)
             .map(|(_, m)| *m)
             .unwrap_or(OCTET_STREAM);
-        files.push(json!({
+        let mut file = json!({
             "name": path.file_name().and_then(|n| n.to_str()).unwrap_or("file"),
             "type": mime,
-            "data": screenshot::base64(&bytes),
-        }));
+        });
+        // json!(data) and json!(files) serialize borrowed Values, cloning their
+        // payloads. Move the large base64 buffers into their final containers.
+        file["data"] = Value::String(data);
+        files.push(file);
     }
-    params["files"] = json!(files);
+    params["files"] = Value::Array(files);
     Ok(params)
 }
 
@@ -2056,10 +2424,16 @@ fn start_navigation(tab: &Tab, _id: u64, method: &str, url: Option<&str>) -> wry
 
 /// `retries` counts how many navigations this request has already outlived.
 fn tab_dispatch(tab: &Tab, t: TabId, id: u64, request: Queued, proxy: &EventLoopProxy<UserEvent>) {
+    // A flush can precede the main-thread Cancel event. Stdin has already marked
+    // its permit, so do not redispatch the abandoned action in that interval.
+    if limits::cancelled(id) {
+        limits::complete(id);
+        return;
+    }
     let wv = &tab.webview;
     let pending = &tab.pending;
     let method = request.method.as_str();
-    let params = &request.params;
+    let params = request.params.as_ref();
 
     // Answered by the load handler once the new page finishes. Registered
     // before the call in case the webview reports Started synchronously.
@@ -2380,9 +2754,8 @@ mod tests {
     fn page_requests_expire_at_their_deadline_once_in_both_queues() {
         let now = std::time::Instant::now();
         let mut p = Pending::default();
-        let request = |ms| {
-            Queued::new_at("eval".into(), json!({ "request_timeout": ms }), now).unwrap()
-        };
+        let request =
+            |ms| Queued::new_at("eval".into(), json!({ "request_timeout": ms }), now).unwrap();
         p.js.insert(1, request(200));
         p.queue.push((2, request(300)));
         let mut expired = Vec::new();

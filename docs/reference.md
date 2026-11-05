@@ -19,7 +19,7 @@ bruster [--mcp] [--hidden|--visible] [--quiet] [options]
 | `--mcp` | use the Model Context Protocol on stdio instead of the native protocol. This option also sets `--hidden` |
 | `--hidden` / `--visible` | move the windows off-screen / show the windows |
 | `--quiet` | send stderr to `/dev/null`. This mutes GL, ALSA, and GTK noise |
-| `--viewport WxH` | initial window size, default 1280x800 |
+| `--viewport WxH` | initial window size, default 1280x800; sides 1–16000, subject to the pixel budget |
 | `--user-agent UA` | replace the user agent |
 | `--profile DIR` | keep cookies and storage between runs |
 | `--proxy URL` | `http://host:port` or `socks5://host:port` |
@@ -269,11 +269,50 @@ defaulting to at least 30000 ms (or the requested `timeout`/`time` plus 5000 ms,
 whichever is longer). This deadline includes time spent waiting for navigation.
 Set it explicitly for unusually long operations.
 
-A timeout stops waiting for the reply; it does not interrupt JavaScript already
-running in the page. An infinite loop can make a web process unresponsive and may
-require restarting Bruster. Late replies are discarded. Navigation uses its own
-`timeout`; native operations such as screenshots do not use `request_timeout`.
+A timeout or MCP cancellation removes queued work and stops cooperative runtime
+waits, actionability checks and delayed typing. Arbitrary JavaScript supplied to
+`eval` cannot be interrupted safely; an infinite loop can make a web process
+unresponsive and may require restarting Bruster. Late replies are discarded.
+Navigation uses its own `timeout`. Screenshots also accept `request_timeout`,
+including time queued, geometry measurement and native capture (default 30000 ms).
+Native screenshot cancellation is best-effort; its concurrency slot remains held
+until native completion, including after a timeout or tab close.
 MCP represents null results as the text `null`.
+
+### Memory budgets
+
+- Stdin records are limited to **8 MiB**, including the newline. Oversized records
+  are drained through the newline so the next request remains readable.
+- At most **128** browser requests are admitted, with a **64 MiB** accounting
+  budget for request data (four times wire bytes, plus upload expansion). Excess
+  requests receive a capacity error; retry after outstanding work completes.
+  Use distinct IDs for concurrent native requests. These limits cover queued
+  event-loop messages as well as pending page work; they are not a total-browser
+  RAM limit.
+- Screenshots run **one per tab, at most two globally**. Each is limited to
+  **25,165,824 physical pixels** (24 × 1024²), accounting for backing scale and
+  full-document width. Full-page height is capped at 16000 CSS pixels before
+  choosing the native capture path. Oversized captures fail instead of allocating
+  an unbounded surface. Clips must fit inside the viewport. `resize` and the CLI
+  viewport use the same dimension/pixel validation.
+- Screenshot `path` avoids base64 and inline JSON. Linux streams PNG directly to
+  the file; Windows copies the native encoded stream in blocks. Large Linux
+  captures use Cairo encoding without constructing another full RGB buffer.
+- Uploads accept at most **32 regular files / 16 MiB total**. Rust encodes bounded
+  blocks and shares immutable retry data; the page decodes base64 in blocks.
+- Each injected runtime retains at most **500 network entries / 2 MiB** of
+  accounted metadata and body text. Headers and URLs are capped at 4096 code
+  units; capture uses at most **four readers**, each with a **five-second** deadline.
+  `network({clear:true})` cancels those cloned readers and clears XHR log state.
+  The page's original fetch/XHR is unaffected. `network({bodies:false})` selects
+  metadata-only logging; `bodies:true` restores capture for future responses.
+  `body_skipped`, `body_truncated` and `truncated` flag incomplete diagnostics.
+- Console history is capped at **500 × 1000 code units**, with bounded-depth/item
+  formatting that avoids getters and `toJSON`. Dialog history is capped at
+  **100 entries / 128 KiB**; messages are limited to 1000 code units. Once full,
+  the last dialog records `dropped` and additional dialog events are suppressed.
+  Clearing history restores admission. Browser-native console retention is
+  separate from these instrumentation budgets.
 
 ## API
 
@@ -289,7 +328,7 @@ supported.
 | `eval` | `expression` | JSON value. Promises are awaited. Compiled as a script |
 | `snapshot` | `selector?`, `max?` (1000), `boxes?`, `format?` (native default `json`, MCP default `text`) | `{url,title,elements[],truncated?}` or text lines |
 | `find` | `text?` or `regex?` + snapshot params | filtered snapshot |
-| `screenshot` | `path?`, `full?`, `clip?` `{x,y,width,height}` | `{path,bytes}` or `{png_base64}`. Full pages are capped at 16000 px |
+| `screenshot` | `path?`, `full?`, `clip?` `{x,y,width,height}`, `request_timeout?` | `{path,bytes}` or `{png_base64}`. Full pages are capped at 16000 CSS px and the physical pixel budget |
 | `rect` | target | `{x,y,width,height}` viewport-relative |
 | `click` | target or `x,y`; `force?`, `timeout?` | `null` |
 | `hover` | target | `null` |
@@ -307,7 +346,7 @@ supported.
 | `attr` | target, `name` | string or null |
 | `count` | `selector` | number |
 | `wait_for` | `selector`/`ref` + `state?` (visible, attached, hidden), `text`, `textGone`, `url`, `idle`, `time` ms; `timeout?` ms | `null` |
-| `network` | `clear?` | fetch/XHR entries with index, method and status where available, plus resource timing entries |
+| `network` | `clear?`, `bodies?` (true) | fetch/XHR entries with index, method and status where available, plus resource timing entries |
 | `network_request` | `index` | one entry with `req_headers`, `res_headers`, and `body` (up to 16,384 UTF-16 code units) |
 | `console` | `clear?` | `[{level,text,ms}]` console output and uncaught errors |
 | `dialog` | `accept?`, `text?`, `clear?` | dialogs seen. Sets the answer for the next dialogs |
@@ -327,7 +366,7 @@ supported.
 
 - Input uses synthetic DOM events (`isTrusted` is false). You do not get `:hover` styles, native `<select>` popups, or OS-level shortcuts.
 - Network and console logs are patched in the page and reset on navigation. Network entries for fetch/XHR include status and an index; other resources use performance timings and may lack status or method. The document request is not included. Logs contain no request bodies. Use `--proxy` for real interception.
-- Fetch body prefixes become available when the limit is reached or the response ends. On WebKitGTK 2.52.0–2.52.6, a [streaming compatibility fallback](../benchmarks/optimizations.md#webkitgtk-streaming-compatibility) uses ordinary readers; fetch-response BYOB readers are unavailable.
+- Fetch body prefixes become available when the limit is reached, the response ends or the capture deadline expires. Binary content types and captures beyond the reader/text budgets are skipped. On WebKitGTK 2.52.0–2.52.6, a [streaming compatibility fallback](../benchmarks/optimizations.md#webkitgtk-streaming-compatibility) uses ordinary readers; fetch-response BYOB readers are unavailable.
 - Cross-origin iframes are out of reach. Same-origin iframes and open shadow roots work.
 - Use HTTP(S) URLs for navigation. `data:` and `file:` URLs are unsupported; serve local pages over localhost instead.
 - bruster does not intercept native file choosers. Use `upload` instead of a click on a file input.
