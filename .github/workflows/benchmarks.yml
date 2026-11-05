@@ -29,7 +29,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: benchmarks-macos
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - name: Build Bruster and record SleepyHollow source
@@ -76,7 +76,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: benchmarks-linux-x86_64
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - name: Resolve latest stable Node.js
