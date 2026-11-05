@@ -12,13 +12,13 @@
 <p>“Visible” here does not promise that the element fits inside the current screenshot. It may be farther down a long page. You might need to scroll to see it in your own browser or in a viewport-sized image.</p>
 
 <h2>Check the exact words when they matter</h2>
-<p><code>expect text</code> compares the element’s text with the value you provide. It normalizes whitespace, so differences such as a line break between words do not necessarily cause a failure. It still checks the words, capitalization, and punctuation.</p>
+<p><code>expect text</code> compares the element’s text with the value you provide. Before comparing, Bruster removes spaces at the beginning and end of the page text and turns repeated spaces, tabs, and line breaks into single spaces. Write the expected text with single spaces between words. The words, capitalization, and punctuation must still match exactly.</p>
 <p>We check the heading with <code>#result h2</code> and the detail line with <code>#result p</code>. This avoids mixing those two messages with the small “LAST SUBMISSION” label elsewhere in the receipt.</p>
 <p>The detail line in this test uses the default workflow, <strong>Navigation check</strong>, and the default checkbox state, <strong>Screenshots: off</strong>. The dots between the pieces are part of the text. Copy the complete expected line when you want an exact check.</p>
 
 <h2>Use a partial match for a partial requirement</h2>
 <p>Sometimes you only care about one piece of a longer message. In this example, the following assertion would check just the screenshot setting:</p>
-<div class="command"><span class="command-label">Alternative assertion for this default, unchecked form</span><pre><code>expect contains "#result p" "Screenshots: off"</code></pre></div>
+<div class="command"><span class="command-label">Alternative assertion when Include screenshots is unchecked</span><pre><code>expect contains "#result p" "Screenshots: off"</code></pre></div>
 <p><code>expect contains</code> looks for that piece of text inside the whole element. It does not require the whole message to match.</p>
 <p>Choose it because a partial match expresses the requirement, not simply because an exact check failed. A very loose assertion can miss a real mistake. Checking only that the receipt contains “Smoke test” would not prove that it names the right project.</p>
 

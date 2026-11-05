@@ -1,5 +1,5 @@
 <p class="lead">A test result is easier to understand when you can see what happened. Reports tell you which check failed. Screenshots and page snapshots help you investigate why.</p>
-<p>In this lesson, you will save two pictures during a successful form submission and find them in the run’s result folder.</p>
+<p>In this lesson, you will save two pictures during a successful form submission and find them in the run’s results folder.</p>
 <p><a class="download-link" href="{{base}}example-tests/learn-testin/evidence.bru" download="evidence.bru">Download evidence.bru ↓</a></p>
 {{evidence}}
 
@@ -15,15 +15,15 @@
 <p>Open that new run folder in your file manager. Inside <code>test-001</code>, find <code>before.png</code> and <code>after.png</code>. Open both and compare them. On the default desktop viewport, the form and receipt should fit in these example images.</p>
 
 <h2>Read the folder as a record of one run</h2>
-<div class="table-wrap"><table><thead><tr><th scope="col">File or folder</th><th scope="col">What it is for</th></tr></thead><tbody><tr><td><code>results.json</code></td><td>The overall report: test names, pass/fail results, steps, and artifact locations.</td></tr><tr><td><code>test-001/</code></td><td>The first test’s own evidence folder. Later tests get their own numbered folders.</td></tr><tr><td><code>stderr.log</code></td><td>Diagnostic messages from the browser process.</td></tr><tr><td><code>before.png</code> and <code>after.png</code></td><td>The pictures requested by this test.</td></tr></tbody></table></div>
+<div class="table-wrap"><table><thead><tr><th scope="col">File or folder</th><th scope="col">What it is for</th></tr></thead><tbody><tr><td><code>results.json</code></td><td>The overall report: test names, pass/fail results, steps, and artifact locations.</td></tr><tr><td><code>test-001/</code></td><td>The first test’s own evidence folder. Later tests get their own numbered folders.</td></tr><tr><td><code>stderr.log</code></td><td>Diagnostic messages from the browser process, inside each test’s folder.</td></tr><tr><td><code>before.png</code> and <code>after.png</code></td><td>The pictures requested by this test, inside <code>test-001/</code>.</td></tr></tbody></table></div>
 <p>JSON is a text format. You can open <code>results.json</code> in your editor and search for your test name or the word <code>error</code>. You do not have to understand every field immediately.</p>
 
 <h2>What is saved when a test fails?</h2>
 <p>On a failed step, Bruster also attempts to save <code>failure.png</code>, <code>snapshot.json</code>, and <code>console.json</code>. A snapshot describes the page’s elements. The console file can contain messages from the page’s scripts.</p>
-<p>These captures are best-effort. If the browser has already crashed, some evidence may be unavailable. Read the original failing step first; a missing screenshot does not replace that original error.</p>
+<p>Bruster tries to collect this evidence, but some files may be unavailable if the browser has already crashed. Start with the error from the failed step. A missing screenshot is a separate problem and does not explain why the step failed.</p>
 
 <h2>A picture is evidence, not a comparison</h2>
-<p>Saving <code>after.png</code> does not automatically check whether its pixels match an approved design. The text assertion is what decides whether this receipt is correct. You can review the image to understand the context.</p>
+<p>Saving <code>after.png</code> does not automatically check whether its pixels match an approved design. The text assertion checks the receipt’s heading. You can review the image to see how the page looked at that point.</p>
 <p>On a narrow screen, the receipt may be below the captured viewport. A visibility assertion can pass even when the element is farther down the page. For a worked example that scrolls before capturing the receipt, see the <a href="{{base}}guides/web-automation-testing/#first-test">recording workflow tutorial</a>.</p>
 
 <section class="exercise"><h2>Try it: find the right run</h2><p>Run the evidence example twice. Find both run folders and open the second run’s pictures. Notice that the old run was kept rather than overwritten.</p></section>

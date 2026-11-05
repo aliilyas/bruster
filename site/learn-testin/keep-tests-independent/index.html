@@ -1,8 +1,8 @@
-<p class="lead">Each test should be able to explain its own starting point. It should not need another test to run first or leave a page in a particular state.</p>
+<p class="lead">Each test should establish its own starting point. It should not need another test to run first or leave a page in a particular state.</p>
 <p>Imagine a first test creates a receipt and a second test tries to edit it. If the first test fails, the second one also fails, even if editing works correctly. You now have two failures but only one underlying problem.</p>
 
 <h2>Fresh browsers make the boundary clear</h2>
-<p>Bruster starts a fresh browser process and profile for each named test. A <strong>profile</strong> is the browser’s stored session data, such as cookies and local storage. A fresh profile gives the next test a clean browser starting point.</p>
+<p>Bruster starts a fresh browser process and profile for each named test. A <strong>profile</strong> stores browser data, including cookies and other information saved by websites. A fresh profile gives the next test a clean starting point.</p>
 <p>This also means the next test will not inherit an open page, filled fields, or a receipt. It needs its own navigation and preparation.</p>
 <p>Actions within one test do share the same browser. That is why you can fill a field, click a button, and inspect the resulting receipt in one sequence. The fresh-start boundary is between named tests, not between every line.</p>
 
@@ -16,7 +16,7 @@
 <h2>Know what belongs in shared setup</h2>
 <p>Put steps in <code>before_each</code> when every test in that file genuinely needs them. Opening the same page is a common example.</p>
 <p>If one case must test an empty name field, filling the name in shared setup can make that case confusing. You would need to undo the setup. It may be clearer to fill the name only in cases that need a valid one.</p>
-<p>For the choices example in lesson 12, both tests needed a complete name and project, so putting those fills in shared setup was sensible. For required-field checks, leaving those fills inside individual cases makes their intention easier to see.</p>
+<p>For the choices example in lesson 12, both tests needed the name and project fields filled in, so putting those steps in shared setup was sensible. For required-field checks, filling the fields inside each test makes its intention easier to see.</p>
 
 <h2>Keep a complete journey together when it needs shared state</h2>
 <p>Some checks naturally need several related actions. To test a second submission replacing a first one, both submissions should happen inside the same test. The first submission establishes the state that the second part of that same case is meant to change.</p>

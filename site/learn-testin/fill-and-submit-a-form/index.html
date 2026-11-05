@@ -12,13 +12,13 @@
 <p>Bruster also has a <code>type</code> command for typing additional text. Start with <code>fill</code> when your goal is to set the whole value. It is easier to understand a test that says exactly what each field should contain.</p>
 
 <h2>Why check the receipt afterward?</h2>
-<p>The final line begins with <code>expect</code>, so it is an assertion. It asks for the text inside <code>#result h2</code> to match <strong>Smoke test created for Bruster</strong>.</p>
+<p>The final check, just before <code>end</code>, begins with <code>expect</code>, so it is an assertion. It asks for the text inside <code>#result h2</code> to match <strong>Smoke test created for Bruster</strong>.</p>
 <p>This check connects the input to the outcome. If the button did nothing, the expected heading would not appear. If the receipt used the wrong project name, the text would not match.</p>
 <p>Notice that we left Workflow and Include screenshots alone. The page’s defaults are enough for this first submission test. Testing the optional choices separately will make those cases easier to explain.</p>
 
 <h2>Run the new file</h2>
 <div class="command"><span class="command-label">macOS / Linux</span><pre><code>./bruster test form-submit.bru --visible</code></pre><span class="command-label">Windows PowerShell</span><pre><code>.\bruster.exe test form-submit.bru --visible</code></pre></div>
-<p>Look for the test name <strong>Ada can create a smoke test</strong> and a summary of one passed test. You now have a small automated form workflow, not only a page-opening check.</p>
+<p>Look for the test name <strong>Ada can create a smoke test</strong> and a summary of one passed test. Your test now fills in a form, submits it, and checks the result.</p>
 <p>If a test fails, compare its saved file with the example. Check the quotes, the exact selector names, and the expected receipt. Save the file before running it again.</p>
 
 <h2>Change the example deliberately</h2>

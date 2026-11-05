@@ -24,7 +24,7 @@
 <p>The extra spaces at the beginning of the action lines are called <strong>indentation</strong>. They make the block easier to read. Bruster does not require those spaces, but keeping them is a good habit.</p>
 
 <h2>A few small writing rules</h2>
-<ul><li>Put one command on each line.</li><li>Use straight double quotes around text and selectors.</li><li>Keep the opening and closing quotes together. A missing quote changes how the line is read.</li><li>Close each test with <code>end</code>.</li><li>Use <code>#</code> outside quotes to begin a comment for humans. Bruster ignores the rest of that comment line.</li></ul>
+<ul><li>Put one command on each line.</li><li>Use straight double quotes around text and selectors.</li><li>Make sure every opening quote has a closing quote. A missing quote changes how the line is read.</li><li>Close each test with <code>end</code>.</li><li>Use <code>#</code> outside quotes to begin a comment for humans. Bruster ignores the comment, from the <code>#</code> to the end of that line.</li></ul>
 <p>For example, <code># Check the page title</code> is a comment. Later you will see <code>"#name"</code> inside quotes; that is a selector, not a comment. The quotation marks make the difference.</p>
 
 <section class="exercise"><h2>Try it: rename the check</h2><p>Change the test name to <code>"my first website check"</code>, save the file, and run it again. Leave the expected title unchanged.</p><details><summary>What should change?</summary><p>The PASS line should use your new test name. The check should still pass, because changing its name did not change the page or expected title.</p></details></section>

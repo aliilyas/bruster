@@ -6,12 +6,12 @@
 <p>For example, <code>expect text "#result h2" "Smoke test created for Bruster"</code> can wait for that heading and text to appear. It does not need you to place a fixed pause before the assertion.</p>
 <p>If the result is already correct, the assertion can finish immediately. A five-second deadline is a maximum wait for that step, not a mandatory five-second pause.</p>
 
-<h2>Understand timeout in ordinary time</h2>
+<h2>Understand timeouts</h2>
 <p>A <strong>timeout</strong> is a limit on how long a step may wait. Bruster’s default per-step deadline is 5,000 milliseconds. There are 1,000 milliseconds in a second, so that means five seconds.</p>
 <p>You can write the deadline near the top of a test file, outside the test blocks:</p>
 <div class="command"><span class="command-label">File setting</span><pre><code>base_url "https://aliilyas.github.io/bruster/demo/"
 timeout 5000</code></pre></div>
-<p>This setting is applied to each step. It is not a promise that the whole test file will finish in five seconds. A file can contain many steps, browser startup, and report work.</p>
+<p>This setting is applied to each step. It is not a promise that the whole test file will finish in five seconds. Running a file can involve many steps, plus time to start the browser and save reports.</p>
 
 <h2>Why a fixed pause is a weak substitute</h2>
 <p>Imagine always waiting three seconds before checking a receipt. If the receipt appears after half a second, you wasted the rest of the wait. If it appears after four seconds, the pause was not long enough.</p>
@@ -19,9 +19,9 @@ timeout 5000</code></pre></div>
 <p>You do not need to add a sleep command to the course examples. Use the built-in assertions to describe the state you want to observe.</p>
 
 <h2>Actions and assertions do different jobs</h2>
-<p>An action such as <code>click</code> runs once using Bruster’s actionability checks. An assertion retries its observation. Bruster does not repeatedly click Submit until the test passes.</p>
+<p>Before a <code>click</code>, Bruster waits for the target to be ready—for example, visible and enabled. It then performs the click once. An assertion, in contrast, repeats its observation until the result matches or the timeout is reached. Bruster does not repeatedly click Submit until the test passes.</p>
 <p>This distinction matters. Repeating a click could submit something twice. Repeating a read of the receipt is normally the intended way to wait for the result.</p>
-<p>If you later use the advanced <code>expect js</code> command, keep its expression read-only for the same reason. You will not need that command for the core exercises in this course.</p>
+<p>If you later use the advanced <code>expect js</code> command, make sure its JavaScript only reads the page rather than changing it, for the same reason. You will not need that command for the core exercises in this course.</p>
 
 <h2>Change a deadline only for a reason</h2>
 <p>You can override a file’s deadline for one run:</p>

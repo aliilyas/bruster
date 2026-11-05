@@ -1,5 +1,5 @@
 <p class="lead">A test asks a clear question and checks the answer. “Does the website work?” is too broad. “Does the receipt show the project I entered?” is something you can actually check.</p>
-<p>Suppose you enter <strong>Bruster</strong> into a field called Project and press a button. A message appears. Was the action successful? You need to read the message to know. A message about a different project would not be the result you wanted.</p>
+<p>Suppose you enter your name, type <strong>Bruster</strong> into the Project field, and submit the form. A message appears. Was the action successful? You need to read the message to know. A message about a different project would not be the result you wanted.</p>
 
 <h2>The three parts of a useful check</h2>
 <ol>
@@ -23,7 +23,7 @@
 <h2>What one passing test can tell you</h2>
 <p>If this check passes, you have evidence about this form, this input, and this result in the browser used for the test. You have not checked every field value or every device.</p>
 <p>For example, submitting a complete form does not show whether a missing project is rejected. That needs another check. Thinking this way helps you choose useful tests without promising more than they cover.</p>
-<p>You may hear the phrase <strong>smoke test</strong>. It means a short check that an important path still works. Our form submission is a good example: it is small, clear, and worth repeating after a change.</p>
+<p>You may hear the phrase <strong>smoke test</strong>. It means a short check that an important task still works. Our form submission is a good example: it is small, clear, and worth repeating after a change.</p>
 
 <section class="exercise"><h2>Try it: improve a vague test</h2><p>Rewrite “Check the form” as a starting point, an action, and an expected result. Use the project name <strong>Garden club</strong>.</p><details><summary>See one possible answer</summary><p>Start on a fresh practice page with no receipt. Enter Ada Lovelace as the name and Garden club as the project. Press Create smoke test. Expect a receipt headed “Smoke test created for Garden club”.</p></details></section>
 <section class="checkpoint"><h2>Check your understanding</h2><p>Is “the button was clicked” enough to prove that the project was submitted correctly?</p><details><summary>Read the answer</summary><p>No. It describes an action. You also need to check the result, such as the correct receipt text.</p></details></section>
