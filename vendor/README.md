@@ -67,6 +67,6 @@ must contain only GLib 0.22 and no `proc-macro-error` or `proc-macro-error-attr`
 
 Once released Wry, Tao, and WebKit bindings all support GTK 0.19 / GLib 0.22,
 update them together, remove the four root overrides, these vendored sources,
-the WebKit Git allowlist entry, and the Docker vendor copy. Regenerate the
+the WebKit Git allowlist entry, and the Docker vendor copy/path filters. Regenerate the
 lockfile and rerun the scans and native tests. Until then the direct Wry/Tao
 requirements are exact so a version update explicitly revisits these patches.
