@@ -6,6 +6,10 @@ updates:
     schedule:
       interval: daily
     open-pull-requests-limit: 5
+    ignore:
+      # Upgrade with GTK/WebKitGTK: their public APIs expose Cairo 0.18 types.
+      - dependency-name: cairo-rs
+        versions: [">=0.19"]
 
   - package-ecosystem: npm
     directories:

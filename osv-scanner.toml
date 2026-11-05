@@ -1,0 +1,10 @@
+# Applies only to lockfiles in this directory, not the npm fixtures.
+# Scope and removal conditions: docs/dependency-security.md#reviewed-exceptions
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0370"
+reason = "proc-macro-error 1.0.4 is a build-time dependency of glib-macros 0.18.5 and gtk3-macros 0.18.2; the GTK3 stack has no compatible replacement."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0429"
+reason = "glib 0.18.5 is required by GTK3/WebKitGTK. Variant::array_iter_str and VariantStrIter have no callers outside glib's own tests/docs in Bruster's resolved Linux dependency graph. Recheck on dependency or GLib usage changes."

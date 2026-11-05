@@ -1,0 +1,11 @@
+# Scope and removal conditions: docs/dependency-security.md#reviewed-exceptions
+vulnerabilities:
+  - id: GHSA-wrw7-89jp-8q8g
+    paths:
+      - Cargo.lock
+    purls:
+      - pkg:cargo/glib@0.18.5
+    statement: >-
+      GTK3/WebKitGTK requires glib 0.18.5. Variant::array_iter_str and
+      VariantStrIter have no callers outside glib's own tests/docs in Bruster's
+      resolved Linux dependency graph. Recheck on dependency or GLib usage changes.

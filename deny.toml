@@ -3,6 +3,11 @@ all-features = true
 
 [advisories]
 git-fetch-with-cli = true
+# GTK3's procedural macros still require this build-time dependency.
+# Scope and removal conditions: docs/dependency-security.md#reviewed-exceptions
+ignore = [
+    { id = "RUSTSEC-2024-0370", reason = "proc-macro-error 1.0.4 is a build-time dependency of glib-macros 0.18.5 and gtk3-macros 0.18.2; the GTK3 stack has no compatible replacement" },
+]
 
 [sources]
 unknown-registry = "deny"

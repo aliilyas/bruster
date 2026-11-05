@@ -148,7 +148,10 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: website-tests-${{ matrix.target }}
-          path: ${{ runner.temp }}/bruster-website-results/
+          # WebView2 can still remove profile lockfiles after browser shutdown.
+          path: |
+            ${{ runner.temp }}/bruster-website-results/
+            !${{ runner.temp }}/bruster-website-results/**/profile/**
           if-no-files-found: warn
           retention-days: 14
       - uses: actions/setup-node@v4
