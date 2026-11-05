@@ -1,0 +1,32 @@
+name: Trivy
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: '38 6 * * *' # Daily at 06:38 UTC.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install Trivy
+        uses: taiki-e/install-action@c509219cf42fba86913069efd0ade2458c59337b # v2.90.1
+        with:
+          tool: trivy
+      - name: Scan repository dependencies including development dependencies
+        shell: bash
+        run: trivy fs --scanners vuln --include-dev-deps --no-progress --exit-code 1 . 2>&1 | tee trivy.txt
+      - name: Retain vulnerability results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: trivy-results
+          path: trivy.txt
+          retention-days: 30

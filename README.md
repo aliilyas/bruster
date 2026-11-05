@@ -7,6 +7,9 @@
 
 [![CI](https://github.com/aliilyas/bruster/actions/workflows/ci.yml/badge.svg)](https://github.com/aliilyas/bruster/actions/workflows/ci.yml)
 [![Dependency audit](https://github.com/aliilyas/bruster/actions/workflows/audit.yml/badge.svg?branch=main)](https://github.com/aliilyas/bruster/actions/workflows/audit.yml)
+[![Cargo deny](https://github.com/aliilyas/bruster/actions/workflows/deny.yml/badge.svg?branch=main)](https://github.com/aliilyas/bruster/actions/workflows/deny.yml)
+[![OSV-Scanner](https://github.com/aliilyas/bruster/actions/workflows/osv.yml/badge.svg?branch=main)](https://github.com/aliilyas/bruster/actions/workflows/osv.yml)
+[![Trivy](https://github.com/aliilyas/bruster/actions/workflows/trivy.yml/badge.svg?branch=main)](https://github.com/aliilyas/bruster/actions/workflows/trivy.yml)
 [![Release](https://img.shields.io/github/v/release/aliilyas/bruster?label=release&color=6ee7f7)](https://github.com/aliilyas/bruster/releases/latest)
 [![Docker Hub](https://img.shields.io/badge/Docker_Hub-ilyastmn%2Fbruster-2496ED?logo=docker&logoColor=white)](https://hub.docker.com/r/ilyastmn/bruster)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -153,6 +156,9 @@ See the [full limitations](docs/reference.md#limits) when choosing a browser bac
 
 Build with `cargo build --release --locked`.
 See [Contributing](CONTRIBUTING.md) for dependencies, tests, and documentation changes.
+
+[Dependency security checks](docs/dependency-security.md): daily RustSec,
+cargo-deny, OSV-Scanner, and Trivy scans, plus Dependabot and Socket setup.
 
 ## License
 
