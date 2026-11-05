@@ -6,6 +6,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -13,8 +17,6 @@ defaults:
   run:
     shell: bash
 
-# Deliberately no concurrency group: GitHub replaces pending runs in a group,
-# even with cancel-in-progress: false. Every merge must retain its measurement.
 jobs:
   macos-timing:
     if: github.ref == 'refs/heads/main'

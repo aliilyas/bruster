@@ -19,6 +19,10 @@ on:
       - 'scripts/package_mcp.py'
       - 'examples/launch-demo/**'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 

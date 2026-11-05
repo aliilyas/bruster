@@ -179,9 +179,10 @@ benchmarks/runs/<commit>-<run-id>-<attempt>/  per-run HTML, Markdown, JSON,
                                             resolved npm manifest and lockfile
 ```
 
-Measurement jobs have **no shared concurrency group**, so close merges do not
-replace pending runs. Publication retries non-fast-forward pushes by fetching
-the latest branch and regenerating history. Results are immutable per run
+Benchmark runs share a concurrency group per workflow and ref. A new run cancels
+older running or pending runs for that ref, so closely spaced merges may not each
+produce measurements. Publication retries non-fast-forward pushes by fetching
+the latest branch and regenerating history. Published results are immutable per run
 attempt; “latest” is chosen by workflow invocation number, not completion order.
 Explicitly published local validations use a separate `local-<timestamp>` record
 ID and a visible local-run label. Their context records the measured Bruster
@@ -198,8 +199,8 @@ Relevant website and test-lab source changes on `main` also trigger the combined
 A failure in the separate macOS job does not block validated Linux results.
 If Linux validation fails, only the previously published measurements are deployed.
 A `GITHUB_TOKEN` push alone does not trigger another push workflow or a Pages
-build. Only deployments are coalesced; every measurement has already been
-persisted. Each deployment reads both latest branches after taking the Pages lock,
+build. New deployment runs also cancel older runs for the same ref.
+Each deployment reads both latest branches after taking the workflow concurrency lock,
 builds the pinned framework fixtures, validates the lab, and assembles one artifact
 containing documentation, benchmarks, and `test-lab/`. Benchmark history and
 custom-domain configuration are preserved.

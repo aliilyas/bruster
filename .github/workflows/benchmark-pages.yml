@@ -47,6 +47,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -77,15 +81,12 @@ jobs:
       contents: read
       pages: write
       id-token: write
-    # Fetch both branches after taking the deployment lock. An older workflow
-    # completion must not put stale source or measurements back on the live site.
-    concurrency:
-      group: github-pages
-      cancel-in-progress: false
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      # Always read the latest branches. An older benchmark completion must not
+      # put stale source or measurements back on the live site.
       - uses: actions/checkout@v7
         with:
           ref: main
