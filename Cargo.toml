@@ -23,6 +23,9 @@ gtk = "0.18"
 webkit2gtk = { version = "=2.0.2", features = ["v2_38"] }
 # Must match the Cairo types returned by GTK 0.18 and WebKitGTK 2.0.
 cairo-rs = { version = "0.18", features = ["png"] }
+png = "0.18"
+# Use the system zlib already required by GTK, with Rust's PNG row filters.
+flate2 = { version = "1", default-features = false, features = ["zlib"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 webview2-com = "0.39"
