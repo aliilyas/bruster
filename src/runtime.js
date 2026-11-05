@@ -870,6 +870,9 @@
   }
 
   function wrapsOne(el, readText) {
+    // Plain paragraphs/list items cannot wrap another snapshot element. Avoid
+    // constructing an empty TreeWalker for this common small-page case.
+    if (!el.firstElementChild) return false;
     let only = null;
     for (const kid of elements(el)) {
       if (!kid.matches(SNAPSHOT_TAGS)) continue;
