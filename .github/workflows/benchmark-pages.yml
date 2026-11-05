@@ -124,7 +124,7 @@ jobs:
         run: |
           python3 scripts/test_lab.py assemble --existing _site --output published --frameworks "$RUNNER_TEMP/lab-frameworks" --base-url "$SITE_URL"
           node scripts/test_lab_check.mjs published/test-lab
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: published
       - uses: actions/deploy-pages@v5
