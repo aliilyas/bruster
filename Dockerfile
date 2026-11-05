@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # Pin multi-platform indexes so amd64 and arm64 use the same base-image release.
-FROM rust:1.90.0-slim-bookworm@sha256:64232e656c058f4468e8d024e990acff04f0fd5a5c0a88a574dc37773d7325c9 AS build
+FROM rust:1.99.0-slim-bookworm@sha256:2c3a22f0a5533ea2dd5a16627bc841228151faa2d4de2644ac9987e4a2f1f2fa AS build
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends dbus-x11 libwebkit2gtk-4.1-dev pkg-config \
