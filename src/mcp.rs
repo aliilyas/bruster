@@ -122,7 +122,7 @@ pub fn incoming(line: &str, mut cancel: impl FnMut(u64)) -> Result<Option<Reques
                 rpc_error(id, INVALID_PARAMS, "tools/call: missing name");
                 return Ok(None);
             };
-            if !tools().iter().any(|t| t["name"] == name) {
+            if !tool_specs().iter().any(|spec| spec.0 == name) {
                 rpc_error(id, INVALID_PARAMS, format!("unknown tool '{name}'"));
                 return Ok(None);
             }
@@ -393,9 +393,18 @@ fn tools() -> &'static [Value] {
     TOOLS.get_or_init(build_tools)
 }
 
-fn build_tools() -> Vec<Value> {
-    const TARGET: &str = "target";
-    let specs: &[(&str, &str, &str, &[&str])] = &[
+const TARGET: &str = "target";
+type ToolSpec = (
+    &'static str,
+    &'static str,
+    &'static str,
+    &'static [&'static str],
+);
+
+// Validate calls from the static names. The first browser command should not
+// allocate every JSON schema; only tools/list needs those cached definitions.
+fn tool_specs() -> &'static [ToolSpec] {
+    &[
         ("navigate", "Open a URL and wait for it. until: load (default), dom (DOMContentLoaded, fastest, fine for server-rendered pages) or idle (load plus a quiet network).", "url,until,timeout", &["url"]),
         ("snapshot", "List visible elements and text with refs usable in other tools, one per line: ref role \"name\" href=... selector scopes to a subtree, max caps the list, boxes adds rects, format=json for objects.", "selector,max,boxes,format", &[]),
         ("find", "Snapshot narrowed to elements whose name, text, value or href contains text or matches regex.", "text,regex,selector,max,boxes,format", &[]),
@@ -439,9 +448,11 @@ fn build_tools() -> Vec<Value> {
         ("tabs", "List open tabs.", "", &[]),
         ("switch_tab", "Make a tab the default for later calls.", "tab", &["tab"]),
         ("close_tab", "Close a tab; the last tab cannot be closed (use close to shut down).", "", &[]),
-    ];
+    ]
+}
 
-    specs
+fn build_tools() -> Vec<Value> {
+    tool_specs()
         .iter()
         .map(|(name, desc, props, required)| {
             let mut properties = serde_json::Map::new();
@@ -528,6 +539,8 @@ mod tests {
             r#"{"z":[1,null,false],"a":"line\nend"}"#,
             r#"{"png_base64":"YWJj","other":[1,2]}"#,
             r#"{"png_base64":false}"#,
+            "{\r\n  \"text\": \"escaped\\n雪\",\n  \"rows\": [1, null]\r\n}",
+            "{\n  \"png_base64\": \"YWJj\",\n  \"other\": [1, 2]\n}",
         ] {
             let raw: &RawValue = serde_json::from_str(source).unwrap();
             let value: Value = serde_json::from_str(source).unwrap();

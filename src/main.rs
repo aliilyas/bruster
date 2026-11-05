@@ -1905,9 +1905,12 @@ fn build_webview(
         .with_initialization_script(RUNTIME_JS)
         .with_ipc_handler(move |req| {
             if let Ok(body) = serde_json::from_str::<PageReply>(req.body()) {
-                // Raw JSON may contain whitespace supplied by page code.
-                // Preserve the one-line protocol even for custom IPC.
-                if !body.result.get().contains(['\n', '\r']) {
+                // MCP escapes object whitespace inside a text string. Native
+                // replies embed raw JSON, so pretty-printed custom IPC must use
+                // the compacting fallback to preserve one record per line.
+                if mcp::enabled()
+                    || memchr::memchr2(b'\n', b'\r', body.result.get().as_bytes()).is_none()
+                {
                     let mut p = ipc_pending.borrow_mut();
                     if !p.take_page_reply(body.id, Some(body.document), Some(body.attempt)) {
                         return;

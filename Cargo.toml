@@ -10,6 +10,7 @@ wry = "0.57"
 tao = "0.37"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["raw_value"] }
+memchr = "2"
 url = "2"
 
 [target.'cfg(unix)'.dependencies]

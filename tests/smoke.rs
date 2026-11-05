@@ -2268,6 +2268,12 @@ fn speaks_mcp() {
     );
     notify("notifications/initialized", json!({}));
 
+    // A client can issue its first browser command before requesting schemas.
+    let tabs = rpc(call(json!("before-list"), "tabs", json!({})));
+    let tabs: Value =
+        serde_json::from_str(tabs["result"]["content"][0]["text"].as_str().unwrap()).unwrap();
+    assert_eq!(tabs.as_array().unwrap().len(), 1);
+
     let tools = rpc(json!({ "jsonrpc": "2.0", "id": 2, "method": "tools/list" }));
     let tools = tools["result"]["tools"].as_array().unwrap();
     assert!(tools.iter().any(|t| t["name"] == "snapshot"));
@@ -2399,6 +2405,29 @@ fn speaks_mcp() {
                 .unwrap_or_else(|| value.to_string())
         );
     }
+
+    // Pretty-printed custom IPC stays a single JSON-RPC line. Stale document
+    // and attempt replies must still be rejected before the raw MCP fast path.
+    rpc(call(
+        json!("install-pretty"),
+        "eval",
+        json!({ "expression": r#"(() => {
+            const original = __bruster.run;
+            __bruster.run = (id, method, params, attempt) => {
+                if (method !== 'title') return original(id, method, params, attempt);
+                __bruster.run = original;
+                const reply = { id, attempt, result: { text: 'escaped\n雪', rows: [1, null] },
+                    document: __bruster.document, generation: __bruster.generation };
+                window.ipc.postMessage(JSON.stringify({...reply, attempt: attempt - 1, result: 'stale'}));
+                window.ipc.postMessage(JSON.stringify({...reply, document: 'old-document', result: 'stale'}));
+                window.ipc.postMessage(JSON.stringify(reply, null, 2).replace(/\n/g, '\r\n'));
+            };
+        })()"# }),
+    ));
+    let pretty = rpc(call(json!("pretty"), "title", json!({})));
+    let pretty: Value =
+        serde_json::from_str(pretty["result"]["content"][0]["text"].as_str().unwrap()).unwrap();
+    assert_eq!(pretty, json!({ "text": "escaped\n雪", "rows": [1, null] }));
 
     // tab argument is routed, not passed to the page.
     let t2 = rpc(call(json!(7), "new_tab", json!({})));
