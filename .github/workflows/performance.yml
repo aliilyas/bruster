@@ -7,7 +7,7 @@ on:
     inputs:
       baseline:
         description: Baseline revision
-        default: v0.3.5
+        default: v0.3.6
         required: true
       rounds:
         description: Alternating pairs per transport (20 minimum for publication)
@@ -15,7 +15,7 @@ on:
         required: true
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.baseline || 'v0.3.6' }}
   cancel-in-progress: true
 
 permissions:
@@ -34,7 +34,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     env:
-      BASELINE: ${{ inputs.baseline || 'v0.3.5' }}
+      BASELINE: ${{ inputs.baseline || 'v0.3.6' }}
       ROUNDS: ${{ inputs.rounds || '20' }}
     steps:
       - uses: actions/checkout@v7
@@ -80,7 +80,7 @@ jobs:
           if [ "$RUNNER_OS" = Linux ]; then set -- xvfb-run -a; else set --; fi
           "$@" python3 scripts/bench_optimizations.py \
             --baseline "$RUNNER_TEMP/baseline-bruster" --candidate "$RUNNER_TEMP/candidate-bruster" \
-            --rounds "$ROUNDS" --output "$RUNNER_TEMP/performance/paired"
+            --rounds "$ROUNDS" --iterations 24 --output "$RUNNER_TEMP/performance/paired"
       - name: Report and retain evidence
         if: always()
         run: |

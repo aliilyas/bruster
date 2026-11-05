@@ -1,6 +1,6 @@
 # Stepwise performance experiments
 
-The candidate targets these costs, with each stage checked before proceeding:
+The v0.3.6 experiments targeted these costs, with each stage checked before proceeding:
 
 1. **Snapshots:** cache text and ancestor predicates only for the duration of one
    snapshot; avoid naming text-role elements whose name would be discarded.
@@ -116,6 +116,33 @@ after this workload was about 4.5% lower through either transport.
   display and DPR 1, not guarantees for every page or a pooled overall speedup.
   The reports include all metrics, including neutral and slower results.
 
+## v0.3.6 regression follow-up
+
+The follow-up compares against both v0.3.6 and current main. Its changes target
+the reported small-snapshot, MCP startup, native large-reply and Linux PNG-size
+regressions:
+
+- Skip empty descendant walkers for leaf paragraphs and list items. Keep the
+  snapshot-local caches and existing shadow-root/visibility semantics.
+- Validate MCP tool names from static specifications; construct JSON schemas
+  when `tools/list` actually needs them. Tool calls before listing are supported.
+- Use a byte search for native reply line breaks. MCP already escapes object
+  whitespace inside its text content, so it can skip that scan. Pretty-printed
+  IPC, escaped Unicode and stale document/attempt filtering have coverage.
+- Stream opaque Linux screenshots through Rust PNG row filters and system zlib
+  at balanced compression (level 6). File output and inline output use the same
+  encoder. A conversion row, encoder row buffers and a 64 KiB IDAT buffer replace
+  the full RGB allocation; this also handles images beyond the old 1 MP cutoff.
+  Transparent and non-image surfaces retain Cairo's conversion. Pixel tests cover
+  alpha, padded rows, native-endian RGB24, backing scale and partial write failures.
+
+The initial six-pair local protocol comparison had broad intervals and mixed
+results; it does **not** establish end-to-end gains. In-page snapshot and encoder
+probes are diagnostic too. The clean paired workflow retains the complete
+comparison, including PNG byte counts, neutral/slower metrics, correctness and
+shutdown checks. Separate baseline inputs can run concurrently without cancelling
+one another. No general startup improvement is claimed from the microbenchmarks.
+
 ## Reproduce
 
 Build baseline and candidate with the same Rust toolchain and release flags,
@@ -127,7 +154,7 @@ matches the correctness-tested executable. On an otherwise idle Linux runner:
 ```sh
 xvfb-run -a python3 scripts/bench_optimizations.py \
   --baseline /path/to/baseline-bruster --candidate /path/to/candidate-bruster \
-  --output results --rounds 20 --iterations 12
+  --output results --rounds 20 --iterations 24
 ```
 
 On macOS omit `xvfb-run -a`. Native screenshot dimensions follow the measured
@@ -153,7 +180,7 @@ compression bytes are intentionally compared separately from pixel correctness.
 Two warmup operations precede repeated timings. Reports use per-session medians
 and paired geometric ratios with seeded, pointwise 95% bootstrap intervals.
 The p95 columns are medians of each session's p95: useful diagnostics, with only
-12 observations per repeated workload by default. Screenshot and fetch samples
+12 observations per repeated workload by script default (24 in CI). Screenshot and fetch samples
 are smaller; their p95s are observed upper samples rather than robust tail estimates.
 Bootstrap intervals are not an all-metric performance gate.
 
