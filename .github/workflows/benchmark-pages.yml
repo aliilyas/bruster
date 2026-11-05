@@ -113,7 +113,7 @@ jobs:
           python3 -m unittest discover -s scripts -p 'test_site_*.py'
           python3 -m unittest discover -s scripts -p 'test_bench_publish.py'
           python3 -m unittest discover -s scripts -p 'test_test_lab.py'
-      - uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@v6
         id: pages
       - name: Build website with published measurements
         env:
