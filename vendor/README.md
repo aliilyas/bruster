@@ -27,8 +27,10 @@ d5777b06fe6435126ae8d816eba269e050e1e10d302cf5461e9c49eccabc3548  tao-0.37.2.cra
 ```
 
 Upstream licenses, source attribution, and `.cargo_vcs_info.json` are retained.
-The registry's `.cargo-ok` marker, redundant `Cargo.toml.orig`, and upstream
-development lockfiles are omitted; Bruster's root lockfile resolves the build.
+The registry's `.cargo-ok` marker, redundant `Cargo.toml.orig`, upstream
+development lockfiles, and Wry's development-only `.cargo/` configuration
+(including its audit exceptions) are omitted; Bruster's root lockfile and Cargo
+configuration resolve the build.
 Upstream's `LICENSE.spdx` metadata text is retained as `LICENSE.spdx.txt`
 (with a trailing newline normalized where needed):
 it is not a valid SPDX SBOM (`DataFormat` is an unknown tag), and the `.txt`
