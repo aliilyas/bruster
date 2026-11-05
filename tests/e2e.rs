@@ -17,7 +17,13 @@ use common::*;
 const SITE_TIMEOUT: u64 = 20_000;
 
 fn names(snap: &Value) -> Vec<String> {
-    snap["elements"].as_array().unwrap().iter().filter_map(|e| e["name"].as_str().or(e["text"].as_str())).map(str::to_owned).collect()
+    snap["elements"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|e| e["name"].as_str().or(e["text"].as_str()))
+        .map(str::to_owned)
+        .collect()
 }
 
 #[test]
@@ -25,8 +31,14 @@ fn names(snap: &Value) -> Vec<String> {
 fn search_engine_results() {
     let mut b = Browser::spawn();
     b.open("https://duckduckgo.com/html/");
-    b.ok("type", json!({ "selector": "input[name=q]", "text": "webkitgtk", "submit": true }));
-    b.ok("wait_for", json!({ "text": "webkitgtk", "timeout": SITE_TIMEOUT }));
+    b.ok(
+        "type",
+        json!({ "selector": "input[name=q]", "text": "webkitgtk", "submit": true }),
+    );
+    b.ok(
+        "wait_for",
+        json!({ "text": "webkitgtk", "timeout": SITE_TIMEOUT }),
+    );
     let hits = b.ok("find", json!({ "regex": "webkit", "selector": "#links" }));
     assert!(hits["elements"].as_array().unwrap().len() >= 3, "{hits}");
 }
@@ -36,18 +48,27 @@ fn search_engine_results() {
 fn login_form_error_under_csp() {
     let mut b = Browser::spawn();
     b.open("https://news.ycombinator.com/login");
-    b.ok("fill_form", json!({ "fields": [
+    b.ok(
+        "fill_form",
+        json!({ "fields": [
         { "selector": "input[name=acct]", "value": "bruster-no-such-user" },
         { "selector": "input[name=pw]", "value": "x" },
-    ] }));
-    b.ok("press", json!({ "selector": "input[name=pw]", "key": "Enter" }));
+    ] }),
+    );
+    b.ok(
+        "press",
+        json!({ "selector": "input[name=pw]", "key": "Enter" }),
+    );
     let t = Instant::now();
     loop {
         let body = b.ok("text", json!({ "selector": "body" }));
         let body = body.as_str().unwrap();
         // HN answers cloud IPs with a bot check instead of the login error; both
         // prove the form was submitted and the reply rendered.
-        if ["Bad login", "Validation required", "Sorry"].iter().any(|k| body.contains(*k)) {
+        if ["Bad login", "Validation required", "Sorry"]
+            .iter()
+            .any(|k| body.contains(*k))
+        {
             break;
         }
         assert!(t.elapsed() < Duration::from_millis(SITE_TIMEOUT), "{body}");
@@ -63,14 +84,25 @@ fn wiki_retry_rate_limit(b: &mut Browser) {
     // reloading preserves the history entry the test is exercising.
     for attempt in 0..=3 {
         let page = b.ok("snapshot", json!({}));
-        let limited = page["title"] == "Wikimedia Error" && page["elements"].as_array().unwrap().iter()
-            .any(|e| e["text"].as_str().is_some_and(|s| s.contains("Error: 429")));
+        let limited = page["title"] == "Wikimedia Error"
+            && page["elements"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|e| e["text"].as_str().is_some_and(|s| s.contains("Error: 429")));
         if !limited {
             return;
         }
-        assert!(attempt < 3, "Wikipedia still rate-limited after three reloads: {page}");
+        assert!(
+            attempt < 3,
+            "Wikipedia still rate-limited after three reloads: {page}"
+        );
         let seconds = 15 << attempt;
-        eprintln!("Wikipedia HTTP 429 at {}; waiting {seconds}s before reload {} of 3", page["url"], attempt + 1);
+        eprintln!(
+            "Wikipedia HTTP 429 at {}; waiting {seconds}s before reload {} of 3",
+            page["url"],
+            attempt + 1
+        );
         std::thread::sleep(Duration::from_secs(seconds));
         b.ok("reload", json!({}));
     }
@@ -79,20 +111,30 @@ fn wiki_retry_rate_limit(b: &mut Browser) {
 fn wiki_history_page(b: &mut Browser, url: &Value) -> Value {
     // MediaWiki replaces analytics and default namespace/profile parameters
     // after rendering. Compare the actual page and decoded search query.
-    b.ok("eval", json!({ "expression": format!(r#"(() => {{
+    b.ok(
+        "eval",
+        json!({ "expression": format!(r#"(() => {{
         const u = new URL({url});
         return {{ origin: u.origin, path: u.pathname, fragment: u.hash,
             title: u.searchParams.get('title'), search: u.searchParams.get('search') }};
-    }})()"#) }))
+    }})()"#) }),
+    )
 }
 
 fn wiki_back_page(b: &mut Browser) -> Value {
     let back = b.ok("back", json!({}));
-    assert!(back["url"].is_string(), "Wikipedia history ended before the entry page: {back}");
+    assert!(
+        back["url"].is_string(),
+        "Wikipedia history ended before the entry page: {back}"
+    );
     wiki_retry_rate_limit(b);
     let current = b.ok("url", json!({}));
     let page = wiki_history_page(b, &back["url"]);
-    assert_eq!(page, wiki_history_page(b, &current), "back reply disagrees with live URL: {back}; {current}");
+    assert_eq!(
+        page,
+        wiki_history_page(b, &current),
+        "back reply disagrees with live URL: {back}; {current}"
+    );
     eprintln!("Wikipedia back: {}", back["url"]);
     page
 }
@@ -105,7 +147,14 @@ fn wiki_search_then_back() {
     // Reuse the browser's asset cache and pace the routes to avoid bursts of
     // uncached requests from fresh WebView2 profiles.
     let mut b = Browser::spawn_with(&["--viewport", "1400x800"]);
-    for (route, (width, page)) in [(1400, "Main_Page"), (900, "Main_Page"), (900, "Special:Search")].into_iter().enumerate() {
+    for (route, (width, page)) in [
+        (1400, "Main_Page"),
+        (900, "Main_Page"),
+        (900, "Special:Search"),
+    ]
+    .into_iter()
+    .enumerate()
+    {
         if route > 0 {
             std::thread::sleep(Duration::from_secs(15));
             b.ok("resize", json!({ "width": width, "height": 800 }));
@@ -124,7 +173,11 @@ fn wiki_search_then_back() {
             if let Some(input) = visible_input_named(&mut b, "search") {
                 break input;
             }
-            assert!(start.elapsed() < Duration::from_millis(SITE_TIMEOUT), "no visible Wikipedia search input at {viewport} {page}: {:?}", b.call("snapshot", json!({})));
+            assert!(
+                start.elapsed() < Duration::from_millis(SITE_TIMEOUT),
+                "no visible Wikipedia search input at {viewport} {page}: {:?}",
+                b.call("snapshot", json!({}))
+            );
             if !toggled && b.ok("eval", json!({ "expression": "!!document.querySelector('#p-search .search-toggle')?.checkVisibility()" })) == true {
                 // The toggle can expand inline or follow its Special:Search href.
                 b.ok("click", json!({ "selector": "#p-search .search-toggle" }));
@@ -136,25 +189,49 @@ fn wiki_search_then_back() {
             }
         };
         let entry_url = b.ok("url", json!({}));
-        b.ok("type", json!({ "ref": input, "text": "WebKitGTK", "submit": true }));
+        b.ok(
+            "type",
+            json!({ "ref": input, "text": "WebKitGTK", "submit": true }),
+        );
         wiki_retry_rate_limit(&mut b);
         let mut result_url = b.ok("url", json!({}));
         // Special:Search submits a full-text search rather than jumping
         // straight to the article as the header's search does.
         let results_page = !result_url.as_str().unwrap().contains("/wiki/WebKit");
         if results_page {
-            let found = b.ok("find", json!({ "regex": "^WebKit(?:GTK)?$", "selector": "#mw-content-text" }));
-            let link = found["elements"].as_array().unwrap().iter()
-                .find(|e| e["role"] == "link" && e["href"].as_str().is_some_and(|url| url.contains("/wiki/WebKit")))
+            let found = b.ok(
+                "find",
+                json!({ "regex": "^WebKit(?:GTK)?$", "selector": "#mw-content-text" }),
+            );
+            let link = found["elements"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|e| {
+                    e["role"] == "link"
+                        && e["href"]
+                            .as_str()
+                            .is_some_and(|url| url.contains("/wiki/WebKit"))
+                })
                 .unwrap_or_else(|| panic!("no WebKit result at {result_url}: {found}"));
             result_url = b.ok("url", json!({}));
             b.ok("click", json!({ "ref": link["ref"] }));
             wiki_retry_rate_limit(&mut b);
         }
-        b.ok("wait_for", json!({ "url": "/wiki/WebKit", "timeout": SITE_TIMEOUT }));
-        assert!(b.ok("title", json!({})).as_str().unwrap().contains("WebKit"));
+        b.ok(
+            "wait_for",
+            json!({ "url": "/wiki/WebKit", "timeout": SITE_TIMEOUT }),
+        );
+        assert!(b
+            .ok("title", json!({}))
+            .as_str()
+            .unwrap()
+            .contains("WebKit"));
         let snap = b.ok("snapshot", json!({ "format": "text" }));
-        assert!(snap.as_str().unwrap().lines().count() > 100, "thin snapshot");
+        assert!(
+            snap.as_str().unwrap().lines().count() > 100,
+            "thin snapshot"
+        );
         eprintln!("Wikipedia {viewport} {page}: entry={entry_url}, search={result_url}");
         let entry_page = wiki_history_page(&mut b, &entry_url);
         let search_page = wiki_history_page(&mut b, &result_url);
@@ -171,7 +248,10 @@ fn wiki_search_then_back() {
             }
             assert!(results_page, "unexpected intermediate history page: {back}");
             assert_eq!(back, search_page);
-            assert!(step < 3, "back never reached the search-entry page: {entry_url}");
+            assert!(
+                step < 3,
+                "back never reached the search-entry page: {entry_url}"
+            );
         }
     }
 }
@@ -182,14 +262,32 @@ fn github_tab_navigation() {
     let mut b = Browser::spawn();
     b.open("https://github.com/tauri-apps/wry");
     let issues = b.ok("find", json!({ "regex": "^Issues" }));
-    let link = issues["elements"].as_array().unwrap().iter().find(|e| e["role"] == "link").expect("issues link");
+    let link = issues["elements"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|e| e["role"] == "link")
+        .expect("issues link");
     b.ok("click", json!({ "ref": link["ref"] }));
-    b.ok("wait_for", json!({ "url": "/issues", "timeout": SITE_TIMEOUT }));
+    b.ok(
+        "wait_for",
+        json!({ "url": "/issues", "timeout": SITE_TIMEOUT }),
+    );
     // The call after a navigating click reads the new page.
     let snap = b.ok("snapshot", json!({}));
-    assert!(names(&snap).iter().any(|n| n.to_lowercase().contains("issue")), "{:?}", &names(&snap)[..10]);
+    assert!(
+        names(&snap)
+            .iter()
+            .any(|n| n.to_lowercase().contains("issue")),
+        "{:?}",
+        &names(&snap)[..10]
+    );
     // GitHub sends a CSP without unsafe-eval; eval must still work.
-    assert!(b.ok("eval", json!({ "expression": "location.pathname" })).as_str().unwrap().ends_with("/issues"));
+    assert!(b
+        .ok("eval", json!({ "expression": "location.pathname" }))
+        .as_str()
+        .unwrap()
+        .ends_with("/issues"));
 }
 
 #[test]
@@ -198,10 +296,24 @@ fn mdn_sidebar_link() {
     let mut b = Browser::spawn();
     b.open("https://developer.mozilla.org/en-US/docs/Web/API/TreeWalker");
     let link = b.ok("find", json!({ "regex": "^NodeIterator$" }));
-    let link = link["elements"].as_array().unwrap().iter().find(|e| e["role"] == "link").expect("link");
+    let link = link["elements"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|e| e["role"] == "link")
+        .expect("link");
     b.ok("click", json!({ "ref": link["ref"] }));
-    b.ok("wait_for", json!({ "url": "NodeIterator", "timeout": SITE_TIMEOUT }));
-    assert_eq!(b.ok("text", json!({ "selector": "h1" })).as_str().unwrap().trim(), "NodeIterator");
+    b.ok(
+        "wait_for",
+        json!({ "url": "NodeIterator", "timeout": SITE_TIMEOUT }),
+    );
+    assert_eq!(
+        b.ok("text", json!({ "selector": "h1" }))
+            .as_str()
+            .unwrap()
+            .trim(),
+        "NodeIterator"
+    );
 }
 
 #[test]
@@ -210,12 +322,19 @@ fn news_site_headlines_and_screenshot() {
     let mut b = Browser::spawn();
     b.open("https://www.bbc.com/news");
     let snap = b.ok("snapshot", json!({}));
-    let headings = snap["elements"].as_array().unwrap().iter().filter(|e| e["role"] == "heading").count();
+    let headings = snap["elements"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|e| e["role"] == "heading")
+        .count();
     assert!(headings > 10, "{headings} headings");
     let shot = b.ok("screenshot", json!({}));
     assert!(shot["png_base64"].as_str().unwrap().len() > 20_000);
     let full = b.ok("screenshot", json!({ "full": true }));
-    assert!(full["png_base64"].as_str().unwrap().len() > shot["png_base64"].as_str().unwrap().len());
+    assert!(
+        full["png_base64"].as_str().unwrap().len() > shot["png_base64"].as_str().unwrap().len()
+    );
 }
 
 #[test]
@@ -223,12 +342,21 @@ fn news_site_headlines_and_screenshot() {
 fn react_app_keyboard() {
     let mut b = Browser::spawn();
     b.open("https://demo.playwright.dev/todomvc/");
-    b.ok("fill", json!({ "selector": ".new-todo", "value": "walk the dog" }));
+    b.ok(
+        "fill",
+        json!({ "selector": ".new-todo", "value": "walk the dog" }),
+    );
     b.ok("press", json!({ "selector": ".new-todo", "key": "Enter" }));
-    b.ok("wait_for", json!({ "text": "walk the dog", "selector": ".todo-list", "timeout": 5000 }));
+    b.ok(
+        "wait_for",
+        json!({ "text": "walk the dog", "selector": ".todo-list", "timeout": 5000 }),
+    );
     assert_eq!(b.ok("count", json!({ "selector": ".todo-list li" })), 1);
     b.ok("check", json!({ "selector": ".todo-list .toggle" }));
-    assert_eq!(b.ok("count", json!({ "selector": ".todo-list li.completed" })), 1);
+    assert_eq!(
+        b.ok("count", json!({ "selector": ".todo-list li.completed" })),
+        1
+    );
 }
 
 #[test]
@@ -238,39 +366,74 @@ fn interaction_playground() {
     let site = "https://the-internet.herokuapp.com";
 
     // A free Heroku dyno can take a while to wake up.
-    let open = |b: &mut Browser, path: &str| b.ok("navigate", json!({ "url": format!("{site}{path}"), "timeout": 90_000 }));
+    let open = |b: &mut Browser, path: &str| {
+        b.ok(
+            "navigate",
+            json!({ "url": format!("{site}{path}"), "timeout": 90_000 }),
+        )
+    };
     open(&mut b, "/login");
     b.ok("fill_form", json!({ "fields": [{ "selector": "#username", "value": "tomsmith" }, { "selector": "#password", "value": "SuperSecretPassword!" }] }));
     b.ok("click", json!({ "selector": "button[type=submit]" }));
-    b.ok("wait_for", json!({ "url": "/secure", "timeout": SITE_TIMEOUT }));
-    assert!(b.ok("find", json!({ "text": "logged into" }))["elements"].as_array().unwrap().len() >= 1);
+    b.ok(
+        "wait_for",
+        json!({ "url": "/secure", "timeout": SITE_TIMEOUT }),
+    );
+    assert!(!b.ok("find", json!({ "text": "logged into" }))["elements"]
+        .as_array()
+        .unwrap()
+        .is_empty());
 
     open(&mut b, "/javascript_alerts");
     b.ok("dialog", json!({ "accept": true, "text": "bruster" }));
     let prompt = b.ok("find", json!({ "regex": "JS Prompt$" }));
     b.ok("click", json!({ "ref": prompt["elements"].as_array().unwrap().iter().find(|e| e["role"] == "button").unwrap()["ref"] }));
-    assert_eq!(b.ok("text", json!({ "selector": "#result" })), "You entered: bruster");
+    assert_eq!(
+        b.ok("text", json!({ "selector": "#result" })),
+        "You entered: bruster"
+    );
 
     open(&mut b, "/drag_and_drop");
-    b.ok("drag", json!({ "from": { "selector": "#column-a" }, "to": { "selector": "#column-b" } }));
+    b.ok(
+        "drag",
+        json!({ "from": { "selector": "#column-a" }, "to": { "selector": "#column-b" } }),
+    );
     assert_eq!(b.ok("text", json!({ "selector": "#column-a header" })), "B");
 
     open(&mut b, "/dynamic_loading/2");
     b.ok("click", json!({ "selector": "#start button" }));
-    b.ok("wait_for", json!({ "text": "Hello World!", "timeout": SITE_TIMEOUT }));
+    b.ok(
+        "wait_for",
+        json!({ "text": "Hello World!", "timeout": SITE_TIMEOUT }),
+    );
 
     open(&mut b, "/windows");
     b.ok("click", json!({ "selector": "a[href='/windows/new']" }));
     let opened = b.wait_event("tab_opened");
     let t = opened["tab"].as_u64().unwrap();
     b.wait_load(t);
-    assert_eq!(b.ok("text", json!({ "tab": t, "selector": "h3" })), "New Window");
+    assert_eq!(
+        b.ok("text", json!({ "tab": t, "selector": "h3" })),
+        "New Window"
+    );
     b.ok("close_tab", json!({ "tab": t }));
 
     open(&mut b, "/dropdown");
-    assert_eq!(b.ok("select", json!({ "selector": "#dropdown", "value": "Option 2" })), json!(["2"]));
+    assert_eq!(
+        b.ok(
+            "select",
+            json!({ "selector": "#dropdown", "value": "Option 2" })
+        ),
+        json!(["2"])
+    );
     open(&mut b, "/checkboxes");
-    assert_eq!(b.ok("check", json!({ "selector": "#checkboxes input:first-child" })), true);
+    assert_eq!(
+        b.ok(
+            "check",
+            json!({ "selector": "#checkboxes input:first-child" })
+        ),
+        true
+    );
 }
 
 #[test]
@@ -294,8 +457,15 @@ fn cold_and_warm_navigation() {
     let mut b = Browser::spawn();
     b.open("https://en.wikipedia.org/wiki/WebKit");
     wiki_retry_rate_limit(&mut b);
-    assert!(b.ok("title", json!({})).as_str().unwrap().contains("WebKit"));
-    b.ok("navigate", json!({ "url": "https://en.wikipedia.org/wiki/Blink_(browser_engine)", "until": "dom" }));
+    assert!(b
+        .ok("title", json!({}))
+        .as_str()
+        .unwrap()
+        .contains("WebKit"));
+    b.ok(
+        "navigate",
+        json!({ "url": "https://en.wikipedia.org/wiki/Blink_(browser_engine)", "until": "dom" }),
+    );
     wiki_retry_rate_limit(&mut b);
     assert!(b.ok("title", json!({})).as_str().unwrap().contains("Blink"));
     let snapshot = b.ok("snapshot", json!({ "format": "text" }));

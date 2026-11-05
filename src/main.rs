@@ -714,12 +714,9 @@ fn main() -> wry::Result<()> {
         silence_stderr();
     }
 
-    let init_script = match opt(&args, INIT_SCRIPT_OPT) {
-        Some(p) => Some(
-            std::fs::read_to_string(&p).unwrap_or_else(|e| panic!("{INIT_SCRIPT_OPT} {p}: {e}")),
-        ),
-        None => None,
-    };
+    let init_script = opt(&args, INIT_SCRIPT_OPT).map(|p| {
+        std::fs::read_to_string(&p).unwrap_or_else(|e| panic!("{INIT_SCRIPT_OPT} {p}: {e}"))
+    });
     let opts = Opts {
         // MCP clients never want windows on the desktop; --visible brings them back.
         hidden: (has(HIDDEN_FLAG) || has(MCP_FLAG)) && !has(VISIBLE_FLAG),

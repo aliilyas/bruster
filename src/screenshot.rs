@@ -15,6 +15,7 @@ const MAX_RGB_PIXELS: i64 = 1024 * 1024;
 static CAPTURES: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 pub struct Slot;
 impl Slot {
+    #[allow(deprecated, reason = "try_update is newer than the Rust 1.85 MSRV")]
     pub fn acquire() -> Option<std::sync::Arc<Self>> {
         use std::sync::atomic::Ordering;
         CAPTURES
@@ -31,21 +32,11 @@ impl Drop for Slot {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct Cancellation {
     stopped: std::rc::Rc<std::cell::Cell<bool>>,
     #[cfg(target_os = "linux")]
     native: webkit2gtk::gio::Cancellable,
-}
-
-impl Default for Cancellation {
-    fn default() -> Self {
-        Self {
-            stopped: Default::default(),
-            #[cfg(target_os = "linux")]
-            native: webkit2gtk::gio::Cancellable::new(),
-        }
-    }
 }
 
 impl Cancellation {

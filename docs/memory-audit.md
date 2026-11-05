@@ -599,11 +599,6 @@ amortize display overhead while keeping browser contexts separate. The archived
 saving. Bruster's own auto-Xvfb path already disables GLX; the archived external
 Xvfb command did not, so it is not an A/B result for that optimization.
 
-The existing local Servo study reports 225.57 MiB headless PSS. It used different
-hardware, viewport and workload timing, so comparing it with the 219.32 MiB CI
-figure cannot establish a saving. An engine replacement needs paired equivalent
-workloads plus compatibility validation.
-
 ## 6. Practical steps available now
 
 For Linux text extraction, where image loading and a smaller layout are acceptable:

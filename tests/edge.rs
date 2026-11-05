@@ -31,7 +31,7 @@ fn rss_mb(root: u32) -> u64 {
         parent.insert(pid, ppid.unwrap_or(0));
     }
     let mut total = 0;
-    for (&pid, _) in &parent {
+    for &pid in parent.keys() {
         let mut p = pid;
         let mine = loop {
             if p == root {
@@ -374,7 +374,10 @@ fn page_requests_time_out_without_duplicate_replies() {
     // Install the resolver before starting a short deadline. A busy runner may
     // expire a request before its JavaScript has even been dispatched.
     b.ok("eval", json!({ "expression": "(() => { window.lateReply = new Promise(r => { window.finishLate = r; }); return true; })()" }));
-    let id = b.send("eval", json!({ "expression": "lateReply", "request_timeout": 200 }));
+    let id = b.send(
+        "eval",
+        json!({ "expression": "lateReply", "request_timeout": 200 }),
+    );
     assert!(b.recv(id).unwrap_err().contains("timed out"));
     // Explicitly resolve the old promise: background timer throttling must not
     // turn this into a false pass where the late reply never actually happened.
@@ -703,10 +706,7 @@ fn tabs_and_memory_recover() {
             std::thread::sleep(Duration::from_millis(100));
             after = rss_mb(pid);
         }
-        assert!(
-            after <= limit,
-            "before {before} peak {peak} after {after}"
-        );
+        assert!(after <= limit, "before {before} peak {peak} after {after}");
     }
 
     // Closing the last tab is rejected; the current tab remains usable.

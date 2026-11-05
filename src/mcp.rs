@@ -360,9 +360,7 @@ pub fn rejected(id: u64, message: &str) {
 /// Browser events become log notifications. Nothing goes out before the
 /// client says it is initialized, or above the level it asked for.
 fn event_notification(v: Value) -> Option<Value> {
-    if v.get("event").is_none() {
-        return None;
-    }
+    v.get("event")?;
     if !INITIALIZED.load(Ordering::Relaxed) || LOG_LEVEL.load(Ordering::Relaxed) > EVENT_LEVEL {
         return None;
     }

@@ -20,6 +20,27 @@ cargo build --release --locked
 Run `target/release/bruster` after building. See the
 [installation guide](https://aliilyas.github.io/bruster/docs/#install) for other platforms.
 
+## Lint and format
+
+Install Clippy and rustfmt for your active Rust toolchain:
+
+```sh
+rustup component add clippy rustfmt
+```
+
+From the repository root, run:
+
+```sh
+cargo lint
+cargo fmt-check
+```
+
+`cargo lint` checks all targets (including tests) and features with the locked
+dependencies, treating warnings as errors. It needs the same platform development
+libraries as a build. Clippy reads the minimum supported Rust version from
+`Cargo.toml`; keep fixes compatible with it. Run `cargo fmt --all` to apply
+formatting. CI runs both checks on every supported platform.
+
 ## Tests
 
 The user-facing `.bru` runner is covered by parser unit tests and real-browser
