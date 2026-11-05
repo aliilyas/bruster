@@ -78,7 +78,7 @@ jobs:
           printf '%s\n' "$digest" > "target/digests/${ARCH}"
       - name: Retain the tested image digest
         if: github.repository == 'aliilyas/bruster' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: docker-digest-${{ matrix.arch }}
           path: target/digests/${{ matrix.arch }}
@@ -92,7 +92,7 @@ jobs:
             cat target/docker-results.json >> "$GITHUB_STEP_SUMMARY"
             echo '```' >> "$GITHUB_STEP_SUMMARY"
           fi
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: docker-${{ matrix.arch }}

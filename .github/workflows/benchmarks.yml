@@ -50,7 +50,7 @@ jobs:
           cat "$RUNNER_TEMP/macos-benchmark-results/report.md" >> "$GITHUB_STEP_SUMMARY"
       - name: Retain macOS timings and evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: macos-benchmarks-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/macos-benchmark-results/
@@ -144,7 +144,7 @@ jobs:
           cat "$RESULTS/report.md" >> "$GITHUB_STEP_SUMMARY"
       - name: Retain raw evidence (including failed runs)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: benchmarks-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/benchmark-results/
