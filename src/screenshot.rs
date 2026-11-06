@@ -9,8 +9,6 @@ pub enum Output {
 }
 pub type Done = Box<dyn FnOnce(Result<Output, String>)>;
 pub const MAX_PIXELS: f64 = 24.0 * 1024.0 * 1024.0;
-#[cfg(target_os = "linux")]
-const MAX_RGB_PIXELS: i64 = 1024 * 1024;
 
 static CAPTURES: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 pub struct Slot;
@@ -129,12 +127,10 @@ pub fn capture(wv: &WebView, region: Region, path: Option<String>, cancel: Cance
                     &surface
                 };
                 if let Some(path) = path {
-                    // File output needs no PNG Vec or additional full RGB surface.
+                    // Stream to disk with bounded row/chunk buffers.
                     let file = std::fs::File::create(&path).map_err(|e| e.to_string())?;
                     let mut writer = std::io::BufWriter::new(file);
-                    surface
-                        .write_to_png(&mut writer)
-                        .map_err(|e| e.to_string())?;
+                    write_png(surface, &mut writer)?;
                     use std::io::Write;
                     writer.flush().map_err(|e| e.to_string())?;
                     let bytes = writer
@@ -154,68 +150,84 @@ pub fn capture(wv: &WebView, region: Region, path: Option<String>, cancel: Cance
 
 #[cfg(target_os = "linux")]
 fn to_png(surface: &cairo::Surface) -> Result<Vec<u8>, String> {
+    let mut buf = Vec::new();
+    write_png(surface, &mut buf)?;
+    Ok(buf)
+}
+
+#[cfg(target_os = "linux")]
+fn write_png(surface: &cairo::Surface, mut out: impl std::io::Write) -> Result<(), String> {
     let _encoding = crate::timing::Span::new("screenshot_png");
     if let Ok(image) = cairo::ImageSurface::try_from(surface.clone()) {
-        // Most pages are opaque. Strip only a proven-opaque alpha channel;
-        // encoding RGBA needlessly increases both compression and pipe work.
-        let conversion = crate::timing::Span::new("screenshot_pixel_conversion");
-        let mut rgb = None;
         if matches!(image.format(), cairo::Format::ARgb32 | cairo::Format::Rgb24)
             && image.width() > 0
             && image.height() > 0
-            && i64::from(image.width()) * i64::from(image.height()) <= MAX_RGB_PIXELS
         {
+            let mut encoded = None;
             image
                 .with_data(|data| {
                     let rows = || {
-                        data.chunks(image.stride() as usize)
+                        data.chunks_exact(image.stride() as usize)
+                            .take(image.height() as usize)
                             .map(|row| &row[..image.width() as usize * 4])
                     };
+                    // Cairo stores native-endian premultiplied ARGB. Only a
+                    // proven-opaque surface can be converted without unpremultiplying.
                     let opaque = image.format() == cairo::Format::Rgb24
                         || rows().all(|row| {
                             row.chunks_exact(4)
                                 .all(|p| u32::from_ne_bytes(p.try_into().unwrap()) >> 24 == 255)
                         });
                     if opaque {
-                        let mut pixels = Vec::with_capacity(
-                            image.width() as usize * image.height() as usize * 3,
-                        );
-                        for row in rows() {
-                            for p in row.chunks_exact(4) {
-                                let pixel = u32::from_ne_bytes(p.try_into().unwrap());
-                                pixels.extend_from_slice(&[
-                                    (pixel >> 16) as u8,
-                                    (pixel >> 8) as u8,
-                                    pixel as u8,
-                                ]);
-                            }
-                        }
-                        rgb = Some(pixels);
+                        encoded = Some(write_rgb_png(
+                            &mut out,
+                            image.width() as u32,
+                            image.height() as u32,
+                            rows(),
+                        ));
                     }
                 })
                 .map_err(|e| e.to_string())?;
-        }
-        drop(conversion);
-        if let Some(rgb) = rgb {
-            let pixels = gtk::gdk_pixbuf::Pixbuf::from_mut_slice(
-                rgb,
-                gtk::gdk_pixbuf::Colorspace::Rgb,
-                false,
-                8,
-                image.width(),
-                image.height(),
-                image.width() * 3,
-            );
-            return pixels
-                .save_to_bufferv("png", &[("compression", "3")])
-                .map_err(|e| e.to_string());
+            if let Some(result) = encoded {
+                return result;
+            }
         }
     }
     // Cairo preserves alpha/premultiplication for transparent captures and also
     // supports non-image surfaces returned by other WebKit versions.
-    let mut buf = Vec::new();
-    surface.write_to_png(&mut buf).map_err(|e| e.to_string())?;
-    Ok(buf)
+    surface.write_to_png(&mut out).map_err(|e| e.to_string())
+}
+
+#[cfg(target_os = "linux")]
+fn write_rgb_png<'a>(
+    out: impl std::io::Write,
+    width: u32,
+    height: u32,
+    rows: impl Iterator<Item = &'a [u8]>,
+) -> Result<(), String> {
+    use std::io::Write;
+    let mut encoder = png::Encoder::new(out, width, height);
+    encoder.set_color(png::ColorType::Rgb);
+    encoder.set_depth(png::BitDepth::Eight);
+    encoder.set_compression(png::Compression::Balanced);
+    let mut writer = encoder.write_header().map_err(|e| e.to_string())?;
+    {
+        // One conversion row, the encoder's row buffers, and a bounded IDAT
+        // chunk; no full RGB/PNG copy, even for full-page captures.
+        let mut stream = writer
+            .stream_writer_with_size(64 * 1024)
+            .map_err(|e| e.to_string())?;
+        let mut rgb = vec![0; width as usize * 3];
+        for row in rows {
+            for (p, rgb) in row.chunks_exact(4).zip(rgb.chunks_exact_mut(3)) {
+                let pixel = u32::from_ne_bytes(p.try_into().unwrap());
+                rgb.copy_from_slice(&[(pixel >> 16) as u8, (pixel >> 8) as u8, pixel as u8]);
+            }
+            stream.write_all(&rgb).map_err(|e| e.to_string())?;
+        }
+        stream.finish().map_err(|e| e.to_string())?;
+    }
+    writer.finish().map_err(|e| e.to_string())
 }
 
 #[cfg(target_os = "linux")]
@@ -491,7 +503,9 @@ mod tests {
         use cairo::{Context, Format, ImageSurface};
         for transparent in [false, true] {
             for scale in [1.0, 2.0] {
-                let surface = ImageSurface::create(Format::ARgb32, 37, 19).unwrap();
+                let surface =
+                    ImageSurface::create_for_data(vec![0; 160 * 19], Format::ARgb32, 37, 19, 160)
+                        .unwrap();
                 let context = Context::new(&surface).unwrap();
                 for x in 0..37 {
                     context.set_source_rgba(
@@ -520,6 +534,75 @@ mod tests {
                 assert_eq!(decode(&optimized), decode(&original));
             }
         }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn png_streams_large_rgb_surfaces_and_propagates_write_failures() {
+        use cairo::{Format, ImageSurface};
+        use std::io::{self, Write};
+
+        // Exceeds the old full-RGB conversion cutoff, includes padding, and
+        // produces multiple IDAT chunks. RGB24's unused high byte is not alpha.
+        let (width, height, stride) = (1025, 1025, 1025 * 4 + 12);
+        let mut data = vec![0xa5; stride * height];
+        let mut expected = Vec::new();
+        let mut seed = 42u32;
+        for row in data.chunks_exact_mut(stride) {
+            for pixel in row[..width * 4].chunks_exact_mut(4) {
+                seed = seed.wrapping_mul(1664525).wrapping_add(1013904223);
+                pixel.copy_from_slice(&seed.to_ne_bytes());
+                expected.extend_from_slice(&[(seed >> 16) as u8, (seed >> 8) as u8, seed as u8]);
+            }
+        }
+        let surface = ImageSurface::create_for_data(
+            data,
+            Format::Rgb24,
+            width as i32,
+            height as i32,
+            stride as i32,
+        )
+        .unwrap();
+        let encoded = super::to_png(&surface).unwrap();
+        let decoded = ImageSurface::create_from_png(&mut io::Cursor::new(&encoded)).unwrap();
+        assert_eq!(
+            (decoded.width(), decoded.height()),
+            (width as i32, height as i32)
+        );
+        let mut actual = Vec::new();
+        decoded
+            .with_data(|data| {
+                for row in data.chunks_exact(decoded.stride() as usize) {
+                    for pixel in row[..width * 4].chunks_exact(4) {
+                        let pixel = u32::from_ne_bytes(pixel.try_into().unwrap());
+                        actual.extend_from_slice(&[
+                            (pixel >> 16) as u8,
+                            (pixel >> 8) as u8,
+                            pixel as u8,
+                        ]);
+                    }
+                }
+            })
+            .unwrap();
+        assert_eq!(actual, expected);
+
+        struct Limited(usize);
+        impl Write for Limited {
+            fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+                if self.0 == 0 {
+                    return Err(io::Error::other("test output full"));
+                }
+                let written = bytes.len().min(self.0);
+                self.0 -= written;
+                Ok(written)
+            }
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+        assert!(super::write_png(&surface, Limited(128))
+            .unwrap_err()
+            .contains("test output full"));
     }
 
     #[test]

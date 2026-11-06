@@ -116,6 +116,27 @@ after this workload was about 4.5% lower through either transport.
   display and DPR 1, not guarantees for every page or a pooled overall speedup.
   The reports include all metrics, including neutral and slower results.
 
+## Bounded Linux PNG encoder follow-up
+
+File and inline captures now share a streaming RGB encoder for proven-opaque
+Cairo image surfaces. It converts one row at a time and uses a 64 KiB IDAT buffer,
+avoiding full-image RGB intermediates even for large captures. Transparent and
+non-image surfaces use Cairo's alpha-preserving encoder. Physical pixel limits,
+capture reservations and cancellation still apply. Tests cover padded rows,
+native byte order, transparency, backing scale, large RGB24 surfaces and write
+failures.
+
+This integrates the PNG change first tested as `ce2042a` on
+`perf/regression-followup`. In that branch's
+[paired CI run 42116247340](https://github.com/aliilyas/bruster/actions/runs/42116247340),
+20 pairs per transport compared `bdbd986` with `f48fc05`. Linux JSONL file
+captures went from **29.593 to 15.756 ms**, paired **−46.28%** (95% interval
+−47.01% to −45.30%); MCP file captures improved **46.10%**. Decoded opaque pixels
+matched, and file sizes were **111,056 versus 111,060 bytes**. This earlier
+candidate also included small protocol/snapshot changes, so retain its exact
+commit provenance when quoting the evidence. macOS screenshot intervals crossed
+zero. The PNG encoder is Linux-specific.
+
 ## Reproduce
 
 Build baseline and candidate with the same Rust toolchain and release flags,
@@ -127,14 +148,16 @@ matches the correctness-tested executable. On an otherwise idle Linux runner:
 ```sh
 xvfb-run -a python3 scripts/bench_optimizations.py \
   --baseline /path/to/baseline-bruster --candidate /path/to/candidate-bruster \
-  --output results --rounds 20 --iterations 12
+  --output results --rounds 20 --iterations 24
 ```
 
 On macOS omit `xvfb-run -a`. Native screenshot dimensions follow the measured
 device pixel ratio. `.github/workflows/performance.yml` runs the build, native
 regressions and paired measurements on Linux and macOS for `perf/**` branches,
-and is also manually dispatchable. It uploads evidence without updating the
-public competitor rankings.
+and is also manually dispatchable. Its default baseline is `origin/main`; supply
+a tag or commit SHA to compare another revision. Baseline-specific concurrency
+groups allow independent comparisons against main and an older revision. It
+uploads evidence without updating the public competitor rankings.
 
 Each transport gets 20 fresh sessions per executable, alternating AB/BA. Each
 session has fresh XDG state (and HOME on macOS); OS caches stay warm. The display
@@ -153,7 +176,7 @@ compression bytes are intentionally compared separately from pixel correctness.
 Two warmup operations precede repeated timings. Reports use per-session medians
 and paired geometric ratios with seeded, pointwise 95% bootstrap intervals.
 The p95 columns are medians of each session's p95: useful diagnostics, with only
-12 observations per repeated workload by default. Screenshot and fetch samples
+12 observations per repeated workload by CLI default (24 in CI). Screenshot and fetch samples
 are smaller; their p95s are observed upper samples rather than robust tail estimates.
 Bootstrap intervals are not an all-metric performance gate.
 
@@ -165,3 +188,44 @@ present; those reports are explicitly ineligible for published speedup claims.
 Performance claims require the clean paired run and native platform correctness
 checks. Stage tracing (`BRUSTER_TRACE_PERF=1`) is diagnostic and disabled in the
 timed comparison.
+
+## Paired public extraction
+
+The continuous comparison's **Extraction** metrics use the shared `EXTRACT`
+JavaScript through `eval`, rather than Bruster's native `snapshot` command.
+[`bench_extraction.py`](../scripts/bench_extraction.py) reuses that expression,
+fixture server, result validation and JSONL driver's timestamp boundaries:
+request write through complete response-line read. Request serialization and
+client-side result parsing are outside those recorded boundaries. These differ
+from the end-to-end client timings of `bench_optimizations.py` above.
+
+```sh
+xvfb-run -a python3 scripts/bench_extraction.py \
+  --baseline /path/to/baseline-bruster --candidate /path/to/candidate-bruster \
+  --output extraction-results --rounds 20 --iterations 24
+```
+
+The Linux paired-performance job runs this after the native optimization suite:
+
+- Ten tiny-page navigations, extracting immediately after each load.
+- Five large-page navigations, extracting both object and JSON-string returns in
+  alternating order, matching the public comparison's counts and order.
+- First-call, second-call and combined-call diagnostics from those same samples.
+  The combined metric sums both recorded call latencies, excluding validation
+  between the requests.
+- Separate warmed tiny/large extraction: two discarded warmups per format,
+  then 24 repetitions per format on the loaded page in CI.
+
+First and second calls can have very different timings after navigation. With
+five samples per format, a bimodal distribution can move a median substantially.
+Inspect raw samples, call order and pointwise paired intervals alongside the
+per-format medians. Cross-run competitor charts alone do not assign a regression
+to Bruster. The warmed diagnostics describe a different workload and are not a
+replacement for the post-navigation results.
+
+Every decoded extraction is validated; hashes must match across formats,
+repetitions and baseline/candidate sessions. Overlapping browser/compiler
+workloads or forced cleanup fail normal runs. `--diagnostic` preserves desktop
+contamination evidence and disables publication eligibility. The workflow keeps
+the source and binary hashes, raw samples, process accounting and report under
+the artifact's `extraction/` directory.

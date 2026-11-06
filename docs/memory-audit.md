@@ -16,7 +16,7 @@ are historical analyses of the named commits, not descriptions of current code.
 | DOM/XHR retention | Snapshot refs use weak references, with a token/DOM-walker fallback on engines without `WeakRef`. One observer per XHR tracks reuse, including opens that never send. Clearing diagnostics drops pending fetch/XHR entry references. |
 | Network diagnostics | 500 entries / 2 MiB accounted text and metadata; four cloned readers with five-second deadlines; 4096-code-unit URL/header bounds. Clearing logs and page teardown cancel readers. Binary fetch responses are skipped; `network({bodies:false})` enables metadata-only capture. The page's original request is preserved. |
 | Console/dialog diagnostics | Console formatting is admitted before bounded item/depth/text traversal; it avoids application getters and `toJSON`. V8's built-in stack accessor is allowed with plain bounded error fields and no custom stack formatter. Dialogs have count, byte and message limits, with a dropped-record counter. Bounded diagnostic substrings are copied to avoid retaining oversized backing strings. |
-| Screenshot peaks | One capture per tab / two globally; 24 × 1024² physical-pixel preflight budget, including scale and full-document width. The 16000-CSS-pixel full-height cap applies before choosing the capture path. Large Linux captures avoid the full RGB intermediate; Linux file output streams PNG directly to disk. |
+| Screenshot peaks | One capture per tab / two globally; 24 × 1024² physical-pixel preflight budget, including scale and full-document width. The 16000-CSS-pixel full-height cap applies before choosing the capture path. Linux opaque captures use row-bounded RGB conversion and a 64 KiB PNG chunk buffer; file output streams directly to disk. |
 | Screenshot lifecycle | Outer deadlines include the screenshot queue. Cancellation restores resized viewports; native callbacks retain their concurrency reservation through timeout/tab close. Unique capture tokens reject late geometry callbacks after public request IDs are reused. Inline replies borrow the base64 string instead of cloning it into a second JSON/MCP tree. |
 | Uploads | At most 32 regular files / 16 MiB total; blockwise file reading, base64 encoding and page decoding, with file-growth checks. Large strings/arrays move into their final containers, and retry parameters share an immutable `Rc<Value>`. Unix FIFO inputs fail without blocking the UI. |
 | Backpressure/cancellation | Stdin records are bounded at 8 MiB. Reference-counted permits bound outstanding browser work to 128 requests / 64 MiB of accounted input and expansion. MCP cancellation removes queued actions and propagates to navigation, captures, waits, actionability checks and delayed typing. Redispatch checks cancellation before running an abandoned action. |
@@ -148,6 +148,11 @@ text while rejecting application accessors/custom stack formatters, and checks
 that the cleared held fetch is absent independently of browser resource timings.
 
 ### Remaining research
+
+The [bounded PNG encoder follow-up](../benchmarks/optimizations.md#bounded-linux-png-encoder-follow-up)
+addresses the Linux file-encoding latency above while retaining row-bounded
+allocation. The +24% result describes the original memory-bounding commit's
+Cairo file writer, not the subsequent streaming RGB encoder.
 
 The Wry native-object reference-cycle investigation, optional engine low-memory
 policies, memory-pressure construction hooks, lazy browser startup/discard and
