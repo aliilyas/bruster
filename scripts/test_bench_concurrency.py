@@ -36,7 +36,7 @@ sys.stdin.read()
     def test_live_helpers_and_truncated_build_names_are_detected_and_excludable(self):
         names = ('baseline-bruster', 'candidate-bruster', 'WebKitWebProcess',
                   'WebKitNetworkProcess', 'chrome', 'headless_shell', 'agent-browser', 'node', 'rustc',
-                  'node-MainThread', 'bilobad', 'rustwright-mcp')
+                  'node-MainThread', 'MainThread', 'bilobad', 'rustwright-mcp')
         children = [self.process(name) for name in names]
         pids = {p.pid for p in children}
         found = {row['pid'] for row in compare.background_work()}
