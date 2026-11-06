@@ -156,6 +156,7 @@ def measure(args, base, binary, transport, round_, label):
                         # equality: compression and RGB/RGBA encoding may differ.
                         row['correctness']['screenshot_' + mode] = pixel_hash
                         row['screenshot_' + mode + '_bytes'] = len(data)
+                        row['timings']['screenshot_' + mode + '_bytes'] = [len(data)]
                 row['timings']['screenshot_' + mode + '_ms'] = samples
 
             client.call('navigate', {'url': base + '/tiny'})

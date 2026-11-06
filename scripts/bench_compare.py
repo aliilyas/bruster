@@ -255,7 +255,7 @@ def background_work(exclude=(), *, before=None):
                 # Controllers remain competitors between their browser sessions.
                 argv = (path / 'cmdline').read_bytes().decode(errors='replace').split('\0')
                 competing = any(Path(arg).name in (
-                    'site_compare.py', 'site_campaign.py', 'bench_compare.py', 'bench_performance.py', 'bench_audit.py', 'bench_optimizations.py'
+                    'site_compare.py', 'site_campaign.py', 'bench_compare.py', 'bench_performance.py', 'bench_audit.py', 'bench_optimizations.py', 'bench_extraction.py'
                 ) for arg in argv)
             fields = (path / 'stat').read_text().rsplit(')', 1)[1].split()
             if competing and fields[0] != 'Z' and fields[19] == process['start']:

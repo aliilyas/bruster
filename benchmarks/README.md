@@ -1,8 +1,9 @@
 # Continuous browser comparisons
 
 For same-tool optimization experiments, see
-[`optimizations.md`](optimizations.md): paired v0.3.5/candidate workloads through
-both JSONL and MCP, including dynamic waits, large responses and screenshot pixels.
+[`optimizations.md`](optimizations.md): paired baseline/candidate workloads through
+both JSONL and MCP, including dynamic waits, large responses and screenshot pixels,
+plus a Linux paired reproduction of the public shared-JavaScript extraction.
 
 [`benchmarks.yml`](../.github/workflows/benchmarks.yml) runs after every push to
 `main` (including merged, squashed and rebased PRs), and through **Run workflow**

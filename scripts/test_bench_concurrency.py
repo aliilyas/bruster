@@ -75,7 +75,7 @@ sys.stdin.read()
 
     def test_controller_is_detected_between_browser_sessions(self):
         with tempfile.TemporaryDirectory() as directory:
-            for name in ('site_compare.py', 'site_campaign.py'):
+            for name in ('site_compare.py', 'site_campaign.py', 'bench_extraction.py'):
                 with self.subTest(name=name):
                     script = Path(directory) / name
                     script.write_text("import sys\nprint('ready', flush=True)\nsys.stdin.read()\n")
