@@ -26,6 +26,9 @@ The archive contains an `implementation/` directory:
 - `MEASUREMENT_STATUS.md`: batch validity ledger.
 - `EVIDENCE_MANIFEST.json`: byte size and SHA-256 for every other archived file.
 
+Identical files are stored as tar hard links to reduce the download size; every
+original path and its contents remain present and are checked against the manifest.
+
 Fault-probe failures and failed CI attempts remain present, including failures
 that later retries resolved. Runtime dependency trees and browser download
 caches are excluded from the archive; exact package locks, download URLs and

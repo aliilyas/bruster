@@ -2,8 +2,8 @@
 
 Implementation worktree: `performance-navigation`, originally on
 `fix/performance-navigation` based on `9446519` (v0.3.2). This report is published
-from `docs/navigation-performance-evidence`, based on November 5 `main` at
-`53be142`. The earlier deep-dive worktree and its measurements are preserved.
+from `docs/navigation-performance-evidence`, based on November 6 `main` at
+`d0440d6`. The earlier deep-dive worktree and its measurements are preserved.
 
 The main changes were merged through [PR #8](https://github.com/aliilyas/bruster/pull/8).
 The queued Windows start fix and benchmark guards were merged through
@@ -264,7 +264,7 @@ exact command lines are verified on the host, then pinned by PID and kernel
 start time inside the measurement sandbox. Sleeping state, no unapproved descendants and
 a CPU budget of 0.05 seconds plus 0.5% of elapsed wall time are required at each
 check. Other detected workloads still reject a sample. The scheduling and
-validation records preserve this daemon's identity and CPU counters. The first
+validation records preserve these helpers' identities and CPU counters. The first
 November attempt rejected all launches because sandboxed executable paths were
 unreadable; those rows remain in `clean-rejected-2026-11-05/`.
 The subsequent restart interrupted a quiet wait before any browser launched;
@@ -307,6 +307,9 @@ counts, lifecycle cleanup, concurrency records, complete PSS sums, extraction
 equivalence and installed-file inventories. `report-summary.json` and
 `summarize.py` expose the aggregation behind the tables. Every archived file has
 a size and SHA-256 in `implementation/EVIDENCE_MANIFEST.json`.
+The archive contains **1,257 paths in 8,021,098 compressed bytes**; identical
+contents use tar hard links. Archive SHA-256:
+`763337768abc8e6d0b320e3c050d8100611de73e192946e0e60ce0aa6aee2e9a`.
 
 The archive also preserves historical and excluded measurements, failed and
 successful CI attempts, cancelled waits, both frozen executables, exact harness
