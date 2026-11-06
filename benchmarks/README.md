@@ -1,5 +1,9 @@
 # Continuous browser comparisons
 
+For the original navigation, startup, graphics, extraction-transport and timer
+fixes, see [`PERFORMANCE_FIXES.md`](PERFORMANCE_FIXES.md), with frozen-build
+measurements and raw evidence.
+
 For same-tool optimization experiments, see
 [`optimizations.md`](optimizations.md): paired baseline/candidate workloads through
 both JSONL and MCP, including dynamic waits, large responses and screenshot pixels,
