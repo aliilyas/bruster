@@ -24,7 +24,7 @@ class UiVisionIsolation(unittest.TestCase):
             thread = threading.Thread(target=server.serve_forever, daemon=True)
             thread.start()
             try:
-                for round_ in range(2):
+                for round_ in range(5):
                     with self.subTest(round=round_):
                         client = ProcessClient(command, True)
                         try:

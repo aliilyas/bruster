@@ -66,7 +66,9 @@ in its provenance and renders a coverage table, including unmeasured tools.
 - Ui.Vision runs its official extension in an isolated full-Chrome profile with
   its panel open and its actual stdio MCP bridge. Each round selects a free
   loopback port and configures the extension to use it; relay mode is rejected.
-  CI checks startup, navigation and shutdown with the default port occupied.
+  Configuration uses the extension's settings UI after first-run initialization,
+  and this provisioning time is included in startup. CI checks five fresh starts,
+  navigation and shutdown with the default port occupied.
   Playwright only provisions and closes that browser. Navigation uses
   `browser_snapshot({url})`; extraction uses
   `run_macro` with `uiv.evaluate` and `uiv.log`; screenshots use the MCP `screenshot`

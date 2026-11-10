@@ -92,27 +92,45 @@ try {
     args: ['--no-sandbox', `--disable-extensions-except=${extension}`, `--load-extension=${extension}`],
   });
   const origin = 'chrome-extension://gcbalfbdmfieckjlnblleoemohcganoc/';
-  const isExtension = worker => worker.url().startsWith(origin);
-  const worker = context.serviceWorkers().find(isExtension)
-    || await context.waitForEvent('serviceworker', { predicate: isExtension });
-  // Provision the extension's normal bridge settings before opening its panel.
-  await worker.evaluate(async port => {
-    const { config = {} } = await chrome.storage.local.get('config');
-    await chrome.storage.local.set({ config: {
-      ...config, mcpBridgeEnabled: true, mcpBridgePort: port,
-    } });
-  }, bridgePort);
   const blank = context.pages()[0];
   const panel = await context.newPage();
   await panel.goto(`${origin}sidepanel.html`);
+  // The first panel initializes and persists defaults asynchronously. Writing
+  // storage before that finishes can lose the custom port. Use the normal
+  // settings controls after initialization, then reload the panel from storage.
+  await panel.getByText('Files', { exact: true }).waitFor();
+  const settings = await context.newPage();
+  await settings.goto(`${origin}options.html`);
+  await settings.getByRole('link', { name: 'AI ✨', exact: true }).click();
+  const enabled = settings.locator('.ai-settings-item')
+    .filter({ hasText: 'MCP bridge (Claude Code' }).getByRole('switch');
+  if (await enabled.getAttribute('aria-checked') !== 'true') await enabled.click();
+  await settings.getByText('Bridge port:', { exact: true }).locator('..')
+    .getByRole('spinbutton').fill(String(bridgePort));
+  await settings.waitForFunction(async port => {
+    const { config = {} } = await chrome.storage.local.get('config');
+    return config.mcpBridgeEnabled && Number(config.mcpBridgePort) === port;
+  }, bridgePort);
+  await settings.close();
+  await panel.reload();
   const deadline = Date.now() + 30000;
   while (true) {
     const status = text(await call('bridge_status'));
     if (status.includes('1 browser connection:')) break;
-    if (Date.now() > deadline) throw new Error(`Ui.Vision panel did not connect: ${status}`);
+    if (Date.now() > deadline) {
+      const settings = await panel.evaluate(async () => {
+        const { config = {} } = await chrome.storage.local.get('config');
+        const active = window.store?.getState()?.config || {};
+        return { storedPort: config.mcpBridgePort, storedEnabled: config.mcpBridgeEnabled,
+          activePort: active.mcpBridgePort, activeEnabled: active.mcpBridgeEnabled };
+      });
+      throw new Error(`Ui.Vision panel did not connect on port ${bridgePort}: ${JSON.stringify(settings)}; ${status}`);
+    }
     await new Promise(resolve => setTimeout(resolve, 200));
   }
-  await call('select_browser', { target: 'chrome#1' });
+  // The numeric suffix counts connections, so the panel reload can advance it.
+  // The isolated bridge has exactly one browser; select that Chrome instance.
+  await call('select_browser', { target: 'chrome' });
   await call('get_authoring_guide');
   for (const page of context.pages()) {
     if (page !== blank && page !== panel) await page.close();
