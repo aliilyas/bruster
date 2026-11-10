@@ -1,0 +1,23 @@
+{
+  "guides/web-automation-testing/": {"datePublished": "2026-11-05", "dateModified": "2026-11-05"},
+  "learn-testin/": {"datePublished": "2026-11-05", "dateModified": "2026-11-06"},
+  "learn-testin/what-a-test-checks/": {"datePublished": "2026-11-05", "dateModified": "2026-11-06"},
+  "learn-testin/meet-the-practice-page/": {"datePublished": "2026-11-05", "dateModified": "2026-11-06"},
+  "learn-testin/write-a-test-plan/": {"datePublished": "2026-11-05", "dateModified": "2026-11-06"},
+  "learn-testin/set-up-bruster/": {"datePublished": "2026-11-05", "dateModified": "2026-11-06"},
+  "learn-testin/make-a-test-file/": {"datePublished": "2026-11-05", "dateModified": "2026-11-06"},
+  "learn-testin/run-your-first-test/": {"datePublished": "2026-11-05", "dateModified": "2026-11-06"},
+  "learn-testin/understand-the-commands/": {"datePublished": "2026-11-05", "dateModified": "2026-11-06"},
+  "learn-testin/find-the-right-element/": {"datePublished": "2026-11-05", "dateModified": "2026-11-06"},
+  "learn-testin/fill-and-submit-a-form/": {"datePublished": "2026-11-05", "dateModified": "2026-11-06"},
+  "learn-testin/check-the-result/": {"datePublished": "2026-11-05", "dateModified": "2026-11-06"},
+  "learn-testin/test-dropdowns-and-checkboxes/": {"datePublished": "2026-11-05", "dateModified": "2026-11-06"},
+  "learn-testin/test-required-fields/": {"datePublished": "2026-11-05", "dateModified": "2026-11-06"},
+  "learn-testin/keep-tests-independent/": {"datePublished": "2026-11-05", "dateModified": "2026-11-06"},
+  "learn-testin/wait-without-guessing/": {"datePublished": "2026-11-05", "dateModified": "2026-11-06"},
+  "learn-testin/save-screenshots-and-reports/": {"datePublished": "2026-11-05", "dateModified": "2026-11-06"},
+  "learn-testin/fix-a-failing-test/": {"datePublished": "2026-11-05", "dateModified": "2026-11-06"},
+  "learn-testin/test-your-own-website/": {"datePublished": "2026-11-05", "dateModified": "2026-11-06"},
+  "learn-testin/make-a-small-regression-suite/": {"datePublished": "2026-11-05", "dateModified": "2026-11-06"},
+  "learn-testin/your-first-testing-project/": {"datePublished": "2026-11-05", "dateModified": "2026-11-06"}
+}

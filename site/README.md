@@ -61,6 +61,14 @@ The guide has a search title/description, canonical and social metadata,
 documentation, footer, and `llms.txt`. The interactive demo uses `noindex, follow`
 and stays out of the sitemap, like the Test Lab's individual fixtures.
 
+`articles.json` maintains publication and substantive-update dates for the guide
+and each course lesson. These dates drive the visible contributor bylines,
+`TechArticle` dates, and sitemap `lastmod` values. Initial dates come from the
+publication commits (`e0ade64` for the guide, `43e6450` for the course) and the
+course's copy revision (`c8b2531`). Update a page's `dateModified` when its content
+or embedded examples materially change; keep `datePublished` fixed. Rebuilds and
+layout-only edits do not reset these dates. Builds work without Git history.
+
 ## Beginner learning site
 
 [`learn-testin/`](learn-testin/) is a separate, minimal reading-focused site at
@@ -120,6 +128,10 @@ runtime requirements, documentation, and version from `Cargo.toml`. Historical
 run pages use `noindex, follow` and are excluded from the sitemap; their raw data
 and links remain available. The current benchmark page is indexable once
 measurements exist.
+
+Benchmark configuration counts in product-page copy come from the latest
+published measurement, so adding tools does not leave stale counts behind. The
+benchmark description summarizes the comparison instead of listing every tool.
 
 The homepage title and visible copy address AI agent browser automation and
 Bruster's fit as a Playwright alternative for native-webview scripts and smoke

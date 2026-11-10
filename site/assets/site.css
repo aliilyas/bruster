@@ -193,6 +193,8 @@ ul, ol { padding-left: 1.3rem; }
 .prose h3 { margin-block: 1.6rem .7rem; }
 .prose p, .prose li { color: var(--muted); font-size: .91rem; }
 .prose p + p { margin-top: .85rem; }
+.prose .article-byline { font-size: .8rem; }
+.article-dates { display: block; }
 .prose li + li { margin-top: .4rem; }
 .prose strong { color: #314a40; font-weight: 600; }
 .prose .code-block { margin-block: 1rem; }

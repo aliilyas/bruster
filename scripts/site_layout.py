@@ -2,6 +2,7 @@
 import html
 import json
 import re
+from datetime import date
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -34,6 +35,30 @@ def substitute(template, values):
     return re.sub(r'\{\{(\w+)\}\}', lambda match: str(values[match[1]]), template)
 
 
+def article_dates(path):
+    """Use maintained editorial dates, including in builds without Git history."""
+    source = json.loads((SITE / 'articles.json').read_text(encoding='utf-8'))[path]
+    published = date.fromisoformat(source['datePublished'])
+    modified = date.fromisoformat(source['dateModified'])
+    if modified < published:
+        raise ValueError(f'Article update predates publication: {path}')
+    return {'datePublished': published.isoformat(), 'dateModified': modified.isoformat()}
+
+
+def article_byline(path):
+    dates = article_dates(path)
+
+    def timestamp(value):
+        label = date.fromisoformat(value).strftime('%d %b %Y').lstrip('0')
+        return f'<time datetime="{value}">{label}</time>'
+
+    parts = [f'Published {timestamp(dates["datePublished"])}']
+    if dates['dateModified'] != dates['datePublished']:
+        parts.append(f'Updated {timestamp(dates["dateModified"])}')
+    return (f'<p class="article-byline">By <a href="{REPOSITORY}">Bruster contributors</a>'
+            f'<span class="article-dates">{" · ".join(parts)}</span></p>')
+
+
 def render_metadata(title, description, path, *, base_url=SITE_URL, section='',
                     noindex=False, application=False, page_type='WebPage', article=''):
     base_url = site_url(base_url)
@@ -59,6 +84,7 @@ def render_metadata(title, description, path, *, base_url=SITE_URL, section='',
             'about': {'@id': base_url + '#software'},
             'image': base_url + 'assets/social.png', 'proficiencyLevel': 'Beginner',
             'author': {'@type': 'Organization', 'name': 'Bruster contributors', 'url': REPOSITORY},
+            **article_dates(path),
         })
     if application:
         webpage['mainEntity'] = {'@id': base_url + '#software'}

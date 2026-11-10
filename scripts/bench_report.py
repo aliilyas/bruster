@@ -457,9 +457,8 @@ def page(record, history=None, base_url=SITE_URL):
     path = f'benchmarks/runs/{record_id(record)}/' if archive else 'benchmarks/'
     title = (f'Bruster Benchmark {run_label(c)}' if archive
              else 'Browser Benchmarks: Bruster & Browser Automation Tools')
-    names = ', '.join(dict.fromkeys(label.split(' / ')[0] for label in tool_labels.values()))
-    description = (f'Compare {names}: startup, navigation, memory, runtime footprint, '
-                   'and reliability, with raw data and methodology.')
+    description = ('Bruster browser benchmarks: compare startup, navigation, memory, runtime footprint, '
+                   'and reliability across automation tools. Raw data and methodology included.')
     if archive:
         description = f'Archived measurement from {m["finished_utc"]}. ' + description
     return render_page(title, description, path, '\n'.join(parts), base_url=base_url,

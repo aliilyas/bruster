@@ -4,7 +4,7 @@ import shutil
 import zipfile
 from urllib.parse import urlsplit
 
-from site_layout import ROOT, SITE, render_metadata, site_url, substitute
+from site_layout import ROOT, SITE, article_byline, render_metadata, site_url, substitute
 
 
 COURSE_PATH = 'learn-testin/'
@@ -121,6 +121,7 @@ def build(output, base_url):
         rendered = substitute(template, {
             'base': base, 'course': base + COURSE_PATH, 'number': f'{index + 1:02}',
             'title': html.escape(title), 'description': html.escape(description),
+            'byline': article_byline(path),
             'contents': contents(base, index), 'content': content,
             'previous': previous, 'next': following,
             'metadata': render_metadata('Learn Website Testing — 20 Lessons for Beginners' if index == 0

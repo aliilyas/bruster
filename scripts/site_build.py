@@ -11,7 +11,7 @@ from xml.etree import ElementTree as ET
 
 from bench_report import render_reports
 from site_learn import build as build_course
-from site_layout import REPOSITORY, ROOT, SITE, SITE_URL, project_version, render_metadata, render_page, site_url, substitute
+from site_layout import REPOSITORY, ROOT, SITE, SITE_URL, article_byline, article_dates, project_version, render_metadata, render_page, site_url, substitute
 
 
 GUIDE_PATH = 'guides/web-automation-testing/'
@@ -174,6 +174,8 @@ def build(output, measurements=None, base_url=SITE_URL):
         'api_table': reference_table('API', 'Browser methods, parameters, and results'),
         'flags_table': reference_table('Run', 'Command-line flags and their effects'),
         'benchmark_preview': benchmark_preview(history),
+        'benchmark_configurations': f'{len(history[0]["summary"])} configurations' if history else 'browser configurations',
+        'guide_byline': article_byline(GUIDE_PATH),
         'demo_recording': dsl_example('example-tests/demo/recording.bru'),
         'demo_checkbox': dsl_example('example-tests/demo/components.bru', 'checkbox state and preview stay in sync'),
         'demo_validation': dsl_example('example-tests/demo/components.bru', 'a missing project blocks submission'),
@@ -210,6 +212,8 @@ def build(output, measurements=None, base_url=SITE_URL):
     for path in paths:
         url = ET.SubElement(sitemap, namespace + 'url')
         ET.SubElement(url, namespace + 'loc').text = base_url + path
+        if path == GUIDE_PATH or path in course_paths:
+            ET.SubElement(url, namespace + 'lastmod').text = article_dates(path)['dateModified']
     ET.ElementTree(sitemap).write(output / 'sitemap.xml', encoding='utf-8', xml_declaration=True)
     # Crawlers only consult /robots.txt at the origin, not /bruster/robots.txt.
     if urlsplit(base_url).path == '/':
