@@ -6,6 +6,7 @@ import { createInterface } from 'node:readline';
 import { createServer } from 'node:net';
 import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { createEvaluator } from './bench_uivision_transport.mjs';
 
 const [executablePath, dependencies] = process.argv.slice(2);
 const require = createRequire(path.join(dependencies, 'package.json'));
@@ -39,30 +40,9 @@ async function call(name, args = {}) {
   return response;
 }
 
-async function macro(script) {
-  // Ui.Vision caps its log transport at 40,000 characters. Keep its normal
-  // post-run response, and retrieve large values in bounded public tool calls.
-  const response = await call('run_macro', { script, log_limit: 40000 });
-  const match = text(response).match(/^\[echo\] __BRUSTER_RESULT__(.*)$/m);
-  if (!match) throw new Error(`Ui.Vision result missing or truncated: ${text(response)}`);
-  return JSON.parse(match[1]);
-}
-
-async function evaluate(expression) {
-  const chunkSize = 12000;
-  const source = `window.__brusterBenchmarkResult = JSON.stringify((${expression}));
-    return {length: window.__brusterBenchmarkResult.length,
-      chunk: window.__brusterBenchmarkResult.slice(0, ${chunkSize})};`;
-  const first = await macro(`const value = uiv.evaluate(${JSON.stringify(source)});
-    uiv.log('__BRUSTER_RESULT__' + JSON.stringify(value));`);
-  let value = first.chunk;
-  for (let start = chunkSize; start < first.length; start += chunkSize) {
-    const read = `return window.__brusterBenchmarkResult.slice(${start}, ${start + chunkSize});`;
-    value += await macro(`uiv.log('__BRUSTER_RESULT__' + JSON.stringify(uiv.evaluate(${JSON.stringify(read)})));`);
-  }
-  if (value.length !== first.length) throw new Error('Incomplete Ui.Vision extraction transport');
-  return JSON.parse(value);
-}
+// Keep the normal post-run response and its cost. Large values are retrieved
+// in bounded public tool calls within Ui.Vision's 40,000-character log limit.
+const evaluate = createEvaluator(async script => text(await call('run_macro', { script, log_limit: 40000 })));
 
 async function navigate(url) {
   // This is Ui.Vision's documented navigate-and-inspect MCP tool.

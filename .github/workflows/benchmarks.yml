@@ -99,7 +99,9 @@ jobs:
           node-version: ${{ steps.node.outputs.version }}
           check-latest: true
       - name: Check publication logic
-        run: python3 -m unittest discover -s scripts -p 'test_bench_*.py'
+        run: |
+          python3 -m unittest discover -s scripts -p 'test_bench_*.py'
+          node --test scripts/test_bench_uivision_transport.mjs
       - name: Install runtimes
         run: |
           mkdir -p "$RESULTS" "$BENCH_DEPS"

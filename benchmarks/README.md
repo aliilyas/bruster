@@ -68,12 +68,13 @@ in its provenance and renders a coverage table, including unmeasured tools.
   loopback port and configures the extension to use it; relay mode is rejected.
   Configuration uses the extension's settings UI after first-run initialization,
   and this provisioning time is included in startup. CI checks five fresh starts,
-  navigation and shutdown with the default port occupied.
+  navigation, large-result extraction and shutdown with the default port occupied.
   Playwright only provisions and closes that browser. Navigation uses
   `browser_snapshot({url})`; extraction uses
   `run_macro` with `uiv.evaluate` and `uiv.log`; screenshots use the MCP `screenshot`
   tool. Large evaluated values are retrieved in 12,000-character chunks to fit
-  its log transport, with every call and default post-run snapshot counted.
+  its log transport, with a unique result marker per call so retained logs cannot
+  substitute an older chunk. Every call and default post-run snapshot is counted.
   The native snapshot's 60,000-character cap is recorded as truncation; shared
   extraction still validates all 2,000 elements. The extension, panel, bridge,
   provisioning SDK and browser are included in resource accounting. Browser
