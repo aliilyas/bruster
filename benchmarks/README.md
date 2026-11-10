@@ -64,8 +64,11 @@ in its provenance and renders a coverage table, including unmeasured tools.
   workload does not measure Vitest/Ginkgo scheduling or parallel test-suite
   throughput. Native accessibility outlines can truncate, which is recorded.
 - Ui.Vision runs its official extension in an isolated full-Chrome profile with
-  its panel open and its actual stdio MCP bridge. Playwright only provisions and
-  closes that browser. Navigation uses `browser_snapshot({url})`; extraction uses
+  its panel open and its actual stdio MCP bridge. Each round selects a free
+  loopback port and configures the extension to use it; relay mode is rejected.
+  CI checks startup, navigation and shutdown with the default port occupied.
+  Playwright only provisions and closes that browser. Navigation uses
+  `browser_snapshot({url})`; extraction uses
   `run_macro` with `uiv.evaluate` and `uiv.log`; screenshots use the MCP `screenshot`
   tool. Large evaluated values are retrieved in 12,000-character chunks to fit
   its log transport, with every call and default post-run snapshot counted.

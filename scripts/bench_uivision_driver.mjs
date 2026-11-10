@@ -12,17 +12,19 @@ const require = createRequire(path.join(dependencies, 'package.json'));
 const { chromium } = require('playwright-core');
 const { Client } = await import(pathToFileURL(require.resolve('@modelcontextprotocol/sdk/client/index.js')));
 const { StdioClientTransport } = await import(pathToFileURL(require.resolve('@modelcontextprotocol/sdk/client/stdio.js')));
-// Refuse an existing bridge: its automatic relay mode would share a user's
-// extension rather than measure this fresh profile and its owned processes.
+// Each round owns a bridge port. The default port can be held by another
+// application or an ephemeral browser connection from an earlier round.
 const probe = createServer();
 await new Promise((resolve, reject) => {
   probe.once('error', reject);
-  probe.listen(50888, '127.0.0.1', resolve);
+  probe.listen(0, '127.0.0.1', resolve);
 });
+const bridgePort = probe.address().port;
 await new Promise(resolve => probe.close(resolve));
 const transport = new StdioClientTransport({
   command: process.execPath,
-  args: [path.join(dependencies, 'node_modules/uivision-mcp-bridge/uivision-mcp-bridge.js')],
+  args: [path.join(dependencies, 'node_modules/uivision-mcp-bridge/uivision-mcp-bridge.js'),
+    '--port', String(bridgePort)],
   env: process.env, stderr: 'pipe',
 });
 transport.stderr.on('data', data => process.stderr.write(data));
@@ -79,15 +81,30 @@ async function close() {
 try {
   await client.connect(transport);
   const before = text(await call('bridge_status'));
-  if (!before.includes('NOT connected')) throw new Error(`Ui.Vision bridge is not isolated: ${before}`);
+  // Also reject relay mode if another process took the chosen port between
+  // the probe and bridge startup, even when that bridge has no browser yet.
+  if (/relay mode/i.test(before) || !before.includes('NOT connected')) {
+    throw new Error(`Ui.Vision bridge is not isolated: ${before}`);
+  }
   const extension = path.join(dependencies, 'uivision-extension');
   context = await chromium.launchPersistentContext(path.join(process.env.HOME, 'chrome-profile'), {
     executablePath, headless: true, viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1,
     args: ['--no-sandbox', `--disable-extensions-except=${extension}`, `--load-extension=${extension}`],
   });
+  const origin = 'chrome-extension://gcbalfbdmfieckjlnblleoemohcganoc/';
+  const isExtension = worker => worker.url().startsWith(origin);
+  const worker = context.serviceWorkers().find(isExtension)
+    || await context.waitForEvent('serviceworker', { predicate: isExtension });
+  // Provision the extension's normal bridge settings before opening its panel.
+  await worker.evaluate(async port => {
+    const { config = {} } = await chrome.storage.local.get('config');
+    await chrome.storage.local.set({ config: {
+      ...config, mcpBridgeEnabled: true, mcpBridgePort: port,
+    } });
+  }, bridgePort);
   const blank = context.pages()[0];
   const panel = await context.newPage();
-  await panel.goto('chrome-extension://gcbalfbdmfieckjlnblleoemohcganoc/sidepanel.html');
+  await panel.goto(`${origin}sidepanel.html`);
   const deadline = Date.now() + 30000;
   while (true) {
     const status = text(await call('bridge_status'));
@@ -100,7 +117,7 @@ try {
   for (const page of context.pages()) {
     if (page !== blank && page !== panel) await page.close();
   }
-  emit({ event: 'ready', tool: 'uivision' });
+  emit({ event: 'ready', tool: 'uivision', bridge_port: bridgePort });
   const lines = createInterface({ input: process.stdin, crlfDelay: Infinity });
   for await (const line of lines) {
     const { id, method, params = {} } = JSON.parse(line);

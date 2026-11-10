@@ -123,6 +123,10 @@ jobs:
           python3 scripts/bench_install_uivision.py --chrome "$BENCH_CHROME" --deps "$BENCH_DEPS"
           cp "$BENCH_DEPS/uivision-provenance.json" "$RESULTS/"
           dpkg-query -W > "$RESULTS/os-packages.txt"
+      - name: Check Ui.Vision bridge isolation
+        env:
+          BRUSTER_TEST_UIVISION: '1'
+        run: python3 -m unittest discover -s scripts -p 'test_bench_uivision.py'
       - name: Build
         run: cargo build --release --locked
       - name: Measure registered Linux configurations
