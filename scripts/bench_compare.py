@@ -248,7 +248,7 @@ def background_work(exclude=(), *, before=None):
             # /proc/comm truncates names to 15 bytes, including frozen builds
             # and engine helpers. Other browser benchmarks can share library
             # pages (changing PSS) even when their controller is mostly idle.
-            competing = name in ('cargo', 'rustc', 'node', 'node-MainThread', 'bilobad', 'rustwright-mcp', 'xscreensaver') or name.startswith((
+            competing = name in ('cargo', 'rustc', 'node', 'node-MainThread', 'MainThread', 'bilobad', 'rustwright-mcp', 'xscreensaver') or name.startswith((
                     'bruster', 'baseline-brust', 'candidate-brust', 'WebKit',
                     'chrome', 'headless_shell', 'agent-browser', 'smoke-', 'edge-', 'e2e-', 'firefox'))
             if name.startswith('python'):
